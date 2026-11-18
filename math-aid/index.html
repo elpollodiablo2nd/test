@@ -173,7 +173,7 @@
         }
 
         .figure svg {
-            width: 180px;
+            width: 210px;
             height: auto;
         }
 
@@ -441,7 +441,7 @@
             button { width: 100%; justify-content: center; }
             .stats { grid-template-columns: repeat(2, 1fr); }
             .math-card { padding: 1.25rem; }
-            .figure svg { width: 140px; }
+            .figure svg { width: 170px; }
         }
     </style>
 </head>
@@ -778,9 +778,9 @@
 
         function svgCirkel(val, label) {
             const line = label === 'r'
-                ? `<line x1="60" y1="45" x2="92" y2="45" stroke="#FFFAEB" stroke-width="3"/><text x="68" y="38" class="fig-label">r = ${val}</text>`
-                : `<line x1="28" y1="45" x2="92" y2="45" stroke="#FFFAEB" stroke-width="3"/><text x="50" y="38" class="fig-label">d = ${val}</text>`;
-            return `<svg viewBox="0 0 120 90" shape-rendering="crispEdges"><circle cx="60" cy="45" r="32" fill="rgba(255,216,0,0.12)" stroke="#FFD800" stroke-width="4"/>${line}</svg>`;
+                ? `<line x1="80" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="115" y="56" class="fig-label">r = ${val}</text>`
+                : `<line x1="50" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="72" y="43" class="fig-label">d = ${val}</text>`;
+            return `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><circle cx="80" cy="50" r="30" fill="rgba(255,216,0,0.12)" stroke="#FFD800" stroke-width="4"/>${line}</svg>`;
         }
 
         function generateCirkel() {
@@ -816,30 +816,43 @@
 
         function generateTrekant() {
             currentProblem.type = 'trekant';
-            if (Math.random() < 0.5) {
+            const roll = Math.random();
+            if (roll < 0.4) {
                 const g = Math.floor(Math.random() * 12) + 4;
                 const h = Math.floor(Math.random() * 10) + 3;
                 currentProblem.problem = 'A = ?';
                 currentProblem.answer = (g * h) / 2;
-                currentProblem.figure = `<svg viewBox="0 0 120 95" shape-rendering="crispEdges"><polygon points="20,70 100,70 100,25" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="52" y="88" class="fig-label">g = ${g}</text><text x="104" y="52" class="fig-label">h = ${h}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="40,75 120,75 120,30" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="72" y="93" class="fig-label">g = ${g}</text><text x="126" y="56" class="fig-label">h = ${h}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde arealet af trekanten med grundlinje <kbd>g = ${g}</kbd> og højde <kbd>h = ${h}</kbd>:`,
                     `Formel: <kbd>A = ½ · g · h = (g · h) / 2</kbd>`,
                     `Indsæt: <kbd>A = (${g} · ${h}) / 2 = ${g * h} / 2 = ${formatNumber((g * h) / 2)}</kbd>`,
                     `Slutresultat: <kbd>A = ${formatNumber(currentProblem.answer)}</kbd>`
                 ];
-            } else {
+            } else if (roll < 0.7) {
                 const a = Math.floor(Math.random() * 8) + 3;
                 const b = Math.floor(Math.random() * 8) + 3;
                 const c = Math.floor(Math.random() * 8) + 3;
                 currentProblem.problem = 'O = ?';
                 currentProblem.answer = a + b + c;
-                currentProblem.figure = `<svg viewBox="0 0 120 95" shape-rendering="crispEdges"><polygon points="25,70 95,70 60,20" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="55" y="88" class="fig-label">c = ${c}</text><text x="8" y="50" class="fig-label">a = ${a}</text><text x="100" y="50" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="80" y="93" class="fig-label">c = ${c}</text><text x="6" y="48" class="fig-label">a = ${a}</text><text x="132" y="52" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde omkredsen af trekanten med siderne <kbd>a = ${a}</kbd>, <kbd>b = ${b}</kbd> og <kbd>c = ${c}</kbd>:`,
                     `Formel: <kbd>O = a + b + c</kbd>`,
                     `Indsæt: <kbd>O = ${a} + ${b} + ${c} = ${a + b + c}</kbd>`,
                     `Slutresultat: <kbd>O = ${a + b + c}</kbd>`
+                ];
+            } else {
+                const a = Math.floor(Math.random() * 41) + 30;
+                const b = Math.floor(Math.random() * 41) + 30;
+                currentProblem.problem = 'x = ?';
+                currentProblem.answer = 180 - a - b;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="56" y="66" class="fig-label">${a}°</text><text x="100" y="66" class="fig-label">${b}°</text><text x="78" y="40" class="fig-label">x°</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde den ukendte vinkel <kbd>x</kbd> i trekanten:`,
+                    `Vinkelsummen i en trekant er altid <kbd>180°</kbd>:`,
+                    `Indsæt: <kbd>x = 180° - ${a}° - ${b}° = ${180 - a - b}°</kbd>`,
+                    `Slutresultat: <kbd>x = ${180 - a - b}°</kbd>`
                 ];
             }
         }
@@ -852,7 +865,7 @@
             if (square) {
                 const s = Math.floor(Math.random() * 9) + 3;
                 currentProblem.answer = wantAreal ? s * s : 4 * s;
-                currentProblem.figure = `<svg viewBox="0 0 120 95" shape-rendering="crispEdges"><rect x="35" y="22" width="50" height="50" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="54" y="16" class="fig-label">s = ${s}</text><text x="92" y="52" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="55" y="28" width="55" height="55" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="76" y="20" class="fig-label">s = ${s}</text><text x="115" y="60" class="fig-label">s = ${s}</text></svg>`;
                 currentProblem.steps = wantAreal ? [
                     `Vi skal finde arealet af kvadratet med sidelængden <kbd>s = ${s}</kbd>:`,
                     `Formel: <kbd>A = s²</kbd>`,
@@ -868,7 +881,7 @@
                 const l = Math.floor(Math.random() * 11) + 4;
                 const b = Math.floor(Math.random() * 8) + 3;
                 currentProblem.answer = wantAreal ? l * b : 2 * (l + b);
-                currentProblem.figure = `<svg viewBox="0 0 120 95" shape-rendering="crispEdges"><rect x="25" y="18" width="70" height="52" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="54" y="12" class="fig-label">l = ${l}</text><text x="101" y="48" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="40" y="25" width="85" height="50" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="75" y="17" class="fig-label">l = ${l}</text><text x="131" y="55" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = wantAreal ? [
                     `Vi skal finde arealet af rektanglet med længde <kbd>l = ${l}</kbd> og bredde <kbd>b = ${b}</kbd>:`,
                     `Formel: <kbd>A = l · b</kbd>`,
@@ -889,7 +902,7 @@
             if (Math.random() < 0.4) {
                 const s = Math.floor(Math.random() * 7) + 2;
                 currentProblem.answer = s * s * s;
-                currentProblem.figure = `<svg viewBox="0 0 120 105" shape-rendering="crispEdges"><polygon points="30,35 45,20 100,20 85,35" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="85,35 100,20 100,75 85,90" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="30" y="35" width="55" height="55" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="52" y="102" class="fig-label">s = ${s}</text><text x="88" y="66" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="50,45 65,30 115,30 100,45" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,45 115,30 115,80 100,95" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="50" y="45" width="50" height="50" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="68" y="107" class="fig-label">s = ${s}</text><text x="120" y="75" class="fig-label">s = ${s}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde rumfanget af terningen med kantlængden <kbd>s = ${s}</kbd>:`,
                     `Formel: <kbd>V = s³</kbd>`,
@@ -901,7 +914,7 @@
                 const b = Math.floor(Math.random() * 7) + 2;
                 const h = Math.floor(Math.random() * 7) + 2;
                 currentProblem.answer = l * b * h;
-                currentProblem.figure = `<svg viewBox="0 0 120 105" shape-rendering="crispEdges"><polygon points="25,35 40,20 100,20 85,35" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="85,35 100,20 100,75 85,90" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="25" y="35" width="60" height="55" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="48" y="102" class="fig-label">l = ${l}</text><text x="88" y="66" class="fig-label">h = ${h}</text><text x="58" y="14" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="40,42 55,27 115,27 100,42" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,42 115,27 115,75 100,90" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="40" y="42" width="60" height="48" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="63" y="105" class="fig-label">l = ${l}</text><text x="120" y="70" class="fig-label">h = ${h}</text><text x="72" y="20" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde rumfanget af kassen med længde <kbd>l = ${l}</kbd>, bredde <kbd>b = ${b}</kbd> og højde <kbd>h = ${h}</kbd>:`,
                     `Formel: <kbd>V = l · b · h</kbd>`,
@@ -962,10 +975,16 @@
             const ans = currentProblem.answer;
             const tol = Number.isInteger(ans) ? 1e-6 : Math.max(0.05, Math.abs(ans) * 0.01);
             if (Math.abs(guess - ans) <= tol) {
-                const msg = currentProblem.type === 'equation'
-                    ? `✅ KORREKT! x = ${formatNumber(ans)}`
-                    : `✅ KORREKT! ${currentProblem.problem.replace('= ?', '= ' + formatNumber(ans))}`;
-                showFeedback(true, msg);
+                let expr;
+                if (currentProblem.type === 'equation') {
+                    expr = `x = ${formatNumber(ans)}`;
+                } else if (currentProblem.problem.includes('= ?')) {
+                    const unit = currentProblem.problem === 'x = ?' ? '°' : '';
+                    expr = currentProblem.problem.replace('= ?', '= ' + formatNumber(ans) + unit);
+                } else {
+                    expr = `${currentProblem.problem} = ${formatNumber(ans)}`;
+                }
+                showFeedback(true, `✅ KORREKT! ${expr}`);
                 input.disabled = true;
                 stats[activeModule].total++;
                 stats[activeModule][currentProblem.type]++;
