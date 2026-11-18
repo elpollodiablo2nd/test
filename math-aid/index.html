@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="da">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -221,6 +221,70 @@
             color: var(--ink);
         }
 
+        .answer-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        #answer-input {
+            flex: 1;
+            min-width: 0;
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.8rem;
+            padding: 0.5rem 1rem;
+            background: #ffffff;
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
+            outline: none;
+        }
+
+        #answer-input:focus {
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange);
+        }
+
+        #answer-input:disabled {
+            background: #EAE2D0;
+        }
+
+        .btn-check {
+            background: var(--m-amber);
+            color: var(--ink);
+            white-space: nowrap;
+        }
+
+        .feedback {
+            display: none;
+            margin-bottom: 1.25rem;
+            padding: 0.9rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            line-height: 1.7;
+        }
+
+        .feedback.visible {
+            display: block;
+        }
+
+        .feedback.correct {
+            background: var(--m-yellow);
+            color: var(--ink);
+        }
+
+        .feedback.wrong {
+            background: var(--m-red);
+            color: var(--cream);
+            animation: shake 0.25s steps(2);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(-6px); }
+        }
+
         .solution {
             display: none;
             margin-top: 1.25rem;
@@ -335,6 +399,7 @@
             .logo-m { width: 72px; height: 72px; }
             .math-expression { font-size: 2rem; }
             .buttons { flex-direction: column; }
+            .answer-row { flex-direction: column; }
             button { width: 100%; justify-content: center; }
             .stats { grid-template-columns: repeat(2, 1fr); }
             .math-card { padding: 1.25rem; }
@@ -357,7 +422,7 @@
                 <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
             </svg>
             <h1>MATH AID</h1>
-            <p class="subtitle">8th Grade European Level Practice · Pixel Edition</p>
+            <p class="subtitle">Øvelse på 8. klasse-niveau · Pixel-udgave</p>
         </header>
 
         <div class="math-card">
@@ -366,13 +431,20 @@
                 <span id="problem" class="math-expression"></span><span class="cursor"></span>
             </div>
 
+            <div class="answer-row">
+                <input id="answer-input" type="text" inputmode="decimal" placeholder="Dit svar..." autocomplete="off">
+                <button id="check-answer" class="btn-check" onclick="checkAnswer()">✅ Tjek svar</button>
+            </div>
+
+            <div id="answer-feedback" class="feedback"></div>
+
             <div class="buttons">
-                <button id="show-solution" class="btn-primary" onclick="showSolution()">💡 Show Solution</button>
-                <button class="btn-refresh" onclick="generateProblem()">🔄 New Challenge</button>
+                <button id="show-solution" class="btn-primary" onclick="showSolution()">💡 Vis løsning</button>
+                <button class="btn-refresh" onclick="generateProblem()">🔄 Ny opgave</button>
             </div>
 
             <div id="solution" class="solution">
-                <div class="solution-title">STEP-BY-STEP SOLUTION</div>
+                <div class="solution-title">TRIN-FOR-TRIN-LØSNING</div>
                 <div id="solution-steps" class="solution-steps"></div>
             </div>
         </div>
@@ -380,7 +452,7 @@
         <div class="stats">
             <div class="stat-item">
                 <div class="stat-value" id="problems-solved">0</div>
-                <div class="stat-label">Problems Solved</div>
+                <div class="stat-label">Opgaver løst</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="addition-count">0</div>
@@ -388,11 +460,11 @@
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="subtraction-count">0</div>
-                <div class="stat-label">Subtraction</div>
+                <div class="stat-label">Subtraktion</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="multiplication-count">0</div>
-                <div class="stat-label">Multiplication</div>
+                <div class="stat-label">Multiplikation</div>
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="division-count">0</div>
@@ -400,11 +472,11 @@
             </div>
             <div class="stat-item">
                 <div class="stat-value" id="equation-count">0</div>
-                <div class="stat-label">Equations</div>
+                <div class="stat-label">Ligninger</div>
             </div>
         </div>
 
-        <p class="hint"><kbd>ENTER</kbd> SHOW SOLUTION &nbsp;&nbsp; <kbd>R</kbd> NEW PROBLEM</p>
+        <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
     </div>
 
     <script>
@@ -420,6 +492,7 @@
         let currentProblem = {
             type: '',
             problem: '',
+            answer: 0,
             steps: []
         };
 
@@ -431,13 +504,21 @@
             { type: 'equation', weight: 15 }
         ];
 
+        const typeNames = {
+            addition: 'Addition',
+            subtraction: 'Subtraktion',
+            multiplication: 'Multiplikation',
+            division: 'Division',
+            equation: 'Ligninger'
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             generateProblem();
         });
 
         function generateProblem() {
             document.getElementById('solution').classList.remove('visible');
-            document.getElementById('show-solution').textContent = '💡 Show Solution';
+            document.getElementById('show-solution').textContent = '💡 Vis løsning';
 
             const totalWeight = problemTypes.reduce((sum, p) => sum + p.weight, 0);
             let random = Math.random() * totalWeight;
@@ -461,12 +542,14 @@
 
             document.getElementById('problem').textContent = currentProblem.problem;
             const badge = document.getElementById('type-badge');
-            badge.textContent = selectedType.charAt(0).toUpperCase() + selectedType.slice(1);
+            badge.textContent = typeNames[selectedType];
             badge.dataset.type = selectedType;
 
-            stats.total++;
-            stats[selectedType]++;
-            updateStats();
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.disabled = false;
+            input.focus();
+            document.getElementById('answer-feedback').className = 'feedback';
         }
 
         function generateAddition() {
@@ -476,16 +559,17 @@
 
             currentProblem.type = 'addition';
             currentProblem.problem = `${a} + ${b}`;
+            currentProblem.answer = result;
 
             const aStr = a.toString();
             const bStr = b.toString();
 
             currentProblem.steps = [
-                `Let's add <kbd>${aStr}</kbd> and <kbd>${bStr}</kbd> column by column from right to left:`,
-                `Units place: <kbd>${aStr.charAt(aStr.length - 1)}</kbd> + <kbd>${bStr.charAt(bStr.length - 1)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 1)) + parseInt(bStr.charAt(bStr.length - 1)))}</kbd>`,
-                aStr.length > 1 && bStr.length > 1 ? `Tens place: <kbd>${aStr.charAt(aStr.length - 2)}</kbd> + <kbd>${bStr.charAt(bStr.length - 2)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 2)) + parseInt(bStr.charAt(bStr.length - 2)))}</kbd>` : '',
-                aStr.length > 2 && bStr.length > 2 ? `Hundreds place: <kbd>${aStr.charAt(0)}</kbd> + <kbd>${bStr.charAt(0)}</kbd> = <kbd>${(parseInt(aStr.charAt(0)) + parseInt(bStr.charAt(0)))}</kbd>` : '',
-                `Final result: <kbd>${a} + ${b} = ${result}</kbd>`
+                `Lad os lægge <kbd>${aStr}</kbd> og <kbd>${bStr}</kbd> sammen kolonne for kolonne fra højre mod venstre:`,
+                `Enerplads: <kbd>${aStr.charAt(aStr.length - 1)}</kbd> + <kbd>${bStr.charAt(bStr.length - 1)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 1)) + parseInt(bStr.charAt(bStr.length - 1)))}</kbd>`,
+                aStr.length > 1 && bStr.length > 1 ? `Tierplads: <kbd>${aStr.charAt(aStr.length - 2)}</kbd> + <kbd>${bStr.charAt(bStr.length - 2)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 2)) + parseInt(bStr.charAt(bStr.length - 2)))}</kbd>` : '',
+                aStr.length > 2 && bStr.length > 2 ? `Hundrederplads: <kbd>${aStr.charAt(0)}</kbd> + <kbd>${bStr.charAt(0)}</kbd> = <kbd>${(parseInt(aStr.charAt(0)) + parseInt(bStr.charAt(0)))}</kbd>` : '',
+                `Slutresultat: <kbd>${a} + ${b} = ${result}</kbd>`
             ].filter(s => s !== '');
         }
 
@@ -500,12 +584,13 @@
 
             currentProblem.type = 'subtraction';
             currentProblem.problem = `${a} - ${b}`;
+            currentProblem.answer = result;
 
             currentProblem.steps = [
-                `Let's subtract <kbd>${b}</kbd> from <kbd>${a}</kbd>:`,
-                `We can break it down: <kbd>${a}</kbd> - <kbd>${b}</kbd> = <kbd>${a - b}</kbd>`,
-                `Verification: <kbd>${result} + ${b} = ${a}</kbd>`,
-                `Final result: <kbd>${a} - ${b} = ${result}</kbd>`
+                `Lad os trække <kbd>${b}</kbd> fra <kbd>${a}</kbd>:`,
+                `Vi kan dele det op: <kbd>${a}</kbd> - <kbd>${b}</kbd> = <kbd>${a - b}</kbd>`,
+                `Kontrol: <kbd>${result} + ${b} = ${a}</kbd>`,
+                `Slutresultat: <kbd>${a} - ${b} = ${result}</kbd>`
             ];
         }
 
@@ -516,14 +601,15 @@
 
             currentProblem.type = 'multiplication';
             currentProblem.problem = `${a} × ${b}`;
+            currentProblem.answer = result;
 
             currentProblem.steps = [
-                `We can use the distributive property of multiplication:`,
-                `Break down one number: <kbd>${b} = ${Math.floor(b / 10) * 10} + ${b % 10}</kbd>`,
-                `First multiply: <kbd>${a} × ${Math.floor(b / 10) * 10} = ${a * (Math.floor(b / 10) * 10)}</kbd>`,
-                `Then multiply: <kbd>${a} × ${b % 10} = ${a * (b % 10)}</kbd>`,
-                `Add the partial results: <kbd>${a * (Math.floor(b / 10) * 10)} + ${a * (b % 10)} = ${result}</kbd>`,
-                `Final result: <kbd>${a} × ${b} = ${result}</kbd>`
+                `Vi kan bruge den distributive lov for multiplikation:`,
+                `Del det ene tal op: <kbd>${b} = ${Math.floor(b / 10) * 10} + ${b % 10}</kbd>`,
+                `Først gange: <kbd>${a} × ${Math.floor(b / 10) * 10} = ${a * (Math.floor(b / 10) * 10)}</kbd>`,
+                `Så gange: <kbd>${a} × ${b % 10} = ${a * (b % 10)}</kbd>`,
+                `Læg delresultaterne sammen: <kbd>${a * (Math.floor(b / 10) * 10)} + ${a * (b % 10)} = ${result}</kbd>`,
+                `Slutresultat: <kbd>${a} × ${b} = ${result}</kbd>`
             ];
         }
 
@@ -539,13 +625,14 @@
 
             currentProblem.type = 'division';
             currentProblem.problem = `${a} ÷ ${b}`;
+            currentProblem.answer = result;
 
             currentProblem.steps = [
-                `Let's divide <kbd>${a}</kbd> by <kbd>${b}</kbd>:`,
-                `Ask: How many times does <kbd>${b}</kbd> fit into <kbd>${a}</kbd>?`,
-                `We know that: <kbd>${b} × ${result} = ${a}</kbd>`,
-                `Verification: <kbd>${result} × ${b} = ${a}</kbd>`,
-                `Final result: <kbd>${a} ÷ ${b} = ${result}</kbd>`
+                `Lad os dividere <kbd>${a}</kbd> med <kbd>${b}</kbd>:`,
+                `Spørg: Hvor mange gange går <kbd>${b}</kbd> op i <kbd>${a}</kbd>?`,
+                `Vi ved, at: <kbd>${b} × ${result} = ${a}</kbd>`,
+                `Kontrol: <kbd>${result} × ${b} = ${a}</kbd>`,
+                `Slutresultat: <kbd>${a} ÷ ${b} = ${result}</kbd>`
             ];
         }
 
@@ -563,10 +650,10 @@
                     c = a * x + b;
                     currentProblem.problem = `${a}x + ${b} = ${c}`;
                     currentProblem.steps = [
-                        `Given: <kbd>${a}x + ${b} = ${c}</kbd>`,
-                        `Step 1: Subtract <kbd>${b}</kbd> from both sides: <kbd>${a}x = ${c - b}</kbd>`,
-                        `Step 2: Divide both sides by <kbd>${a}</kbd>: <kbd>x = ${(c - b) / a}</kbd>`,
-                        `Final solution: <kbd>x = ${x}</kbd>`
+                        `Givet: <kbd>${a}x + ${b} = ${c}</kbd>`,
+                        `Trin 1: Træk <kbd>${b}</kbd> fra på begge sider: <kbd>${a}x = ${c - b}</kbd>`,
+                        `Trin 2: Divider begge sider med <kbd>${a}</kbd>: <kbd>x = ${(c - b) / a}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
                     ];
                     break;
                 case 'a(x+b)=c':
@@ -576,10 +663,10 @@
                     c = a * (x + b);
                     currentProblem.problem = `${a}(x + ${b}) = ${c}`;
                     currentProblem.steps = [
-                        `Given: <kbd>${a}(x + ${b}) = ${c}</kbd>`,
-                        `Step 1: Divide both sides by <kbd>${a}</kbd>: <kbd>x + ${b} = ${c / a}</kbd>`,
-                        `Step 2: Subtract <kbd>${b}</kbd> from both sides: <kbd>x = ${c / a - b}</kbd>`,
-                        `Final solution: <kbd>x = ${x}</kbd>`
+                        `Givet: <kbd>${a}(x + ${b}) = ${c}</kbd>`,
+                        `Trin 1: Divider begge sider med <kbd>${a}</kbd>: <kbd>x + ${b} = ${c / a}</kbd>`,
+                        `Trin 2: Træk <kbd>${b}</kbd> fra på begge sider: <kbd>x = ${c / a - b}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
                     ];
                     break;
                 case 'ax-b=c':
@@ -589,10 +676,10 @@
                     c = a * x - b;
                     currentProblem.problem = `${a}x - ${b} = ${c}`;
                     currentProblem.steps = [
-                        `Given: <kbd>${a}x - ${b} = ${c}</kbd>`,
-                        `Step 1: Add <kbd>${b}</kbd> to both sides: <kbd>${a}x = ${c + b}</kbd>`,
-                        `Step 2: Divide both sides by <kbd>${a}</kbd>: <kbd>x = ${(c + b) / a}</kbd>`,
-                        `Final solution: <kbd>x = ${x}</kbd>`
+                        `Givet: <kbd>${a}x - ${b} = ${c}</kbd>`,
+                        `Trin 1: Læg <kbd>${b}</kbd> til på begge sider: <kbd>${a}x = ${c + b}</kbd>`,
+                        `Trin 2: Divider begge sider med <kbd>${a}</kbd>: <kbd>x = ${(c + b) / a}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
                     ];
                     break;
                 case 'a(x-b)=c':
@@ -602,14 +689,15 @@
                     c = a * (x - b);
                     currentProblem.problem = `${a}(x - ${b}) = ${c}`;
                     currentProblem.steps = [
-                        `Given: <kbd>${a}(x - ${b}) = ${c}</kbd>`,
-                        `Step 1: Divide both sides by <kbd>${a}</kbd>: <kbd>x - ${b} = ${c / a}</kbd>`,
-                        `Step 2: Add <kbd>${b}</kbd> to both sides: <kbd>x = ${c / a + b}</kbd>`,
-                        `Final solution: <kbd>x = ${x}</kbd>`
+                        `Givet: <kbd>${a}(x - ${b}) = ${c}</kbd>`,
+                        `Trin 1: Divider begge sider med <kbd>${a}</kbd>: <kbd>x - ${b} = ${c / a}</kbd>`,
+                        `Trin 2: Læg <kbd>${b}</kbd> til på begge sider: <kbd>x = ${c / a + b}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
                     ];
                     break;
             }
             currentProblem.type = 'equation';
+            currentProblem.answer = x;
         }
 
         function showSolution() {
@@ -619,7 +707,7 @@
 
             if (solutionDiv.classList.contains('visible')) {
                 solutionDiv.classList.remove('visible');
-                showBtn.textContent = '💡 Show Solution';
+                showBtn.textContent = '💡 Vis løsning';
             } else {
                 let stepsHtml = '';
                 currentProblem.steps.forEach((step) => {
@@ -627,7 +715,46 @@
                 });
                 solutionSteps.innerHTML = stepsHtml;
                 solutionDiv.classList.add('visible');
-                showBtn.textContent = '📖 Hide Solution';
+                showBtn.textContent = '📖 Skjul løsning';
+            }
+        }
+
+        function formatNumber(n) {
+            return String(n).replace('.', ',');
+        }
+
+        function showFeedback(ok, msg) {
+            const fb = document.getElementById('answer-feedback');
+            fb.classList.remove('visible', 'correct', 'wrong');
+            void fb.offsetWidth;
+            fb.textContent = msg;
+            fb.classList.add('visible', ok ? 'correct' : 'wrong');
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('answer-input');
+            if (input.disabled) return;
+            const raw = input.value.trim().replace(',', '.');
+            if (raw === '') {
+                showFeedback(false, '❌ Skriv dit svar først!');
+                return;
+            }
+            const guess = Number(raw);
+            if (isNaN(guess)) {
+                showFeedback(false, '❌ Det skal være et tal!');
+                return;
+            }
+            if (Math.abs(guess - currentProblem.answer) < 1e-9) {
+                const msg = currentProblem.type === 'equation'
+                    ? `✅ KORREKT! x = ${formatNumber(currentProblem.answer)}`
+                    : `✅ KORREKT! ${currentProblem.problem} = ${formatNumber(currentProblem.answer)}`;
+                showFeedback(true, msg);
+                input.disabled = true;
+                stats.total++;
+                stats[currentProblem.type]++;
+                updateStats();
+            } else {
+                showFeedback(false, '❌ Forkert — prøv igen!');
             }
         }
 
@@ -641,6 +768,14 @@
         }
 
         document.addEventListener('keydown', (e) => {
+            if (e.target && e.target.id === 'answer-input') {
+                if (e.key === 'Enter') {
+                    checkAnswer();
+                    e.preventDefault();
+                }
+                return;
+            }
+            if (e.target && e.target.tagName === 'BUTTON') return;
             if (e.key === 'Enter' || e.key === ' ') {
                 showSolution();
                 e.preventDefault();
