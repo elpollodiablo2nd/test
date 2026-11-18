@@ -264,19 +264,40 @@
     px(ctx, 402, 38, 5, 5, '#e0cba6');
     px(ctx, 411, 47, 4, 4, '#e0cba6');
     px(ctx, 405, 49, 3, 3, '#e0cba6');
+    for (var ci = 0; ci < 5; ci++) {
+      var cw = 55 + (ci * 37) % 55;
+      var cm = (ci * 173 - this.dist * 0.08 - t * (3 + ci)) % (W + 200);
+      if (cm < -100) cm += W + 200;
+      var cyy = 22 + (ci * 29) % 62;
+      ctx.globalAlpha = 0.9;
+      px(ctx, cm, cyy, cw, 10, '#33204f');
+      px(ctx, cm + 10, cyy - 5, cw - 24, 6, '#5a3a78');
+      px(ctx, cm + 6, cyy + 10, cw - 16, 5, '#241539');
+      ctx.globalAlpha = 1;
+    }
   };
 
   function drawEiffel(ctx, x, baseY, h, color) {
-    var w = h * 0.42;
-    px(ctx, x + w / 2 - 1, baseY - h, 3, h, color);
-    px(ctx, x + w / 2 - 4, baseY - h * 0.72, 8, 3, color);
-    px(ctx, x + w / 2 - 7, baseY - h * 0.45, 14, 3, color);
-    px(ctx, x + w * 0.12, baseY - h * 0.45, 3, h * 0.45, color);
-    px(ctx, x + w * 0.85, baseY - h * 0.45, 3, h * 0.45, color);
-    px(ctx, x + w * 0.05, baseY - 4, 5, 4, color);
-    px(ctx, x + w * 0.9, baseY - 4, 5, 4, color);
-    px(ctx, x + w * 0.22, baseY - h * 0.72, w * 0.56, 2, color);
-    px(ctx, x + w * 0.3, baseY - h * 0.45, w * 0.4, 2, color);
+    var w = h * 0.5;
+    var cx = x + w / 2;
+    px(ctx, cx - 1, baseY - h - 6, 2, 7, color);
+    px(ctx, cx - 2, baseY - h, 5, h * 0.10, color);
+    px(ctx, cx - 9, baseY - h * 0.90, 18, 4, color);
+    px(ctx, cx - 6, baseY - h * 0.90 + 4, 3, h * 0.32, color);
+    px(ctx, cx + 3, baseY - h * 0.90 + 4, 3, h * 0.32, color);
+    px(ctx, cx - 5, baseY - h * 0.62, 10, 2, color);
+    px(ctx, cx - 14, baseY - h * 0.58, 28, 4, color);
+    px(ctx, cx - 11, baseY - h * 0.58 + 4, 4, h * 0.30, color);
+    px(ctx, cx + 7, baseY - h * 0.58 + 4, 4, h * 0.30, color);
+    px(ctx, cx - 10, baseY - h * 0.40, 20, 2, color);
+    px(ctx, cx - 20, baseY - h * 0.28, 40, 4, color);
+    px(ctx, cx - 20, baseY - h * 0.28 + 4, 5, h * 0.28, color);
+    px(ctx, cx + 15, baseY - h * 0.28 + 4, 5, h * 0.28, color);
+    for (var yy = baseY - h * 0.28 + 10; yy < baseY - 8; yy += 10) px(ctx, cx - 15, yy, 30, 1, color);
+    px(ctx, cx - 15, baseY - h * 0.28 + 6, 30, 3, color);
+    px(ctx, cx - 24, baseY - 7, 10, 7, color);
+    px(ctx, cx + 14, baseY - 7, 10, 7, color);
+    px(ctx, cx - 20, baseY - 11, 40, 2, color);
   }
 
   Game.prototype.drawFar = function (ctx, t) {
@@ -286,8 +307,22 @@
       px(ctx, base + 20, GROUND_Y - 60, 46, 60, '#241543');
       px(ctx, base + 80, GROUND_Y - 84, 38, 84, '#241543');
       px(ctx, base + 130, GROUND_Y - 52, 52, 52, '#241543');
-      drawEiffel(ctx, base + 210, GROUND_Y, 150, '#241543');
-      if (Math.floor(t * 1.5) % 2 === 0) px(ctx, base + 210 + 31, GROUND_Y - 154, 3, 3, '#ff6a6a');
+      drawEiffel(ctx, base + 200, GROUND_Y, 170, '#241543');
+      if (Math.floor(t * 1.5) % 2 === 0) px(ctx, base + 200 + 41, GROUND_Y - 177, 3, 3, '#ff6a6a');
+      for (var si = 0; si < 4; si++) {
+        if (Math.floor(t * 2 + si * 1.7) % 3 === 0) {
+          px(ctx, base + 200 + (si * 23) % 80, GROUND_Y - 150 + (si * 31) % 110, 2, 2, '#ffd98a');
+        }
+      }
+      for (var bi = 0; bi < 3; bi++) {
+        var bm = (bi * 260 + t * 18 - this.dist * 0.2) % (W + 60);
+        if (bm < -30) bm += W + 60;
+        var byy = 40 + bi * 22 + Math.sin(t * 3 + bi) * 3;
+        var flap = Math.floor(t * 6 + bi) % 2;
+        px(ctx, bm - 1, flap ? byy - 1 : byy, 3, 1, '#1a0f2e');
+        px(ctx, bm + 4, flap ? byy - 1 : byy, 3, 1, '#1a0f2e');
+        px(ctx, bm + 2, byy, 2, 1, '#1a0f2e');
+      }
       px(ctx, base + 350, GROUND_Y - 70, 44, 70, '#241543');
       px(ctx, base + 410, GROUND_Y - 96, 34, 96, '#241543');
       px(ctx, base + 460, GROUND_Y - 58, 60, 58, '#241543');
@@ -297,20 +332,33 @@
 
   Game.prototype.drawMid = function (ctx, t) {
     var off = -(this.dist * 0.4) % 520;
+    var blds = [
+      { x: 10, w: 70, h: 96, c: '#33204f' },
+      { x: 95, w: 60, h: 120, c: '#3a2657' },
+      { x: 170, w: 80, h: 84, c: '#33204f' },
+      { x: 265, w: 55, h: 108, c: '#3a2657' },
+      { x: 335, w: 70, h: 90, c: '#33204f' },
+      { x: 420, w: 62, h: 116, c: '#3a2657' }
+    ];
     for (var k = -1; k < 2; k++) {
       var base = off + k * 520;
-      px(ctx, base + 10, GROUND_Y - 96, 70, 96, '#33204f');
-      px(ctx, base + 95, GROUND_Y - 120, 60, 120, '#3a2657');
-      px(ctx, base + 170, GROUND_Y - 84, 80, 84, '#33204f');
-      px(ctx, base + 265, GROUND_Y - 108, 55, 108, '#3a2657');
-      px(ctx, base + 335, GROUND_Y - 90, 70, 90, '#33204f');
-      px(ctx, base + 420, GROUND_Y - 116, 62, 116, '#3a2657');
-      for (var b = 0; b < 6; b++) {
-        var bx = base + 14 + b * 78;
-        for (var wy = GROUND_Y - 88; wy < GROUND_Y - 16; wy += 14) {
-          for (var wx = bx; wx < bx + 56; wx += 12) {
-            var lit = ((wx * 7 + wy * 13 + b * 31) % 17) < 5;
-            if (lit) px(ctx, wx + 2, wy, 6, 8, (t % 2 + ((wx + wy) % 3)) % 4 === 0 ? '#ffd98a' : '#e8b96a');
+      for (var b = 0; b < blds.length; b++) {
+        var B = blds[b];
+        var x0 = base + B.x;
+        var top = GROUND_Y - B.h;
+        px(ctx, x0, top, B.w, B.h, B.c);
+        px(ctx, x0, top, B.w, 3, '#241533');
+        px(ctx, x0 + 2, top - 3, 4, 3, '#241533');
+        if (b % 2 === 0) px(ctx, x0 + B.w - 12, top - 6, 6, 6, '#241533');
+        var cols = Math.floor((B.w - 12) / 12);
+        var rows = Math.floor((B.h - 18) / 14);
+        for (var r = 0; r < rows; r++) {
+          for (var ci = 0; ci < cols; ci++) {
+            var wx = x0 + 6 + ci * 12;
+            var wy = top + 8 + r * 14;
+            var hsh = (b * 131 + ci * 17 + r * 29 + k * 7) % 23;
+            if (hsh < 6) px(ctx, wx, wy, 6, 8, hsh % 3 === 0 ? '#ffd98a' : '#e8b96a');
+            else if (hsh < 9) px(ctx, wx, wy, 6, 8, '#241533');
           }
         }
       }
@@ -325,6 +373,10 @@
       px(ctx, base + 96, GROUND_Y - 34, 58, 10, '#7a2d3f');
       for (var a = 0; a < 6; a++) px(ctx, base + 96 + a * 10, GROUND_Y - 34, 5, 10, a % 2 ? '#e8ded0' : '#7a2d3f');
       px(ctx, base + 100, GROUND_Y - 24, 50, 24, '#241533');
+      px(ctx, base + 112, GROUND_Y - 22, 12, 22, '#ffdf9e');
+      px(ctx, base + 112, GROUND_Y - 22, 12, 3, '#241533');
+      px(ctx, base + 117, GROUND_Y - 22, 1, 22, '#241533');
+      text(ctx, 'CAFE', base + 104, GROUND_Y - 46, 6, '#ffd98a');
     }
   };
 
@@ -338,9 +390,13 @@
         px(ctx, x + (row ? 18 : 0), y, 30, 12, row ? '#443452' : '#52406a');
       }
     }
-    var man = -(this.dist * 1 % 700);
+    var man = -(this.dist % 700);
     px(ctx, man + 300, GROUND_Y + 22, 16, 6, '#33264a');
     px(ctx, man + 900, GROUND_Y + 22, 16, 6, '#33264a');
+    var cw = -(this.dist % 900);
+    for (var i = 0; i < 6; i++) px(ctx, cw + 200 + i * 22, GROUND_Y + 12, 12, 22, 'rgba(232,222,208,0.30)');
+    px(ctx, -(this.dist % 500) + 150, GROUND_Y + 30, 10, 4, '#33264a');
+    px(ctx, -(this.dist % 460) + 380, GROUND_Y + 28, 4, 8, '#2c2140');
   };
 
   Game.prototype.drawMouse = function (ctx, m, t) {
@@ -391,6 +447,11 @@
     px(ctx, 12, 23 + (run ? Math.max(0, -lp) * 2 : 1), 5, 5 - (run ? Math.max(0, -lp) * 2 : 1), '#d17a24');
     px(ctx, 22, 23 + (run ? Math.max(0, lp) * 2 : 1), 5, 5 - (run ? Math.max(0, lp) * 2 : 1), '#d17a24');
     px(ctx, 30, 22 + (run ? Math.max(0, -lp) * 2 : 2), 5, 6 - (run ? Math.max(0, -lp) * 2 : 2), '#d17a24');
+    px(ctx, 2, 27, 5, 2, '#f5e6c8');
+    px(ctx, 12, 27, 5, 2, '#f5e6c8');
+    px(ctx, 22, 27, 5, 2, '#f5e6c8');
+    px(ctx, 30, 27, 5, 2, '#f5e6c8');
+    px(ctx, 24, 15, 13, 2, '#c23b3b');
     px(ctx, 0, 4, 4, 12 + (c.onGround ? 0 : -3), '#e8912d');
     px(ctx, -2, 0, 5, 6, '#e8912d');
     px(ctx, -3, -3, 4, 4, '#e8912d');
@@ -438,19 +499,28 @@
     px(ctx, x + 5, y - 44, 13, 2, '#a02e2e');
     px(ctx, x + 8, y - 41, 2, 2, '#1a1a22');
     px(ctx, x + 12, y - 41, 2, 2, '#1a1a22');
+    px(ctx, x + 7, y - 43, 4, 1, '#7a4a2d');
+    px(ctx, x + 12, y - 43, 4, 1, '#7a4a2d');
     px(ctx, x + 8, y - 37, 5, 1, '#7a4a2d');
     var armX = x + 18 + lunge * 8;
     px(ctx, armX - 2, y - 28, 10 + lunge * 6, 3, '#e8b98a');
-    var netX = armX + 8 + lunge * 6;
-    var netY = y - 40;
-    px(ctx, netX - 1, y - 46, 2, 16, '#8a6a4d');
-    ctx.strokeStyle = '#d8d2c4';
-    ctx.lineWidth = 1;
+    var hx = armX + 8 + lunge * 6;
+    var hy = y - 40;
+    px(ctx, hx - 1, hy - 9, 3, 14, '#8a6a4d');
+    var cx = hx + 8, cy = hy + 5, r = 9;
+    ctx.strokeStyle = '#e8e2d4';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(netX + 7, netY + 4, 8, -1.2, 1.2);
+    ctx.arc(cx, cy, r, 0, 6.29);
     ctx.stroke();
-    px(ctx, netX + 2, netY + 2, 11, 1, 'rgba(216,210,196,0.7)');
-    px(ctx, netX + 5, netY - 2, 1, 11, 'rgba(216,210,196,0.7)');
+    for (var dxi = -6; dxi <= 6; dxi += 3) {
+      var hh = Math.sqrt(Math.max(0, r * r - dxi * dxi));
+      px(ctx, cx + dxi, cy - hh + 1, 1, hh * 2 - 2, 'rgba(232,226,212,0.9)');
+    }
+    for (var dyi = -6; dyi <= 6; dyi += 3) {
+      var ww = Math.sqrt(Math.max(0, r * r - dyi * dyi));
+      px(ctx, cx - ww + 1, cy + dyi, ww * 2 - 2, 1, 'rgba(232,226,212,0.9)');
+    }
   };
 
   Game.prototype.drawHUD = function (ctx) {
