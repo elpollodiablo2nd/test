@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Le Chonck — une aventure parisienne</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #120b1e; overflow: hidden; }
+  #wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #000;
+    box-shadow: 0 0 80px rgba(232, 132, 92, 0.18);
+    touch-action: none;
+    cursor: pointer;
+  }
+  #hint {
+    position: fixed; bottom: 10px; left: 0; width: 100%;
+    text-align: center; color: #5a4a7a; font: 12px monospace;
+    pointer-events: none; user-select: none;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="480" height="270"></canvas></div>
+<div id="hint">ESPACE / CLIC : sauter &nbsp;&middot;&nbsp; M : musique on/off</div>
+<script src="game.js"></script>
+</body>
+</html>
