@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Aid — Pixel Edition</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --m-yellow: #FFD800;
+            --m-amber: #FFAF00;
+            --m-orange: #FF8205;
+            --m-orange-dark: #FA500F;
+            --m-red: #E10500;
+            --ink: #000000;
+            --cream: #FFFAEB;
+            --night: #0B0714;
+            --screen: #150C24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+        }
+
+        body {
+            font-family: 'VT323', 'Courier New', monospace;
+            background-color: var(--night);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
+                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+            background-size: auto, 32px 32px, 32px 32px;
+            color: var(--cream);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem 3rem;
+            overflow-x: hidden;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px);
+            z-index: 50;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .logo-m {
+            width: 96px;
+            height: 96px;
+            shape-rendering: crispEdges;
+            filter: drop-shadow(5px 5px 0 rgba(0, 0, 0, 0.8));
+            animation: bob 1.6s steps(2, jump-none) infinite;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 2rem;
+            margin-top: 1.25rem;
+            letter-spacing: 2px;
+            background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(4px 4px 0 #000);
+        }
+
+        @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+            h1 { color: var(--m-orange); background: none; }
+        }
+
+        .subtitle {
+            font-size: 1.4rem;
+            color: var(--m-amber);
+            margin-top: 0.75rem;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            box-shadow: 0 -8px 0 currentColor, 0 8px 0 currentColor, -8px 0 0 currentColor, 8px 0 0 currentColor;
+            animation: twinkle 1.2s steps(2, jump-none) infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.15; transform: translateY(-6px); }
+        }
+
+        .math-card {
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .type-badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            padding: 0.55rem 0.8rem;
+            margin-bottom: 1.25rem;
+            background: var(--m-yellow);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        #type-badge[data-type="subtraction"] { background: var(--m-amber); }
+        #type-badge[data-type="multiplication"] { background: var(--m-orange); }
+        #type-badge[data-type="division"] { background: var(--m-orange-dark); color: var(--cream); }
+        #type-badge[data-type="equation"] { background: var(--m-red); color: var(--cream); }
+
+        .problem-display {
+            padding: 1.5rem;
+            min-height: 96px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
+                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.7), inset -4px -4px 0 rgba(255, 255, 255, 0.07);
+            margin-bottom: 1.5rem;
+        }
+
+        .math-expression {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 2.8rem;
+            color: var(--m-yellow);
+            text-shadow: 0 0 14px rgba(255, 216, 0, 0.55), 4px 4px 0 var(--m-red);
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 0.55em;
+            height: 0.9em;
+            margin-left: 10px;
+            background: var(--m-yellow);
+            box-shadow: 0 0 10px rgba(255, 216, 0, 0.8);
+            animation: blink 0.9s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 4px solid var(--ink);
+            box-shadow: 0 6px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+        }
+
+        button:hover {
+            filter: brightness(1.08);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 var(--ink);
+        }
+
+        button:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+
+        .btn-primary {
+            background: var(--m-orange);
+            color: var(--ink);
+        }
+
+        .btn-refresh {
+            background: var(--cream);
+            color: var(--ink);
+        }
+
+        .solution {
+            display: none;
+            margin-top: 1.25rem;
+            padding: 1.25rem 1.5rem;
+            background: #FFF3D0;
+            border: 4px solid var(--ink);
+            border-left: 12px solid var(--m-orange-dark);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.08);
+        }
+
+        .solution.visible {
+            display: block;
+            animation: pop 0.15s steps(2);
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.96); }
+            to { transform: scale(1); }
+        }
+
+        .solution-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            color: var(--m-orange-dark);
+            margin-bottom: 1rem;
+        }
+
+        .solution-steps {
+            font-size: 1.45rem;
+            line-height: 1.6;
+        }
+
+        .solution-steps kbd {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.3rem;
+            background: var(--ink);
+            color: var(--m-yellow);
+            padding: 0.1rem 0.45rem;
+            border: 3px solid var(--ink);
+            box-shadow: inset -3px -3px 0 rgba(255, 255, 255, 0.18), inset 3px 3px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .step {
+            position: relative;
+            margin-bottom: 0.6rem;
+            padding-left: 1.25rem;
+        }
+
+        .step::before {
+            content: "►";
+            position: absolute;
+            left: 0;
+            color: var(--m-orange-dark);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.6rem 0.25rem;
+            background: rgba(0, 0, 0, 0.35);
+            border: 3px solid rgba(255, 250, 235, 0.25);
+        }
+
+        .stat-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1rem;
+            color: var(--m-yellow);
+            text-shadow: 3px 3px 0 #000;
+        }
+
+        .stat-label {
+            font-size: 1.05rem;
+            margin-top: 0.35rem;
+            color: var(--cream);
+            opacity: 0.85;
+        }
+
+        #subtraction-count { color: var(--m-amber); }
+        #multiplication-count { color: var(--m-orange); }
+        #division-count { color: var(--m-orange-dark); }
+        #equation-count { color: #FF6A5E; }
+
+        .hint {
+            margin-top: 1.25rem;
+            text-align: center;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.55rem;
+            color: rgba(255, 250, 235, 0.6);
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .hint kbd {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.55rem;
+            background: var(--ink);
+            color: var(--m-yellow);
+            border: 3px solid rgba(255, 250, 235, 0.4);
+            padding: 0.3rem 0.45rem;
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 1.25rem; }
+            .logo-m { width: 72px; height: 72px; }
+            .math-expression { font-size: 2rem; }
+            .buttons { flex-direction: column; }
+            button { width: 100%; justify-content: center; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .math-card { padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <span class="sparkle" style="top: 6px; left: 14%; color: var(--m-yellow);"></span>
+            <span class="sparkle" style="top: 40px; right: 16%; color: var(--m-orange); animation-delay: 0.3s;"></span>
+            <span class="sparkle" style="top: 90px; left: 8%; color: var(--m-red); animation-delay: 0.6s;"></span>
+            <span class="sparkle" style="top: 110px; right: 9%; color: var(--m-amber); animation-delay: 0.9s;"></span>
+            <svg class="logo-m" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="Mistral M logo">
+                <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
+                <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
+                <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
+                <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
+                <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
+                <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
+            </svg>
+            <h1>MATH AID</h1>
+            <p class="subtitle">8th Grade European Level Practice · Pixel Edition</p>
+        </header>
+
+        <div class="math-card">
+            <div id="type-badge" class="type-badge" data-type="addition"></div>
+            <div class="problem-display">
+                <span id="problem" class="math-expression"></span><span class="cursor"></span>
+            </div>
+
+            <div class="buttons">
+                <button id="show-solution" class="btn-primary" onclick="showSolution()">💡 Show Solution</button>
+                <button class="btn-refresh" onclick="generateProblem()">🔄 New Challenge</button>
+            </div>
+
+            <div id="solution" class="solution">
+                <div class="solution-title">STEP-BY-STEP SOLUTION</div>
+                <div id="solution-steps" class="solution-steps"></div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="problems-solved">0</div>
+                <div class="stat-label">Problems Solved</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="addition-count">0</div>
+                <div class="stat-label">Addition</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="subtraction-count">0</div>
+                <div class="stat-label">Subtraction</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="multiplication-count">0</div>
+                <div class="stat-label">Multiplication</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="division-count">0</div>
+                <div class="stat-label">Division</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="equation-count">0</div>
+                <div class="stat-label">Equations</div>
+            </div>
+        </div>
+
+        <p class="hint"><kbd>ENTER</kbd> SHOW SOLUTION &nbsp;&nbsp; <kbd>R</kbd> NEW PROBLEM</p>
+    </div>
+
+    <script>
+        let stats = {
+            total: 0,
+            addition: 0,
+            subtraction: 0,
+            multiplication: 0,
+            division: 0,
+            equation: 0
+        };
+
+        let currentProblem = {
+            type: '',
+            problem: '',
+            steps: []
+        };
+
+        const problemTypes = [
+            { type: 'addition', weight: 25 },
+            { type: 'subtraction', weight: 25 },
+            { type: 'multiplication', weight: 20 },
+            { type: 'division', weight: 15 },
+            { type: 'equation', weight: 15 }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            generateProblem();
+        });
+
+        function generateProblem() {
+            document.getElementById('solution').classList.remove('visible');
+            document.getElementById('show-solution').textContent = '💡 Show Solution';
+
+            const totalWeight = problemTypes.reduce((sum, p) => sum + p.weight, 0);
+            let random = Math.random() * totalWeight;
+            let selectedType = 'addition';
+
+            for (const pt of problemTypes) {
+                if (random < pt.weight) {
+                    selectedType = pt.type;
+                    break;
+                }
+                random -= pt.weight;
+            }
+
+            switch (selectedType) {
+                case 'addition': generateAddition(); break;
+                case 'subtraction': generateSubtraction(); break;
+                case 'multiplication': generateMultiplication(); break;
+                case 'division': generateDivision(); break;
+                case 'equation': generateEquation(); break;
+            }
+
+            document.getElementById('problem').textContent = currentProblem.problem;
+            const badge = document.getElementById('type-badge');
+            badge.textContent = selectedType.charAt(0).toUpperCase() + selectedType.slice(1);
+            badge.dataset.type = selectedType;
+
+            stats.total++;
+            stats[selectedType]++;
+            updateStats();
+        }
+
+        function generateAddition() {
+            const a = Math.floor(Math.random() * 500) + 100;
+            const b = Math.floor(Math.random() * 500) + 100;
+            const result = a + b;
+
+            currentProblem.type = 'addition';
+            currentProblem.problem = `${a} + ${b}`;
+
+            const aStr = a.toString();
+            const bStr = b.toString();
+
+            currentProblem.steps = [
+                `Let's add <kbd>${aStr}</kbd> and <kbd>${bStr}</kbd> column by column from right to left:`,
+                `Units place: <kbd>${aStr.charAt(aStr.length - 1)}</kbd> + <kbd>${bStr.charAt(bStr.length - 1)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 1)) + parseInt(bStr.charAt(bStr.length - 1)))}</kbd>`,
+                aStr.length > 1 && bStr.length > 1 ? `Tens place: <kbd>${aStr.charAt(aStr.length - 2)}</kbd> + <kbd>${bStr.charAt(bStr.length - 2)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 2)) + parseInt(bStr.charAt(bStr.length - 2)))}</kbd>` : '',
+                aStr.length > 2 && bStr.length > 2 ? `Hundreds place: <kbd>${aStr.charAt(0)}</kbd> + <kbd>${bStr.charAt(0)}</kbd> = <kbd>${(parseInt(aStr.charAt(0)) + parseInt(bStr.charAt(0)))}</kbd>` : '',
+                `Final result: <kbd>${a} + ${b} = ${result}</kbd>`
+            ].filter(s => s !== '');
+        }
+
+        function generateSubtraction() {
+            let a, b;
+            do {
+                a = Math.floor(Math.random() * 500) + 200;
+                b = Math.floor(Math.random() * 400) + 100;
+            } while (a <= b);
+
+            const result = a - b;
+
+            currentProblem.type = 'subtraction';
+            currentProblem.problem = `${a} - ${b}`;
+
+            currentProblem.steps = [
+                `Let's subtract <kbd>${b}</kbd> from <kbd>${a}</kbd>:`,
+                `We can break it down: <kbd>${a}</kbd> - <kbd>${b}</kbd> = <kbd>${a - b}</kbd>`,
+                `Verification: <kbd>${result} + ${b} = ${a}</kbd>`,
+                `Final result: <kbd>${a} - ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateMultiplication() {
+            const a = Math.floor(Math.random() * 20) + 2;
+            const b = Math.floor(Math.random() * 20) + 2;
+            const result = a * b;
+
+            currentProblem.type = 'multiplication';
+            currentProblem.problem = `${a} × ${b}`;
+
+            currentProblem.steps = [
+                `We can use the distributive property of multiplication:`,
+                `Break down one number: <kbd>${b} = ${Math.floor(b / 10) * 10} + ${b % 10}</kbd>`,
+                `First multiply: <kbd>${a} × ${Math.floor(b / 10) * 10} = ${a * (Math.floor(b / 10) * 10)}</kbd>`,
+                `Then multiply: <kbd>${a} × ${b % 10} = ${a * (b % 10)}</kbd>`,
+                `Add the partial results: <kbd>${a * (Math.floor(b / 10) * 10)} + ${a * (b % 10)} = ${result}</kbd>`,
+                `Final result: <kbd>${a} × ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateDivision() {
+            let a, b;
+            do {
+                b = Math.floor(Math.random() * 12) + 2;
+                const quotient = Math.floor(Math.random() * 20) + 2;
+                a = b * quotient;
+            } while (a > 300);
+
+            const result = a / b;
+
+            currentProblem.type = 'division';
+            currentProblem.problem = `${a} ÷ ${b}`;
+
+            currentProblem.steps = [
+                `Let's divide <kbd>${a}</kbd> by <kbd>${b}</kbd>:`,
+                `Ask: How many times does <kbd>${b}</kbd> fit into <kbd>${a}</kbd>?`,
+                `We know that: <kbd>${b} × ${result} = ${a}</kbd>`,
+                `Verification: <kbd>${result} × ${b} = ${a}</kbd>`,
+                `Final result: <kbd>${a} ÷ ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateEquation() {
+            const equationTypes = ['ax+b=c', 'a(x+b)=c', 'ax-b=c', 'a(x-b)=c'];
+            const type = equationTypes[Math.floor(Math.random() * equationTypes.length)];
+
+            let a, b, c, x;
+
+            switch (type) {
+                case 'ax+b=c':
+                    a = Math.floor(Math.random() * 8) + 2;
+                    b = Math.floor(Math.random() * 20) + 1;
+                    x = Math.floor(Math.random() * 10) + 1;
+                    c = a * x + b;
+                    currentProblem.problem = `${a}x + ${b} = ${c}`;
+                    currentProblem.steps = [
+                        `Given: <kbd>${a}x + ${b} = ${c}</kbd>`,
+                        `Step 1: Subtract <kbd>${b}</kbd> from both sides: <kbd>${a}x = ${c - b}</kbd>`,
+                        `Step 2: Divide both sides by <kbd>${a}</kbd>: <kbd>x = ${(c - b) / a}</kbd>`,
+                        `Final solution: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'a(x+b)=c':
+                    a = Math.floor(Math.random() * 6) + 2;
+                    b = Math.floor(Math.random() * 10) + 1;
+                    x = Math.floor(Math.random() * 8) + 1;
+                    c = a * (x + b);
+                    currentProblem.problem = `${a}(x + ${b}) = ${c}`;
+                    currentProblem.steps = [
+                        `Given: <kbd>${a}(x + ${b}) = ${c}</kbd>`,
+                        `Step 1: Divide both sides by <kbd>${a}</kbd>: <kbd>x + ${b} = ${c / a}</kbd>`,
+                        `Step 2: Subtract <kbd>${b}</kbd> from both sides: <kbd>x = ${c / a - b}</kbd>`,
+                        `Final solution: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'ax-b=c':
+                    a = Math.floor(Math.random() * 8) + 2;
+                    b = Math.floor(Math.random() * 20) + 1;
+                    x = Math.floor(Math.random() * 10) + 1;
+                    c = a * x - b;
+                    currentProblem.problem = `${a}x - ${b} = ${c}`;
+                    currentProblem.steps = [
+                        `Given: <kbd>${a}x - ${b} = ${c}</kbd>`,
+                        `Step 1: Add <kbd>${b}</kbd> to both sides: <kbd>${a}x = ${c + b}</kbd>`,
+                        `Step 2: Divide both sides by <kbd>${a}</kbd>: <kbd>x = ${(c + b) / a}</kbd>`,
+                        `Final solution: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'a(x-b)=c':
+                    a = Math.floor(Math.random() * 6) + 2;
+                    b = Math.floor(Math.random() * 10) + 1;
+                    x = Math.floor(Math.random() * 8) + 1 + b;
+                    c = a * (x - b);
+                    currentProblem.problem = `${a}(x - ${b}) = ${c}`;
+                    currentProblem.steps = [
+                        `Given: <kbd>${a}(x - ${b}) = ${c}</kbd>`,
+                        `Step 1: Divide both sides by <kbd>${a}</kbd>: <kbd>x - ${b} = ${c / a}</kbd>`,
+                        `Step 2: Add <kbd>${b}</kbd> to both sides: <kbd>x = ${c / a + b}</kbd>`,
+                        `Final solution: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+            }
+            currentProblem.type = 'equation';
+        }
+
+        function showSolution() {
+            const solutionDiv = document.getElementById('solution');
+            const solutionSteps = document.getElementById('solution-steps');
+            const showBtn = document.getElementById('show-solution');
+
+            if (solutionDiv.classList.contains('visible')) {
+                solutionDiv.classList.remove('visible');
+                showBtn.textContent = '💡 Show Solution';
+            } else {
+                let stepsHtml = '';
+                currentProblem.steps.forEach((step) => {
+                    stepsHtml += `<div class="step">${step}</div>`;
+                });
+                solutionSteps.innerHTML = stepsHtml;
+                solutionDiv.classList.add('visible');
+                showBtn.textContent = '📖 Hide Solution';
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('problems-solved').textContent = stats.total;
+            document.getElementById('addition-count').textContent = stats.addition;
+            document.getElementById('subtraction-count').textContent = stats.subtraction;
+            document.getElementById('multiplication-count').textContent = stats.multiplication;
+            document.getElementById('division-count').textContent = stats.division;
+            document.getElementById('equation-count').textContent = stats.equation;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                showSolution();
+                e.preventDefault();
+            } else if (e.key === 'r' || e.key === 'R') {
+                generateProblem();
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>

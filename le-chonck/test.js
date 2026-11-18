@@ -170,6 +170,36 @@ test('collecting a mouse scores +25 and restores catcatcher gap (capped)', () =>
   assert.ok(g.gap <= MAX_GAP && g.gap > MAX_GAP - 1, `gap capped at MAX_GAP (got ${g.gap})`);
 });
 
+test('baguette grants superspeed: +50, gap boost, trips disabled, faster scroll', () => {
+  const g = makeGame();
+  startGame(g);
+  stepN(g, 0.3);
+  g.baguettes.push({ x: g.cat.x + 6, y: g.cat.y + 6, w: 16, h: 6 });
+  g.step(1 / 60, {});
+  assert.ok(g.boost > 4, `boost active (${g.boost})`);
+  assert.ok(g.bonus >= 50, `bonus +50 (${g.bonus})`);
+  const gapBefore = g.gap;
+  g.obstacles.push({ type: 'bin', x: g.cat.x + 8, y: GROUND_Y - 30, w: 20, h: 30 });
+  g.step(1 / 60, {});
+  assert.ok(g.cat.trip <= 0, 'no trip during superspeed');
+  assert.ok(g.gap <= gapBefore, 'gap not penalized during superspeed');
+  const d0 = g.dist;
+  g.step(1 / 60, {});
+  const dBoost = g.dist - d0;
+  g.boost = 0;
+  const d1 = g.dist;
+  g.step(1 / 60, {});
+  const dNormal = g.dist - d1;
+  assert.ok(dBoost > dNormal * 1.4, `superspeed scrolls faster (${dBoost.toFixed(2)} vs ${dNormal.toFixed(2)})`);
+});
+
+test('all mice spawn fully above the street surface', () => {
+  const g = makeGame(5);
+  for (let i = 0; i < 50; i++) g.spawnMice();
+  assert.ok(g.mousies.length > 0, 'mice spawned');
+  for (const m of g.mousies) assert.ok(m.y + m.h <= GROUND_Y + 0.01, `mouse above ground (y=${m.y}, h=${m.h})`);
+});
+
 test('obstacle hit trips the cat, costs gap, grants invulnerability', () => {
   const g = makeGame();
   startGame(g);
