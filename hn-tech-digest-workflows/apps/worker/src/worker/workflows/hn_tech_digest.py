@@ -20,9 +20,12 @@ from mistralai.workflows.plugins.mistralai.connectors import (
 )
 
 gmail_connector = connector("gmail")
-hacker_news_connector = connector("hacker-news-api")
+# The custom HTTP connector created in Studio for the Algolia HN API. The API stores the
+# name with a suffix (hacker_news_api_d906); referencing it by ID is stable and exact.
+HN_API_CONNECTOR_ID = "01a1f923-c102-7478-b0e3-4ee243142e84"
+HN_API_CONNECTOR_NAME = "hacker_news_api_d906"
+hacker_news_connector = connector(HN_API_CONNECTOR_ID)
 
-HN_API_CONNECTOR = "hacker-news-api"
 HN_SEARCH_TOOL = "search_stories"
 HN_ITEM_BASE = "https://news.ycombinator.com/item?id="
 CHAT_MODEL = "mistral-large-latest"
@@ -193,7 +196,7 @@ async def fetch_front_page_stories(
     hits = payload.get("hits") if isinstance(payload, dict) else None
     if not isinstance(hits, list):
         raise RuntimeError(
-            f"connector '{HN_API_CONNECTOR}' tool '{HN_SEARCH_TOOL}' returned no hits: "
+            f"connector '{HN_API_CONNECTOR_NAME}' tool '{HN_SEARCH_TOOL}' returned no hits: "
             f"{str(payload)[:300]}"
         )
     stories = [s for hit in hits if (s := parse_algolia_hit(hit)) is not None]

@@ -2,10 +2,13 @@
 
 One-shot, user-triggered workflow (`hn-tech-digest`, on-behalf-of, no schedule) that:
 
-1. Fetches the Hacker News front page through the **`hacker-news-api` HTTP connector**
-   (Algolia HN API, `GET /search?tags=front_page`, up to 30 hits in one call). Direct
+1. Fetches the Hacker News front page through a custom HTTP connector for the
+   **Algolia HN API** (`GET /search?tags=front_page`, up to 30 hits in one call). Direct
    worker egress to arbitrary hosts is blocked on Mistral Cloud, so the fetch goes
-   through the connectors gateway.
+   through the connectors gateway. The workflow references the connector by **ID**
+   (`01a1f923-c102-7478-b0e3-4ee243142e84`, stored name `hacker_news_api_d906`) because
+   the plain name `hacker-news-api` does not resolve; if you recreate the connector,
+   update `HN_API_CONNECTOR_ID` in `apps/worker/src/worker/workflows/hn_tech_digest.py`.
 2. Asks `mistral-large-latest` to select the top **tech-industry** stories (excludes personal
    blogs, essays, and non-tech news) and returns a structured `Digest`: per-story summaries, a
    Markdown digest, and a 180-260 word podcast script (~1-2 minutes spoken).
@@ -41,7 +44,8 @@ through the connectors gateway):
 1. Open the [Connectors page](https://console.mistral.ai/connectors/marketplace) in your workspace.
 2. **+ Add connector** → **Add a custom connector** → protocol **HTTP**.
 3. Server URL: `https://hn.algolia.com/api/v1`. Authentication: **None**.
-4. Name it exactly **`hacker-news-api`** (the workflow resolves the slot by this name).
+4. Name it `hacker-news-api` (the API stores it with a suffix, e.g. `hacker_news_api_d906`;
+   the workflow resolves the slot by connector **ID**, see above).
 5. Import the OpenAPI spec from this repo: `connectors/hacker-news-api.openapi.yaml`
    (upload the file, or paste its contents). It exposes `search_stories` (GET /search)
    and `get_item` (GET /items/{itemId}).
