@@ -1128,6 +1128,13 @@ function drawPads(cx, cy, R, yaw, pitch) {
     }
 }
 
+function limbCross(ra, rb, cx, cy, R) {
+    const t = (0.02 - ra[2]) / (rb[2] - ra[2]);
+    const x = ra[0] + (rb[0] - ra[0]) * t;
+    const y = ra[1] + (rb[1] - ra[1]) * t;
+    return { x: cx + x * R, y: cy - y * R };
+}
+
 function drawLand(cx, cy, R, yaw, pitch) {
     const land = state.land;
     if (!land || !land.length) return;
@@ -1135,21 +1142,30 @@ function drawLand(cx, cy, R, yaw, pitch) {
     for (const poly of land) {
         for (const ring of poly) {
             let anyFront = false;
-            const pts = [];
+            let prev = null;
             for (let i = 0; i < ring.length; i++) {
-                let p = project(ring[i][0], ring[i][1], 0, cx, cy, R, yaw, pitch);
-                if (p.z > 0.02) anyFront = true;
-                else {
-                    const dx = p.x - cx, dy = p.y - cy;
-                    const len = Math.hypot(dx, dy) || 1;
-                    p = { x: cx + dx / len * R * 0.998, y: cy + dy / len * R * 0.998 };
+                const v = unitVec(ring[i][1], ring[i][0]);
+                const r = rotPoint(v, yaw, pitch);
+                const front = r[2] > 0.02;
+                if (front) anyFront = true;
+                if (i === 0) {
+                    if (front) { ctx.moveTo(cx + r[0] * R, cy - r[1] * R); prev = { f: true, r }; }
+                    else prev = { f: false, r };
+                    continue;
                 }
-                pts.push(p);
+                if (front && prev.f) {
+                    ctx.lineTo(cx + r[0] * R, cy - r[1] * R);
+                } else if (front && !prev.f) {
+                    const c = limbCross(prev.r, r, cx, cy, R);
+                    ctx.moveTo(c.x, c.y);
+                    ctx.lineTo(cx + r[0] * R, cy - r[1] * R);
+                } else if (!front && prev.f) {
+                    const c = limbCross(prev.r, r, cx, cy, R);
+                    ctx.lineTo(c.x, c.y);
+                }
+                prev = { f: front, r };
             }
-            if (!anyFront) continue;
-            ctx.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-            ctx.closePath();
+            if (anyFront) ctx.closePath();
         }
     }
     ctx.fillStyle = "rgba(255,216,0,0.10)";
