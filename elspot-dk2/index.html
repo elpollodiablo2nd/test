@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elspot DK2 — Timestral Forecast</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --m-yellow: #FFD800;
+            --m-amber: #FFAF00;
+            --m-orange: #FF8205;
+            --m-orange-dark: #FA500F;
+            --m-red: #E10500;
+            --ink: #000000;
+            --cream: #FFFAEB;
+            --night: #0B0714;
+            --screen: #150C24;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; image-rendering: pixelated; }
+
+        body {
+            font-family: 'VT323', 'Courier New', monospace;
+            background-color: var(--night);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
+                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+            background-size: auto, 32px 32px, 32px 32px;
+            color: var(--cream);
+            min-height: 100vh;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px);
+        }
+
+        .container { max-width: 860px; width: 100%; margin: 0 auto; padding: 2rem 1rem 3rem; position: relative; }
+
+        header { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; margin-bottom: 1.5rem; text-align: center; position: relative; }
+
+        h1, .pixel-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.5rem;
+            background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(4px 4px 0 #000);
+        }
+
+        .logo-m { width: 96px; height: 96px; shape-rendering: crispEdges; filter: drop-shadow(5px 5px 0 rgba(0,0,0,0.8)); animation: bob 1.6s steps(2, jump-none) infinite; }
+        @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            padding: 0.55rem 0.8rem;
+            background: var(--m-yellow);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .card {
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            padding: 1.75rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .card h2 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+            color: var(--ink);
+            text-shadow: 3px 3px 0 rgba(225, 5, 0, 0.35);
+        }
+
+        .card p { font-size: 1.25rem; line-height: 1.35; margin-bottom: 0.9rem; }
+
+        button {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            padding: 1rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 0 6px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+        }
+        button:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
+        button:active { transform: translateY(6px); box-shadow: 0 0 0 var(--ink); }
+        button:disabled { filter: grayscale(0.7); cursor: wait; }
+        .btn-primary { background: var(--m-orange); color: var(--ink); }
+        .btn-alt { background: var(--cream); color: var(--ink); }
+
+        .controls { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; }
+
+        input.pixel, select.pixel {
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            padding: 0.5rem 1rem;
+            background: #ffffff;
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
+            outline: none;
+        }
+        input.pixel:focus, select.pixel:focus { box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange); }
+        #apiKey { flex: 1 1 260px; }
+
+        .feedback {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.9rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            line-height: 1.7;
+        }
+        .feedback.visible { display: block; }
+        .feedback.correct { background: var(--m-yellow); color: var(--ink); }
+        .feedback.wrong { background: var(--m-red); color: var(--cream); animation: shake 0.25s steps(2); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px); } }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            margin-bottom: 1.75rem;
+        }
+        .stat-item { text-align: center; padding: 0.6rem 0.25rem; background: rgba(0, 0, 0, 0.35); border: 3px solid rgba(255, 250, 235, 0.25); }
+        .stat-value { font-family: 'Press Start 2P', monospace; font-size: 0.95rem; color: var(--m-yellow); text-shadow: 3px 3px 0 #000; }
+        .stat-label { font-size: 1.05rem; opacity: 0.85; }
+
+        .screen {
+            background:
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
+                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.7), inset -4px -4px 0 rgba(255, 255, 255, 0.07);
+            padding: 1rem;
+        }
+
+        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; }
+        #chart .grid { stroke: rgba(255, 250, 235, 0.18); stroke-width: 2; }
+        #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
+        #chart .axis { font-family: 'VT323', monospace; font-size: 15px; fill: var(--cream); opacity: 0.85; }
+        #chart .line-hist { stroke: var(--m-yellow); stroke-width: 3; fill: none; }
+        #chart .line-today { stroke: var(--m-amber); stroke-width: 5; fill: none; }
+        #chart .line-actual { stroke: #8CFF6B; stroke-width: 4; fill: none; }
+        #chart .line-lag1 { stroke: var(--cream); stroke-width: 3; fill: none; stroke-dasharray: 10 8; opacity: 0.9; }
+        #chart .line-fc { stroke: var(--m-orange); stroke-width: 5; fill: none; stroke-dasharray: 14 8; }
+        #chart .band { fill: rgba(225, 5, 0, 0.30); stroke: none; }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 1.15rem; }
+        .legend span::before { content: ""; display: inline-block; width: 18px; height: 6px; margin-right: 6px; vertical-align: middle; border: 2px solid var(--ink); }
+        .legend .l-hist::before { background: var(--m-yellow); }
+        .legend .l-today::before { background: var(--m-amber); }
+        .legend .l-actual::before { background: #8CFF6B; }
+        .legend .l-lag1::before { background: var(--cream); }
+        .legend .l-fc::before { background: var(--m-orange); }
+        .legend .l-band::before { background: rgba(225, 5, 0, 0.45); }
+
+        .hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+        .hour-cell { border: 3px solid var(--ink); padding: 0.45rem 0.6rem; background: #fff; display: flex; flex-direction: column; box-shadow: 3px 3px 0 rgba(0,0,0,0.25); }
+        .hour-cell.cheapest { background: var(--m-yellow); box-shadow: 3px 3px 0 var(--ink); }
+        .hour-cell .h { font-family: 'Press Start 2P', monospace; font-size: 0.55rem; }
+        .hour-cell .v { font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: var(--m-orange-dark); margin: 0.3rem 0; }
+        .hour-cell .r { font-size: 1.05rem; opacity: 0.8; }
+        .dim { font-size: 1.25rem; opacity: 0.75; }
+
+        footer { text-align: center; font-size: 1.1rem; opacity: 0.8; margin-top: 0.5rem; line-height: 1.5; }
+        footer a { color: var(--m-orange); }
+
+        @media (max-width: 640px) {
+            .card { padding: 1.25rem; }
+            .logo-m { width: 72px; height: 72px; }
+            h1 { font-size: 1.05rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <svg class="logo-m" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
+                <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
+                <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
+                <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
+                <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
+                <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
+                <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
+            </svg>
+            <h1>ELSPOT DK2</h1>
+            <span class="badge">Timestral 1.0 · East Denmark</span>
+        </header>
+
+        <div class="stats" id="stats"></div>
+
+        <section class="card">
+            <h2>PRICE CHART · DKK/MWh</h2>
+            <div class="screen">
+                <svg id="chart" viewBox="0 0 760 320" role="img" aria-label="Hourly DK2 day-ahead prices and forecast"></svg>
+                <div class="legend">
+                    <span class="l-hist">history</span>
+                    <span class="l-today">last 24h</span>
+                    <span class="l-actual">published ahead</span>
+                    <span class="l-lag1">lag-1 baseline</span>
+                    <span class="l-fc">timestral median</span>
+                    <span class="l-band">q10–q90</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>RUN THE MODEL</h2>
+            <p>Day-ahead prices for DK2 are published once a day by Energinet, and tomorrow usually tracks today.
+                This page loads the recent hourly prices itself and calls the deployed <b>dk2-elspot-forecast</b>
+                workflow, which runs Mistral's <b>Timestral</b> time-series model on them (no retraining — the history
+                is the context). Your API key is only stored in this browser and sent to api.mistral.ai.</p>
+            <div class="controls">
+                <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
+                <select id="modelSize" class="pixel" title="Timestral checkpoint">
+                    <option value="5M">5M</option>
+                    <option value="28M" selected>28M</option>
+                    <option value="123M">123M</option>
+                    <option value="209M">209M</option>
+                </select>
+                <button id="loadBtn" class="btn-alt">LOAD PRICES</button>
+                <button id="runBtn" class="btn-primary">RUN TIMESTRAL</button>
+            </div>
+            <div id="feedback" class="feedback"></div>
+        </section>
+
+        <section class="card">
+            <h2>NEXT 24H — HOURLY FORECAST · DKK/MWh</h2>
+            <div id="hours" class="hours-grid"></div>
+        </section>
+
+        <footer>
+            Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.<br>
+            Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a> via the deployed <b>dk2-elspot-forecast</b> workflow (repo <b>elspot-dk2-workflows/</b>).
+        </footer>
+    </div>
+
+    <script>
+        "use strict";
+
+        var ENERGINET_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices";
+        var MISTRAL_API = "https://api.mistral.ai";
+        var WORKFLOW_NAME = "dk2-elspot-forecast";
+        var DEPLOYMENT_NAME = "dk2-elspot-forecast";
+        var HOURS_PER_DAY = 24;
+        var HOUR_MS = 3600 * 1000;
+
+        // ---------- pure core (unit-tested by test.js) ----------
+
+        function parseHourUtc(value) {
+            return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : value + "Z");
+        }
+
+        function aggregateHourlyUtc(records) {
+            var buckets = {};
+            for (var i = 0; i < records.length; i++) {
+                var rec = records[i];
+                if (!rec.TimeUTC || rec.DayAheadPriceDKK == null) continue;
+                var d = parseHourUtc(String(rec.TimeUTC));
+                var hour = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours());
+                if (!buckets[hour]) buckets[hour] = { sum: 0, n: 0 };
+                buckets[hour].sum += Number(rec.DayAheadPriceDKK);
+                buckets[hour].n += 1;
+            }
+            return Object.keys(buckets).map(function (k) {
+                var b = buckets[k];
+                return { utc: new Date(Number(k)), price: b.sum / b.n };
+            }).sort(function (a, b) { return a.utc - b.utc; });
+        }
+
+        function dkLabel(date) {
+            var f = new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit",
+                day: "2-digit", hour: "2-digit", hourCycle: "h23"
+            });
+            var parts = {};
+            f.formatToParts(date).forEach(function (p) { parts[p.type] = p.value; });
+            return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":00";
+        }
+
+        function pearson(xs, ys) {
+            var n = xs.length;
+            if (n < 2) return 0;
+            var mx = 0, my = 0, i;
+            for (i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+            mx /= n; my /= n;
+            var num = 0, dx = 0, dy = 0;
+            for (i = 0; i < n; i++) {
+                num += (xs[i] - mx) * (ys[i] - my);
+                dx += (xs[i] - mx) * (xs[i] - mx);
+                dy += (ys[i] - my) * (ys[i] - my);
+            }
+            var den = Math.sqrt(dx * dy);
+            return den ? num / den : 0;
+        }
+
+        function corrLag1(points) {
+            var prices = points.map(function (p) { return p.price; });
+            var xs = [], ys = [];
+            for (var i = 0; i + HOURS_PER_DAY < prices.length; i++) {
+                xs.push(prices[i]);
+                ys.push(prices[i + HOURS_PER_DAY]);
+            }
+            return pearson(xs, ys);
+        }
+
+        function lag1Forecast(points, horizon) {
+            var prices = points.map(function (p) { return p.price; });
+            var out = [];
+            for (var h = 0; h < horizon; h++) {
+                out.push(prices[prices.length - HOURS_PER_DAY + (h % HOURS_PER_DAY)]);
+            }
+            return out;
+        }
+
+        function mae(predictions, actuals) {
+            var sum = 0, n = 0;
+            for (var i = 0; i < predictions.length; i++) {
+                sum += Math.abs(predictions[i] - actuals[i]);
+                n++;
+            }
+            return n ? sum / n : 0;
+        }
+
+        function backtestMae(points, predictFn, backtestDays, horizon) {
+            var prices = points.map(function (p) { return p.price; });
+            var errors = [];
+            for (var i = 1; i <= backtestDays; i++) {
+                var contextEnd = prices.length - horizon * i;
+                if (contextEnd < 7 * HOURS_PER_DAY) break;
+                var predicted = predictFn(points.slice(0, contextEnd), horizon);
+                for (var j = 0; j < horizon; j++) {
+                    errors.push(Math.abs(predicted[j] - prices[contextEnd + j]));
+                }
+            }
+            if (!errors.length) return null;
+            return errors.reduce(function (a, b) { return a + b; }, 0) / errors.length;
+        }
+
+        var Core = {
+            parseHourUtc: parseHourUtc,
+            aggregateHourlyUtc: aggregateHourlyUtc,
+            dkLabel: dkLabel,
+            pearson: pearson,
+            corrLag1: corrLag1,
+            lag1Forecast: lag1Forecast,
+            mae: mae,
+            backtestMae: backtestMae
+        };
+        if (typeof module !== "undefined" && module.exports) module.exports = Core;
+
+        // ---------- app (browser only) ----------
+
+        var state = { history: [], forecast: null };
+
+        function feedback(message, kind) {
+            var el = document.getElementById("feedback");
+            el.textContent = message;
+            el.className = "feedback visible " + kind;
+        }
+
+        function setBusy(busy) {
+            document.getElementById("runBtn").disabled = busy;
+            document.getElementById("loadBtn").disabled = busy;
+        }
+
+        function fetchPrices(days) {
+            var start = new Date(Date.now() - (days + 2) * 86400000).toISOString().slice(0, 16);
+            var params = new URLSearchParams({
+                filter: JSON.stringify({ PriceArea: ["DK2"] }),
+                start: start,
+                sort: "TimeUTC asc",
+                limit: (days + 2) * 96 + 200
+            });
+            return fetch(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
+                if (!resp.ok) throw new Error("Energinet API " + resp.status);
+                return resp.json();
+            }).then(function (data) {
+                var points = aggregateHourlyUtc(data.records || []);
+                if (points.length < 7 * HOURS_PER_DAY) throw new Error("not enough DK2 history from Energinet");
+                return points;
+            });
+        }
+
+        function renderStats() {
+            var corr = corrLag1(state.history);
+            var maeLag1 = backtestMae(state.history, lag1Forecast, 7, HOURS_PER_DAY);
+            var tomorrowAvg = "—", cheapest = "—", maeTimestral = "—";
+            if (state.forecast && state.forecast.length) {
+                var sum = 0, minF = state.forecast[0];
+                state.forecast.forEach(function (f) {
+                    sum += f.median;
+                    if (f.median < minF.median) minF = f;
+                });
+                tomorrowAvg = Math.round(sum / state.forecast.length) + " kr";
+                cheapest = minF.hour_dk.slice(11, 16);
+            }
+            var items = [
+                ["CORR LAG-1", corr.toFixed(3), "var(--m-yellow)"],
+                ["MAE LAG-1", maeLag1 == null ? "—" : Math.round(maeLag1) + " kr", "var(--m-amber)"],
+                ["MAE TIMESTRAL", maeTimestral, "var(--m-orange)"],
+                ["NEXT 24H AVG", tomorrowAvg, "var(--m-orange-dark)"],
+                ["CHEAPEST HR", cheapest, "var(--m-red)"]
+            ];
+            if (state.workflowStats) {
+                var t = state.workflowStats.mae_timestral_dkk;
+                items[2][1] = t == null ? "—" : Math.round(t) + " kr";
+            }
+            document.getElementById("stats").innerHTML = items.map(function (it) {
+                return '<div class="stat-item"><div class="stat-value" style="color:' + it[2] + '">' + it[1] +
+                    '</div><div class="stat-label">' + it[0] + "</div></div>";
+            }).join("");
+        }
+
+        function renderChart() {
+            var svg = document.getElementById("chart");
+            var W = 760, H = 320, padL = 60, padR = 14, padT = 16, padB = 32;
+            var history = state.history;
+            if (!history.length) { svg.innerHTML = ""; return; }
+            var hist = history.slice(-5 * HOURS_PER_DAY);
+            var lastUtc = history[history.length - 1].utc.getTime();
+            var x1 = lastUtc + HOURS_PER_DAY * HOUR_MS;
+            var x0 = hist[0].utc.getTime();
+            var allVals = hist.map(function (p) { return p.price; });
+            var lag1 = lag1Forecast(history, HOURS_PER_DAY);
+            allVals = allVals.concat(lag1);
+            if (state.forecast) {
+                state.forecast.forEach(function (f) { allVals.push(f.median, f.q10, f.q90); });
+            }
+            var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
+            var pad = (yMax - yMin) * 0.08 || 1;
+            var y0 = yMin - pad, y1 = yMax + pad;
+            function X(t) { return padL + (t - x0) / (x1 - x0) * (W - padL - padR); }
+            function Y(v) { return H - padB - (v - y0) / (y1 - y0) * (H - padT - padB); }
+            var s = "";
+            for (var v = Math.ceil(y0 / 500) * 500; v <= y1; v += 500) {
+                s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
+                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + v + "</text>";
+            }
+            for (var t = x0; t <= x1; t += HOURS_PER_DAY * HOUR_MS) {
+                s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
+                     '<text class="axis" x="' + (X(t) + 4) + '" y="' + (H - padB + 18) + '">' + dkLabel(new Date(t)).slice(5, 10) + "</text>";
+            }
+            s += '<line class="now" x1="' + X(lastUtc) + '" y1="' + padT + '" x2="' + X(lastUtc) + '" y2="' + (H - padB) + '"/>' +
+                 '<text class="axis" x="' + X(lastUtc) + '" y="' + (padT + 12) + '" text-anchor="middle">LAST</text>';
+            s += '<polyline class="line-hist" points="' + hist.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            var today = hist.slice(-HOURS_PER_DAY);
+            s += '<polyline class="line-today" points="' + today.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            var ahead = history.filter(function (p) { return p.utc.getTime() > lastUtc; });
+            if (ahead.length) {
+                s += '<polyline class="line-actual" points="' + ahead.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            }
+            var lagPts = lag1.map(function (val, i) { return { t: lastUtc + (i + 1) * HOUR_MS, v: val }; });
+            s += '<polyline class="line-lag1" points="' + lagPts.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
+            if (state.forecast) {
+                var fPts = state.forecast.map(function (f, i) {
+                    return { t: lastUtc + (i + 1) * HOUR_MS, m: f.median, lo: f.q10, hi: f.q90 };
+                });
+                var band = fPts.map(function (p) { return X(p.t) + "," + Y(p.hi); }).join(" ") + " " +
+                    fPts.slice().reverse().map(function (p) { return X(p.t) + "," + Y(p.lo); }).join(" ");
+                s += '<polygon class="band" points="' + band + '"/>';
+                s += '<polyline class="line-fc" points="' + fPts.map(function (p) { return X(p.t) + "," + Y(p.m); }).join(" ") + '"/>';
+            }
+            svg.innerHTML = s;
+        }
+
+        function renderHours() {
+            var el = document.getElementById("hours");
+            if (!state.forecast || !state.forecast.length) {
+                el.innerHTML = '<p class="dim">No forecast yet — press RUN TIMESTRAL (needs your API key) or LOAD PRICES for the lag-1 baseline.</p>';
+                return;
+            }
+            var minF = state.forecast[0];
+            state.forecast.forEach(function (f) { if (f.median < minF.median) minF = f; });
+            el.innerHTML = state.forecast.map(function (f) {
+                var cls = f === minF ? "hour-cell cheapest" : "hour-cell";
+                return '<div class="' + cls + '"><span class="h">' + f.hour_dk.slice(11) + '</span>' +
+                    '<span class="v">' + Math.round(f.median) + ' kr</span>' +
+                    '<span class="r">q10–q90: ' + Math.round(f.q10) + "–" + Math.round(f.q90) + "</span></div>";
+            }).join("");
+        }
+
+        function renderAll() {
+            renderStats();
+            renderChart();
+            renderHours();
+        }
+
+        function loadPrices() {
+            setBusy(true);
+            feedback("Fetching DK2 day-ahead prices from Energinet…", "correct");
+            return fetchPrices(10).then(function (points) {
+                state.history = points;
+                state.forecast = null;
+                state.workflowStats = null;
+                renderAll();
+                feedback("Loaded " + points.length + " hourly DK2 prices, last " + dkLabel(points[points.length - 1].utc) + " (DK time).", "correct");
+            }).catch(function (err) {
+                feedback("Could not load prices: " + err.message, "wrong");
+            }).finally(function () { setBusy(false); });
+        }
+
+        function runTimestral() {
+            var key = document.getElementById("apiKey").value.trim();
+            if (!key) { feedback("Paste your Mistral API key first — it is stored only in this browser.", "wrong"); return; }
+            try { localStorage.setItem("elspot_dk2_api_key", key); } catch (e) {}
+            var modelSize = document.getElementById("modelSize").value;
+            setBusy(true);
+            feedback("Running workflow '" + WORKFLOW_NAME + "' (Timestral " + modelSize + ") on the managed deployment…", "correct");
+            fetch(MISTRAL_API + "/v1/workflows/" + WORKFLOW_NAME + "/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+                body: JSON.stringify({
+                    input: { days: 30, horizon_hours: 24, model_size: modelSize, backtest_days: 7, dry_run: false },
+                    wait_for_result: true,
+                    timeout_seconds: 300,
+                    deployment_name: DEPLOYMENT_NAME
+                })
+            }).then(function (resp) {
+                if (!resp.ok) {
+                    return resp.json().catch(function () { return null; }).then(function (body) {
+                        var msg = (body && (body.detail || body.message)) || ("HTTP " + resp.status);
+                        if (typeof msg !== "string") { try { msg = JSON.stringify(msg); } catch (e) { msg = "HTTP " + resp.status; } }
+                        if (resp.status === 401 || resp.status === 403) msg = "API key rejected (" + resp.status + ") — check the key";
+                        if (resp.status === 404) msg = "workflow '" + WORKFLOW_NAME + "' not found — deploy elspot-dk2-workflows first";
+                        throw new Error(msg);
+                    });
+                }
+                return resp.json();
+            }).then(function (out) {
+                var result = out && out.result;
+                if (!result || !result.forecast) throw new Error("execution returned no forecast");
+                state.forecast = result.forecast;
+                state.workflowStats = result.stats || null;
+                renderAll();
+                feedback("Forecast ready — " + result.model + ", generated " + String(result.generated_at).slice(0, 16) + "Z. MAE Timestral " +
+                    (result.stats && result.stats.mae_timestral_dkk != null ? Math.round(result.stats.mae_timestral_dkk) + " kr" : "n/a") +
+                    " vs lag-1 " + (result.stats && result.stats.mae_lag1_dkk != null ? Math.round(result.stats.mae_lag1_dkk) + " kr" : "n/a") + ".", "correct");
+            }).catch(function (err) {
+                feedback("Timestral run failed: " + err.message, "wrong");
+            }).finally(function () { setBusy(false); });
+        }
+
+        function init() {
+            document.getElementById("loadBtn").addEventListener("click", loadPrices);
+            document.getElementById("runBtn").addEventListener("click", runTimestral);
+            try {
+                var saved = localStorage.getItem("elspot_dk2_api_key");
+                if (saved) document.getElementById("apiKey").value = saved;
+            } catch (e) {}
+            loadPrices();
+        }
+
+        if (typeof document !== "undefined") init();
+    </script>
+</body>
+</html>

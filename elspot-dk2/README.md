@@ -1,0 +1,64 @@
+# ELSPOT DK2 — Timestral Forecast
+
+A single-file, pixel-art web app that forecasts **day-ahead electricity prices in East Denmark (DK2)**
+with Mistral's **Timestral** time-series foundation model, deployed as a managed workflow in this repo
+(`elspot-dk2-workflows/`).
+
+![style](https://img.shields.io/badge/style-Mistral%20pixel%20UI-FF8205) ![stack](https://img.shields.io/badge/stack-vanilla%20HTML%2FJS%2FSVG-FFD800) ![model](https://img.shields.io/badge/model-Timestral%201.0-FFAF00)
+
+## Run it
+
+Plain HTML — no build step. GitHub Pages serves this folder once the branch is merged, e.g.
+`https://elpollodiablo2nd.github.io/test/elspot-dk2/`, or open `index.html` locally / serve the folder
+(`python3 -m http.server 8000`).
+
+## Use it
+
+1. **LOAD PRICES** — fetches the last ~10 days of hourly DK2 day-ahead prices live from
+   [Energi Data Service](https://www.energidataservice.dk/tso-electricity/DayAheadPrices)
+   (`DayAheadPrices`, `PriceArea=DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
+   Day-ahead prices for tomorrow are published **once a day (~13:00 CET)**, and tomorrow usually
+   tracks today: the chart always shows the **lag-1 baseline** (tomorrow ≈ today), and the HUD shows
+   the day-to-day correlation and the lag-1 backtest MAE.
+2. Paste your **Mistral API key** (stored only in `localStorage`, sent only to `api.mistral.ai`) and
+   press **RUN TIMESTRAL** — the page calls the deployed `dk2-elspot-forecast` workflow
+   (`POST /v1/workflows/dk2-elspot-forecast/execute`, `wait_for_result`), which runs Timestral
+   (default 28M checkpoint; 5M/123M/209M selectable) on the last 30 days and returns the next 24h
+   with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
+3. The chart overlays the **Timestral median** (orange dashes) and its **q10–q90 band** (red), and the
+   hourly grid below lists all 24 forecast hours, cheapest highlighted.
+
+No retraining is involved: Timestral is zero-shot — the price history is the inference context
+(up to 32K steps), with hour-of-day/weekday passed as known-future covariates.
+
+## How it works
+
+- **Data**: `GET https://api.energidataservice.dk/dataset/DayAheadPrices?filter={"PriceArea":["DK2"]}&start=…&sort=TimeUTC asc`
+  — keyless, CORS-enabled; bucketed to hourly UTC (DST-proof), labels shown in Europe/Copenhagen.
+- **Model**: the managed workflow deployment `dk2-elspot-forecast` (source: `elspot-dk2-workflows/` in
+  this repo) runs `TimestralForecaster.from_pretrained("mistralai/Timestral-<size>")` (open weights,
+  Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts 24 steps ahead.
+- **Baseline**: lag-1 ("tomorrow = today, same hour"), scored against Timestral on a 7-day
+  rolling-origin backtest — reported as MAE stats in both the workflow result and the HUD.
+- Styled with the **Mistral pixel UI** skill (Press Start 2P / VT323, rainbow gradient, chunky
+  borders, CRT scanlines); chart is an inline SVG with `shape-rendering: crispEdges`.
+
+## Tests
+
+```
+node test.js                                    # pure-function tests of the embedded JS
+cd elspot-dk2-workflows && uv run pytest apps/worker/tests   # workflow tests (mocked model)
+```
+
+## Files
+
+- `index.html` — the whole app (markup + CSS + JS, no dependencies besides Google Fonts)
+- `test.js` — Node tests for the pure chart/stat functions extracted from `index.html`
+- `.nojekyll` — disables Jekyll processing on GitHub Pages
+
+## Credits
+
+- Prices: [Energi Data Service (Energinet)](https://www.energidataservice.dk/) — `DayAheadPrices`, DK2
+- Model: [Mistral Timestral 1.0](https://docs.mistral.ai/models/timestral-1-0-28m) —
+  [weights](https://huggingface.co/mistralai/Timestral-28M) (Modified MIT),
+  [inference code](https://github.com/mistralai/timestral) (Apache 2.0)
