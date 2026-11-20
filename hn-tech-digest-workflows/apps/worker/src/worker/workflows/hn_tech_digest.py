@@ -249,7 +249,6 @@ async def build_tech_digest(
             UserMessage(content=user_prompt),
         ],
         temperature=0.2,
-        reasoning_effort="none",
         response_format=ResponseFormat.model_validate(
             response_format_from_pydantic_model(Digest)
         ),
