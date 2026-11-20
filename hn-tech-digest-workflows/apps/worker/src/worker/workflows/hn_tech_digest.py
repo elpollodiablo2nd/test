@@ -1,4 +1,3 @@
-import asyncio
 from datetime import timedelta
 from html import escape
 from urllib.parse import urlparse
@@ -21,8 +20,10 @@ from mistralai.workflows.plugins.mistralai.connectors import (
 )
 
 gmail_connector = connector("gmail")
+hacker_news_connector = connector("hacker-news-api")
 
-HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
+HN_API_CONNECTOR = "hacker-news-api"
+HN_SEARCH_TOOL = "search_stories"
 HN_ITEM_BASE = "https://news.ycombinator.com/item?id="
 CHAT_MODEL = "mistral-large-latest"
 TTS_MODEL = "voxtral-mini-tts-3-0"
@@ -32,7 +33,6 @@ DEFAULT_FRONT_PAGE_LIMIT = 30
 DEFAULT_MAX_STORIES = 8
 MAX_PODCAST_WORDS = 320
 MAX_ATTACHMENT_B64_CHARS = 4_128_768
-USER_AGENT = "hn-tech-digest-workflow/1.0"
 
 
 class HnTechDigestInput(pydantic.BaseModel):
@@ -90,22 +90,46 @@ def story_domain(url: str | None) -> str:
     return host.removeprefix("www.")
 
 
-def parse_story(item: dict) -> HnStory | None:
-    if not isinstance(item, dict) or item.get("type") != "story":
+def parse_algolia_hit(hit: object) -> HnStory | None:
+    if not isinstance(hit, dict):
         return None
-    title = item.get("title")
-    story_id = item.get("id")
-    if not title or not isinstance(story_id, int):
+    title = hit.get("title")
+    object_id = hit.get("objectID", hit.get("story_id"))
+    if not title or object_id is None:
+        return None
+    try:
+        story_id = int(object_id)
+    except (ValueError, TypeError):
         return None
     return HnStory(
         id=story_id,
         title=str(title),
-        url=item.get("url"),
-        score=int(item.get("score") or 0),
-        by=str(item.get("by") or ""),
-        descendants=int(item.get("descendants") or 0),
+        url=hit.get("url"),
+        score=int(hit.get("points") or 0),
+        by=str(hit.get("author") or ""),
+        descendants=int(hit.get("num_comments") or 0),
         hn_url=f"{HN_ITEM_BASE}{story_id}",
     )
+
+
+def unwrap_tool_result(result: object) -> object:
+    if not isinstance(result, dict):
+        return result
+    structured = result.get("structuredContent")
+    if structured is not None:
+        return structured
+    content = result.get("content")
+    if isinstance(content, list):
+        import json
+
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                try:
+                    return json.loads(block.get("text", ""))
+                except (ValueError, TypeError):
+                    continue
+        return None
+    return result
 
 
 def render_digest_html(digest: Digest) -> str:
@@ -158,28 +182,21 @@ def build_story_listing(stories: list[HnStory]) -> str:
     start_to_close_timeout=timedelta(seconds=90),
     retry_policy_max_attempts=3,
 )
-async def fetch_front_page_stories(limit: int) -> list[HnStory]:
-    import httpx
-
-    async with httpx.AsyncClient(
-        timeout=30.0, follow_redirects=True, headers={"User-Agent": USER_AGENT}
-    ) as client:
-        response = await client.get(f"{HN_API_BASE}/frontpage.json")
-        response.raise_for_status()
-        ids = [i for i in response.json() if isinstance(i, int)][:limit]
-
-        semaphore = asyncio.Semaphore(10)
-
-        async def fetch_item(item_id: int) -> dict | None:
-            async with semaphore:
-                item_response = await client.get(f"{HN_API_BASE}/item/{item_id}.json")
-                if item_response.status_code != 200:
-                    return None
-                return item_response.json()
-
-        items = await asyncio.gather(*(fetch_item(i) for i in ids))
-
-    stories = [story for item in items if (story := parse_story(item)) is not None]
+async def fetch_front_page_stories(
+    limit: int, hn: ToolCallClient = Depends(hacker_news_connector)
+) -> list[HnStory]:
+    result = await hn.call_tool(
+        tool_name=HN_SEARCH_TOOL,
+        arguments={"tags": "front_page", "hitsPerPage": limit},
+    )
+    payload = unwrap_tool_result(result)
+    hits = payload.get("hits") if isinstance(payload, dict) else None
+    if not isinstance(hits, list):
+        raise RuntimeError(
+            f"connector '{HN_API_CONNECTOR}' tool '{HN_SEARCH_TOOL}' returned no hits: "
+            f"{str(payload)[:300]}"
+        )
+    stories = [s for hit in hits if (s := parse_algolia_hit(hit)) is not None]
     if not stories:
         raise RuntimeError("Hacker News front page returned no usable stories")
     return stories
@@ -242,25 +259,8 @@ async def generate_podcast_audio(script: str, voice_id: str) -> str:
 
 
 def extract_sent_message(result: object) -> dict:
-    if isinstance(result, dict):
-        if "id" in result or "threadId" in result:
-            return result
-        content = result.get("content")
-        if isinstance(content, list):
-            import json
-
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "text":
-                    try:
-                        parsed = json.loads(block.get("text", ""))
-                    except (ValueError, TypeError):
-                        continue
-                    if isinstance(parsed, dict):
-                        return parsed
-        structured = result.get("structuredContent")
-        if isinstance(structured, dict):
-            return structured
-    return {}
+    payload = unwrap_tool_result(result)
+    return payload if isinstance(payload, dict) else {}
 
 
 @workflows.activity(
@@ -300,13 +300,14 @@ async def send_digest_email(
     name="hn-tech-digest",
     workflow_display_name="HN Tech Digest",
     workflow_description=(
-        "One-shot, user-triggered digest: fetches the Hacker News front page, selects the "
-        "top tech-industry stories, summarizes them, renders a 1-2 minute podcast-style MP3, "
-        "and emails both to your own Gmail inbox. No schedule; start it manually."
+        "One-shot, user-triggered digest: fetches the Hacker News front page via the "
+        "'hacker-news-api' connector, selects the top tech-industry stories, summarizes "
+        "them, renders a 1-2 minute podcast-style MP3, and emails both to your own Gmail "
+        "inbox. No schedule; start it manually."
     ),
     on_behalf_of=True,
 )
-@uses_connectors(gmail_connector)
+@uses_connectors(gmail_connector, hacker_news_connector)
 class HnTechDigestWorkflow:
     @workflows.workflow.entrypoint
     async def run(self, input: HnTechDigestInput) -> HnTechDigestResult:

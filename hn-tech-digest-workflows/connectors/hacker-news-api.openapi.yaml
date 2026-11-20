@@ -1,0 +1,90 @@
+openapi: 3.0.3
+info:
+  title: Hacker News API (Algolia)
+  description: Algolia HN Search API. The `tags=front_page` search returns the current Hacker News front page with full metadata in one call.
+  version: 1.0.0
+servers:
+  - url: https://hn.algolia.com/api/v1
+paths:
+  /search:
+    get:
+      operationId: search_stories
+      summary: Search Hacker News stories and comments
+      description: Use tags=front_page (optionally combined with story, e.g. "story,front_page") to get the current front page.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: tags
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated tags, e.g. "front_page" or "story,front_page".
+        - name: hitsPerPage
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 30
+            maximum: 1000
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hits:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        objectID:
+                          type: string
+                        story_id:
+                          type: integer
+                        title:
+                          type: string
+                        url:
+                          type: string
+                        author:
+                          type: string
+                        points:
+                          type: integer
+                        num_comments:
+                          type: integer
+                        created_at_i:
+                          type: integer
+                  nbHits:
+                    type: integer
+                  page:
+                    type: integer
+                  hitsPerPage:
+                    type: integer
+  /items/{itemId}:
+    get:
+      operationId: get_item
+      summary: Get an item (story/comment) and its children by id
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Item
+          content:
+            application/json:
+              schema:
+                type: object

@@ -13,9 +13,10 @@ from worker.workflows.hn_tech_digest import (
     HnTechDigestWorkflow,
     build_story_listing,
     extract_sent_message,
-    parse_story,
+    parse_algolia_hit,
     render_digest_html,
     story_domain,
+    unwrap_tool_result,
 )
 
 WORKFLOW_EXECUTION_TIMEOUT = timedelta(seconds=30)
@@ -53,28 +54,30 @@ def make_digest() -> Digest:
     )
 
 
-def test_parse_story_accepts_story_items():
-    item = {
-        "id": 42,
-        "type": "story",
+def test_parse_algolia_hit_accepts_story_hits():
+    hit = {
+        "objectID": "42",
         "title": "A launch",
         "url": "https://blog.example.org/a",
-        "score": 10,
-        "by": "dang",
-        "descendants": 5,
+        "points": 10,
+        "author": "dang",
+        "num_comments": 5,
     }
-    story = parse_story(item)
+    story = parse_algolia_hit(hit)
     assert story is not None
     assert story.id == 42
+    assert story.score == 10
+    assert story.descendants == 5
+    assert story.by == "dang"
     assert story.hn_url == "https://news.ycombinator.com/item?id=42"
     assert story_domain(story.url) == "blog.example.org"
 
 
-def test_parse_story_rejects_non_stories_and_missing_titles():
-    assert parse_story({"id": 1, "type": "comment", "title": "x"}) is None
-    assert parse_story({"id": 1, "type": "story"}) is None
-    assert parse_story({"type": "story", "title": "no id"}) is None
-    assert parse_story("not a dict") is None
+def test_parse_algolia_hit_rejects_bad_hits():
+    assert parse_algolia_hit({"objectID": "1"}) is None
+    assert parse_algolia_hit({"title": "no id"}) is None
+    assert parse_algolia_hit({"objectID": "abc", "title": "bad id"}) is None
+    assert parse_algolia_hit("not a dict") is None
 
 
 def test_story_domain_defaults_to_hn():
@@ -98,6 +101,16 @@ def test_render_digest_html_escapes_and_links():
     assert "&lt;script&gt;" in html
     assert 'href="https://www.example.com/post"' in html
     assert "HN discussion" in html
+
+
+def test_unwrap_tool_result_handles_plain_mcp_and_structured_shapes():
+    assert unwrap_tool_result({"id": "m1"}) == {"id": "m1"}
+    mcp_shape = {"content": [{"type": "text", "text": '{"hits": [1, 2]}'}]}
+    assert unwrap_tool_result(mcp_shape) == {"hits": [1, 2]}
+    assert unwrap_tool_result({"structuredContent": {"hits": []}}) == {"hits": []}
+    not_json = {"content": [{"type": "text", "text": "not json"}]}
+    assert unwrap_tool_result(not_json) is None
+    assert unwrap_tool_result(None) is None
 
 
 def test_extract_sent_message_handles_plain_and_mcp_shapes():
