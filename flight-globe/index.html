@@ -1081,7 +1081,7 @@ function project(lat, lon, alt, cx, cy, R, yaw, pitch) {
     const v = unitVec(lat, lon);
     const s = 1 + (alt || 0);
     const r = rotPoint([v[0] * s, v[1] * s, v[2] * s], yaw, pitch);
-    return { x: cx + r[0] * R, y: cy - r[1] * R, z: r[2] };
+    return { x: cx - r[0] * R, y: cy - r[1] * R, z: r[2] };
 }
 
 function drawArc(pts, cx, cy, R, yaw, pitch, style, width, dash, dashOff, glow, glowColor) {
@@ -1095,7 +1095,7 @@ function drawArc(pts, cx, cy, R, yaw, pitch, style, width, dash, dashOff, glow, 
     for (const v of pts) {
         const r = rotPoint(v, yaw, pitch);
         if (r[2] > 0.02) {
-            const x = cx + r[0] * R, y = cy - r[1] * R;
+            const x = cx - r[0] * R, y = cy - r[1] * R;
             if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
         } else pen = false;
     }
@@ -1132,7 +1132,7 @@ function limbCross(ra, rb, cx, cy, R) {
     const t = (0.02 - ra[2]) / (rb[2] - ra[2]);
     const x = ra[0] + (rb[0] - ra[0]) * t;
     const y = ra[1] + (rb[1] - ra[1]) * t;
-    return { x: cx + x * R, y: cy - y * R };
+    return { x: cx - x * R, y: cy - y * R };
 }
 
 function drawLand(cx, cy, R, yaw, pitch) {
@@ -1149,16 +1149,16 @@ function drawLand(cx, cy, R, yaw, pitch) {
                 const front = r[2] > 0.02;
                 if (front) anyFront = true;
                 if (i === 0) {
-                    if (front) { ctx.moveTo(cx + r[0] * R, cy - r[1] * R); prev = { f: true, r }; }
+                    if (front) { ctx.moveTo(cx - r[0] * R, cy - r[1] * R); prev = { f: true, r }; }
                     else prev = { f: false, r };
                     continue;
                 }
                 if (front && prev.f) {
-                    ctx.lineTo(cx + r[0] * R, cy - r[1] * R);
+                    ctx.lineTo(cx - r[0] * R, cy - r[1] * R);
                 } else if (front && !prev.f) {
                     const c = limbCross(prev.r, r, cx, cy, R);
                     ctx.moveTo(c.x, c.y);
-                    ctx.lineTo(cx + r[0] * R, cy - r[1] * R);
+                    ctx.lineTo(cx - r[0] * R, cy - r[1] * R);
                 } else if (!front && prev.f) {
                     const c = limbCross(prev.r, r, cx, cy, R);
                     ctx.lineTo(c.x, c.y);
@@ -1466,7 +1466,7 @@ canvas.addEventListener("pointermove", e => {
         lastY = e.clientY;
         moved += Math.abs(dx) + Math.abs(dy);
         const R = Math.min(canvas.width, canvas.height) * 0.40 * state.zoom;
-        state.yaw += dx / R;
+        state.yaw -= dx / R;
         state.pitch = Math.max(-1.45, Math.min(1.45, state.pitch + dy / R));
         state.tween = null;
     } else {
@@ -1500,8 +1500,8 @@ canvas.addEventListener("wheel", e => {
 window.addEventListener("keydown", e => {
     if (e.target && e.target.tagName === "INPUT") return;
     const step = 0.09;
-    if (e.key === "ArrowLeft") { state.yaw -= step; state.tween = null; }
-    else if (e.key === "ArrowRight") { state.yaw += step; state.tween = null; }
+    if (e.key === "ArrowLeft") { state.yaw += step; state.tween = null; }
+    else if (e.key === "ArrowRight") { state.yaw -= step; state.tween = null; }
     else if (e.key === "ArrowUp") { state.pitch = Math.max(-1.45, state.pitch + step); state.tween = null; }
     else if (e.key === "ArrowDown") { state.pitch = Math.min(1.45, state.pitch - step); state.tween = null; }
     else if (e.key === "+" || e.key === "=") { state.zoom = Math.min(6, state.zoom * 1.2); ui.statZoom.textContent = state.zoom.toFixed(1) + "×"; }
