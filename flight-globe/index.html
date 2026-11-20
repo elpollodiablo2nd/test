@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLIGHT GLOBE — pixel wrapper for FlightConnections.com</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --m-yellow: #FFD800;
+            --m-amber: #FFAF00;
+            --m-orange: #FF8205;
+            --m-orange-dark: #FA500F;
+            --m-red: #E10500;
+            --ink: #000000;
+            --cream: #FFFAEB;
+            --night: #0B0714;
+            --screen: #150C24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+        }
+
+        body {
+            font-family: 'VT323', 'Courier New', monospace;
+            background-color: var(--night);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
+                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+            background-size: auto, 32px 32px, 32px 32px;
+            color: var(--cream);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem 3rem;
+            overflow-x: hidden;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px);
+            z-index: 50;
+        }
+
+        .container {
+            max-width: 1240px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .logo-m {
+            width: 84px;
+            height: 84px;
+            shape-rendering: crispEdges;
+            filter: drop-shadow(5px 5px 0 rgba(0, 0, 0, 0.8));
+            animation: bob 1.6s steps(2, jump-none) infinite;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.7rem;
+            margin-top: 1.1rem;
+            letter-spacing: 2px;
+            background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(4px 4px 0 #000);
+        }
+
+        @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+            h1 { color: var(--m-orange); background: none; }
+        }
+
+        .subtitle {
+            font-size: 1.4rem;
+            color: var(--m-amber);
+            margin-top: 0.7rem;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            box-shadow: 0 -8px 0 currentColor, 0 8px 0 currentColor, -8px 0 0 currentColor, 8px 0 0 currentColor;
+            animation: twinkle 1.2s steps(2, jump-none) infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.15; transform: translateY(-6px); }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.6rem 0.25rem;
+            background: rgba(0, 0, 0, 0.35);
+            border: 3px solid rgba(255, 250, 235, 0.25);
+        }
+
+        .stat-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.95rem;
+            color: var(--m-yellow);
+            text-shadow: 3px 3px 0 #000;
+        }
+
+        .stat-value.orange { color: var(--m-orange); }
+        .stat-value.red { color: var(--m-red); }
+        .stat-value.amber { color: var(--m-amber); }
+
+        .stat-label {
+            font-size: 1.05rem;
+            margin-top: 0.35rem;
+            color: var(--cream);
+            opacity: 0.85;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.45fr 1fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .screen {
+            position: relative;
+            background:
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
+                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            height: clamp(380px, 64vh, 660px);
+            overflow: hidden;
+        }
+
+        #globe {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        #globe.dragging { cursor: grabbing; }
+        #globe.pick { cursor: pointer; }
+
+        .globe-hint {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 0.55rem 0.75rem;
+            text-align: center;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.52rem;
+            color: rgba(255, 250, 235, 0.75);
+            text-shadow: 2px 2px 0 #000;
+            background: rgba(11, 7, 20, 0.55);
+            pointer-events: none;
+        }
+
+        .globe-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(11, 7, 20, 0.72);
+            font-size: 1.7rem;
+            color: var(--m-yellow);
+            text-shadow: 3px 3px 0 #000;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 0.55em;
+            height: 0.9em;
+            margin-left: 10px;
+            background: var(--m-yellow);
+            box-shadow: 0 0 10px rgba(255, 216, 0, 0.8);
+            animation: blink 0.9s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .card {
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .type-badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            padding: 0.55rem 0.8rem;
+            margin-bottom: 1.1rem;
+            background: var(--m-yellow);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .type-badge[data-type="gange"] { background: var(--m-orange); }
+        .type-badge[data-type="laengde"] { background: var(--m-amber); }
+        .type-badge[data-type="equation"] { background: var(--m-red); color: var(--cream); }
+
+        button, a.btn-link {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            padding: 0.9rem 1.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: 4px solid var(--ink);
+            box-shadow: 0 6px 0 var(--ink);
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+            background: var(--cream);
+            color: var(--ink);
+        }
+
+        button:hover, a.btn-link:hover {
+            filter: brightness(1.08);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 var(--ink);
+        }
+
+        button:active, a.btn-link:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+
+        .btn-primary { background: var(--m-orange); color: var(--ink); }
+        .btn-amber { background: var(--m-amber); color: var(--ink); }
+        .btn-screen {
+            background: var(--screen);
+            color: var(--cream);
+        }
+
+        button.toggle.active {
+            background: var(--m-yellow);
+            color: var(--ink);
+        }
+
+        .buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 1.25rem;
+        }
+
+        .search-wrap {
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+
+        input.pixel {
+            width: 100%;
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.5rem;
+            padding: 0.45rem 0.9rem;
+            background: #ffffff;
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
+            outline: none;
+        }
+
+        input.pixel:focus {
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange);
+        }
+
+        .results {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 var(--ink);
+            z-index: 20;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .results.visible { display: block; }
+
+        .result-btn {
+            display: block;
+            width: 100%;
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.25rem;
+            text-align: left;
+            padding: 0.35rem 0.8rem;
+            border: none;
+            box-shadow: none;
+            background: #ffffff;
+            color: var(--ink);
+            cursor: pointer;
+        }
+
+        .result-btn:hover, .result-btn:focus {
+            background: var(--m-yellow);
+            transform: none;
+            box-shadow: none;
+            filter: none;
+        }
+
+        .result-btn b { color: var(--m-orange-dark); }
+
+        .sel-name {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.8rem;
+            line-height: 1.7;
+            margin-bottom: 0.5rem;
+        }
+
+        .sel-city {
+            font-size: 1.35rem;
+            line-height: 1.2;
+            margin-bottom: 0.6rem;
+        }
+
+        .iata-badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            background: var(--ink);
+            color: var(--m-yellow);
+            padding: 0.45rem 0.7rem;
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--m-orange-dark);
+            margin-bottom: 0.9rem;
+        }
+
+        .mini-stats {
+            display: flex;
+            gap: 1.25rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .mini-stat .v {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.95rem;
+            color: var(--m-orange-dark);
+        }
+
+        .mini-stat .l {
+            font-size: 1.05rem;
+            opacity: 0.8;
+        }
+
+        .fc-link {
+            width: 100%;
+            margin-bottom: 1.25rem;
+            display: none;
+        }
+
+        .fc-link.visible { display: inline-flex; }
+
+        .sec-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            color: var(--m-orange-dark);
+            margin: 1.1rem 0 0.6rem;
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            max-height: 190px;
+            overflow-y: auto;
+            padding: 2px;
+        }
+
+        .chip {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 0.3rem 0.55rem;
+            border: 3px solid var(--ink);
+            background: var(--cream);
+            color: var(--ink);
+            box-shadow: 3px 3px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+        }
+
+        .chip:hover {
+            background: var(--m-yellow);
+            transform: translateY(-2px);
+            box-shadow: 3px 5px 0 var(--ink);
+        }
+
+        .chip:active {
+            transform: translateY(3px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+
+        .chip[data-kind="indirect"] { background: #FFD9D4; }
+        .chip[data-kind="indirect"]:hover { background: var(--m-amber); }
+        .chip.more { background: var(--screen); color: var(--cream); cursor: default; }
+        .chip.more:hover { transform: none; box-shadow: 3px 3px 0 var(--ink); background: var(--screen); }
+
+        .chips::-webkit-scrollbar, .results::-webkit-scrollbar { width: 10px; }
+        .chips::-webkit-scrollbar-thumb, .results::-webkit-scrollbar-thumb { background: var(--ink); }
+        .chips::-webkit-scrollbar-track, .results::-webkit-scrollbar-track { background: rgba(0,0,0,0.08); }
+
+        .feedback {
+            display: none;
+            margin-bottom: 1.1rem;
+            padding: 0.8rem 1.1rem;
+            border: 4px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            line-height: 1.7;
+        }
+
+        .feedback.visible { display: block; }
+        .feedback.wrong { background: var(--m-red); color: var(--cream); }
+        .feedback.correct { background: var(--m-yellow); color: var(--ink); }
+
+        .empty-note {
+            font-size: 1.25rem;
+            opacity: 0.75;
+            padding: 0.4rem 0;
+        }
+
+        footer {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 1.15rem;
+            color: rgba(255, 250, 235, 0.75);
+            text-shadow: 2px 2px 0 #000;
+            line-height: 1.5;
+        }
+
+        footer a { color: var(--m-yellow); }
+
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+            .screen { height: clamp(340px, 55vh, 540px); }
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 1.1rem; }
+            .logo-m { width: 64px; height: 64px; }
+            .subtitle { font-size: 1.15rem; }
+            .buttons { flex-direction: column; }
+            .buttons button, .buttons a.btn-link { width: 100%; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .card { padding: 1.1rem; }
+        }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <svg class="logo-m" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="Mistral M logo">
+            <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
+            <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
+            <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
+            <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
+            <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
+            <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
+        </svg>
+        <span class="sparkle" style="color:#FFD800; left:12%; top:18%;"></span>
+        <span class="sparkle" style="color:#FF8205; right:14%; top:30%; animation-delay:0.4s;"></span>
+        <span class="sparkle" style="color:#E10500; left:22%; bottom:8%; animation-delay:0.8s;"></span>
+        <h1>FLIGHT GLOBE</h1>
+        <div class="subtitle">a pixel wrapper for FlightConnections.com — all flights worldwide on a rotatable globe</div>
+    </header>
+
+    <div class="stats">
+        <div class="stat-item"><div class="stat-value" id="stat-airports">…</div><div class="stat-label">AIRPORTS</div></div>
+        <div class="stat-item"><div class="stat-value amber" id="stat-routes">…</div><div class="stat-label">ROUTES</div></div>
+        <div class="stat-item"><div class="stat-value orange" id="stat-selected">NONE</div><div class="stat-label">SELECTED</div></div>
+        <div class="stat-item"><div class="stat-value red" id="stat-zoom">1.0×</div><div class="stat-label">ZOOM</div></div>
+    </div>
+
+    <div class="layout">
+        <div class="screen" id="screen">
+            <canvas id="globe"></canvas>
+            <div class="globe-loading" id="loading">LOADING ROUTE DATA<span class="cursor"></span></div>
+            <div class="globe-hint">DRAG = ROTATE &nbsp;·&nbsp; SCROLL = ZOOM &nbsp;·&nbsp; CLICK AN AIRPORT</div>
+        </div>
+
+        <div>
+            <div class="card">
+                <span class="type-badge">AIRPORT SEARCH</span>
+                <div class="feedback wrong" id="feedback"></div>
+                <div class="search-wrap">
+                    <input class="pixel" id="search" type="text" placeholder="TYPE IATA / CITY / NAME…" autocomplete="off" spellcheck="false">
+                    <div class="results" id="results"></div>
+                </div>
+                <div class="buttons">
+                    <button class="btn-amber" id="btn-reset" type="button">RESET VIEW</button>
+                    <button class="btn-screen toggle" id="btn-spin" type="button">SPIN: OFF</button>
+                    <button class="btn-screen toggle" id="btn-all" type="button">ALL ROUTES: OFF</button>
+                    <button class="btn-screen toggle active" id="btn-direct" type="button">DIRECT: ON</button>
+                    <button class="btn-screen toggle active" id="btn-indirect" type="button">1-STOP: ON</button>
+                </div>
+                <a class="btn-primary fc-link visible" id="fc-home" href="https://www.flightconnections.com/" target="_blank" rel="noopener">OPEN FLIGHTCONNECTIONS.COM ↗</a>
+            </div>
+
+            <div class="card">
+                <span class="type-badge" data-type="gange">SELECTED AIRPORT</span>
+                <div class="sel-name" id="sel-name">NONE — CLICK AN AIRPORT ON THE GLOBE</div>
+                <div class="sel-city" id="sel-city"></div>
+                <span class="iata-badge" id="sel-iata">---</span>
+                <div class="mini-stats">
+                    <div class="mini-stat"><span class="v" id="mini-direct">0</span> <span class="l">DIRECT</span></div>
+                    <div class="mini-stat"><span class="v" id="mini-indirect">0</span> <span class="l">1-STOP</span></div>
+                </div>
+                <a class="btn-primary fc-link" id="fc-link" href="https://www.flightconnections.com/" target="_blank" rel="noopener">OPEN ON FLIGHTCONNECTIONS ↗</a>
+                <div class="sec-title">DIRECT CONNECTIONS (<span id="direct-count">0</span>)</div>
+                <div class="chips" id="direct-list"><div class="empty-note">click an airport to list its direct routes</div></div>
+                <div class="sec-title">INDIRECT — 1 STOP (<span id="indirect-count">0</span>)</div>
+                <div class="chips" id="indirect-list"><div class="empty-note">one-stop destinations appear here</div></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        route data: <a href="https://openflights.org/data.html" target="_blank" rel="noopener">OpenFlights</a> (airports + routes, loaded live via jsDelivr / GitHub) · live schedules &amp; map: <a href="https://www.flightconnections.com/" target="_blank" rel="noopener">FlightConnections.com</a><br>
+        click a destination chip to fly the globe there · the orange button deep-links to the matching page on FlightConnections.com
+    </footer>
+</div>
+<noscript><p style="text-align:center; padding:2rem;">This app needs JavaScript to render the globe.</p></noscript>
+<script>
+const TOP_N = 1200;
+const DATA = {
+    airports: [
+        "https://cdn.jsdelivr.net/gh/jpatokal/openflights@master/data/airports.dat",
+        "https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat"
+    ],
+    routes: [
+        "https://cdn.jsdelivr.net/gh/jpatokal/openflights@master/data/routes.dat",
+        "https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat"
+    ]
+};
+
+const FALLBACK_AIRPORTS = [
+    ["AMS","Schiphol","Amsterdam","Netherlands",52.31,4.76],
+    ["LHR","Heathrow","London","United Kingdom",51.47,-0.45],
+    ["LGW","Gatwick","London","United Kingdom",51.15,-0.19],
+    ["CDG","Charles de Gaulle","Paris","France",49.01,2.55],
+    ["FRA","Frankfurt","Frankfurt","Germany",50.03,8.56],
+    ["MUC","Munich","Munich","Germany",48.35,11.79],
+    ["JFK","Kennedy","New York","USA",40.64,-73.78],
+    ["EWR","Newark","New York","USA",40.69,-74.17],
+    ["LAX","Los Angeles Intl","Los Angeles","USA",33.94,-118.41],
+    ["ORD","O'Hare","Chicago","USA",41.97,-87.91],
+    ["ATL","Atlanta","Atlanta","USA",33.64,-84.43],
+    ["DFW","Dallas Fort Worth","Dallas","USA",32.90,-97.04],
+    ["SFO","San Francisco Intl","San Francisco","USA",37.62,-122.38],
+    ["MIA","Miami Intl","Miami","USA",25.79,-80.29],
+    ["YYZ","Pearson","Toronto","Canada",43.68,-79.63],
+    ["MEX","Mexico City Intl","Mexico City","Mexico",19.44,-99.07],
+    ["GRU","Guarulhos","Sao Paulo","Brazil",-23.43,-46.47],
+    ["EZE","Ezeiza","Buenos Aires","Argentina",-34.82,-58.54],
+    ["GIG","Galeao","Rio de Janeiro","Brazil",-22.81,-43.25],
+    ["SCL","Santiago","Santiago","Chile",-33.39,-70.79],
+    ["LIM","Jorge Chavez","Lima","Peru",-12.02,-77.11],
+    ["BOG","El Dorado","Bogota","Colombia",4.70,-74.07],
+    ["MAD","Barajas","Madrid","Spain",40.47,-3.57],
+    ["BCN","Barcelona","Barcelona","Spain",41.30,2.08],
+    ["FCO","Fiumicino","Rome","Italy",41.80,12.25],
+    ["MXP","Malpensa","Milan","Italy",45.63,8.73],
+    ["ZRH","Zurich","Zurich","Switzerland",47.46,8.55],
+    ["VIE","Vienna","Vienna","Austria",48.11,16.57],
+    ["CPH","Copenhagen","Copenhagen","Denmark",55.62,12.66],
+    ["ARN","Arlanda","Stockholm","Sweden",59.65,17.92],
+    ["OSL","Gardermoen","Oslo","Norway",60.19,11.10],
+    ["HEL","Helsinki","Helsinki","Finland",60.32,24.96],
+    ["DUB","Dublin","Dublin","Ireland",53.42,-6.27],
+    ["LIS","Lisbon","Lisbon","Portugal",38.77,-9.13],
+    ["ATH","Eleftherios","Athens","Greece",37.94,23.65],
+    ["IST","Istanbul","Istanbul","Turkey",41.26,28.74],
+    ["DXB","Dubai Intl","Dubai","UAE",25.25,55.36],
+    ["DOH","Hamad","Doha","Qatar",25.26,51.61],
+    ["AUH","Zayed","Abu Dhabi","UAE",24.43,54.65],
+    ["RUH","King Khalid","Riyadh","Saudi Arabia",24.96,46.70],
+    ["JNB","O.R. Tambo","Johannesburg","South Africa",-26.14,28.25],
+    ["CPT","Cape Town Intl","Cape Town","South Africa",-33.97,-18.60],
+    ["CAI","Cairo Intl","Cairo","Egypt",30.12,31.41],
+    ["NBO","Jomo Kenyatta","Nairobi","Kenya",-1.32,36.93],
+    ["LOS","Murtala Muhammed","Lagos","Nigeria",6.58,3.33],
+    ["CMN","Mohammed V","Casablanca","Morocco",33.37,-7.59],
+    ["DEL","Indira Gandhi","New Delhi","India",28.57,77.10],
+    ["BOM","Chhatrapati","Mumbai","India",19.09,72.87],
+    ["BLR","Kempegowda","Bangalore","India",13.20,77.71],
+    ["SIN","Changi","Singapore","Singapore",1.36,103.99],
+    ["BKK","Suvarnabhumi","Bangkok","Thailand",13.69,100.75],
+    ["HKG","Hong Kong Intl","Hong Kong","China",22.31,113.92],
+    ["PEK","Capital","Beijing","China",40.08,116.58],
+    ["PVG","Pudong","Shanghai","China",31.14,121.81],
+    ["ICN","Incheon","Seoul","South Korea",37.46,126.44],
+    ["NRT","Narita","Tokyo","Japan",35.77,140.39],
+    ["HND","Haneda","Tokyo","Japan",35.55,139.78],
+    ["KUL","Kuala Lumpur Intl","Kuala Lumpur","Malaysia",2.75,101.71],
+    ["CGK","Soekarno-Hatta","Jakarta","Indonesia",-6.13,106.66],
+    ["SYD","Kingsford Smith","Sydney","Australia",-33.95,151.18],
+    ["MEL","Melbourne","Melbourne","Australia",-37.67,144.84],
+    ["AKL","Auckland","Auckland","New Zealand",-37.01,-174.79],
+    ["HNL","Honolulu","Honolulu","USA",21.32,-157.92],
+    ["SEA","Seattle-Tacoma","Seattle","USA",47.45,-122.30],
+    ["BOS","Logan","Boston","USA",42.36,-71.01],
+    ["IAD","Dulles","Washington","USA",38.94,-77.46],
+    ["IAH","Bush","Houston","USA",29.98,-95.34],
+    ["DEN","Denver Intl","Denver","USA",39.86,-104.67],
+    ["LAS","Harry Reid","Las Vegas","USA",36.08,-115.15],
+    ["MCO","Orlando Intl","Orlando","USA",28.43,-81.31],
+    ["PHX","Sky Harbor","Phoenix","USA",33.43,-112.01],
+    ["YVR","Vancouver Intl","Vancouver","Canada",49.20,-123.18],
+    ["KIX","Kansai","Osaka","Japan",34.43,135.24],
+    ["TPE","Taoyuan","Taipei","Taiwan",25.08,121.23],
+    ["MNL","Ninoy Aquino","Manila","Philippines",14.51,121.02],
+    ["TLV","Ben Gurion","Tel Aviv","Israel",32.01,34.89],
+    ["KWI","Kuwait Intl","Kuwait City","Kuwait",29.23,47.97],
+    ["MCT","Muscat Intl","Muscat","Oman",23.59,58.28],
+    ["AMM","Queen Alia","Amman","Jordan",31.72,35.99],
+    ["SEZ","Seychelles Intl","Mahe","Seychelles",-4.66,55.49],
+    ["MRU","Sir Seewoosagur","Mahe","Mauritius",-20.43,57.68],
+    ["DAR","Julius Nyerere","Dar es Salaam","Tanzania",-6.88,39.20],
+    ["ADD","Bole","Addis Ababa","Ethiopia",8.98,38.80],
+    ["ACC","Kotoka","Accra","Ghana",5.60,-0.19],
+    ["DKR","Blaise Diagne","Dakar","Senegal",14.72,-17.49],
+    ["PTY","Tocumen","Panama City","Panama",8.99,-79.38]
+];
+
+const FALLBACK_ROUTES = [
+    ["AMS","LHR"],["AMS","CDG"],["AMS","FRA"],["AMS","JFK"],["AMS","DXB"],["AMS","SIN"],["AMS","IST"],["AMS","CPH"],["AMS","MAD"],["AMS","BCN"],["AMS","FCO"],["AMS","ZRH"],["AMS","VIE"],["AMS","ARN"],["AMS","OSL"],["AMS","DUB"],["AMS","LIS"],["AMS","ATH"],["AMS","PEK"],["AMS","NRT"],["AMS","GRU"],["AMS","JNB"],["AMS","CAI"],["AMS","DEL"],["AMS","BOM"],["AMS","BKK"],["AMS","HKG"],["AMS","KUL"],["AMS","CGK"],["AMS","SYD"],["AMS","LAX"],["AMS","SFO"],["AMS","ORD"],["AMS","MEX"],["AMS","YYZ"],["AMS","LOS"],["AMS","NBO"],["AMS","AUH"],["AMS","DOH"],["AMS","MUC"],
+    ["LHR","CDG"],["LHR","FRA"],["LHR","JFK"],["LHR","LAX"],["LHR","DXB"],["LHR","SIN"],["LHR","SFO"],["LHR","ORD"],["LHR","DUB"],["LHR","MAD"],["LHR","FCO"],["LHR","ZRH"],["LHR","IST"],["LHR","CAI"],["LHR","DEL"],["LHR","BOM"],["LHR","BKK"],["LHR","HKG"],["LHR","NRT"],["LHR","JNB"],["LHR","CPT"],["LHR","YYZ"],["LHR","MEX"],["LHR","GRU"],["LHR","EZE"],["LHR","AUH"],["LHR","DOH"],["LHR","KUL"],["LHR","SYD"],["LHR","MEL"],["LHR","AKL"],["LHR","LOS"],["LHR","NBO"],["LHR","PEK"],["LHR","PVG"],["LHR","ICN"],["LHR","HND"],["LHR","MIA"],["LHR","BOS"],["LHR","IAD"],["LHR","ATL"],["LHR","SEA"],["LHR","DEN"],["LHR","LAS"],["LHR","PHX"],["LHR","YVR"],["LHR","HNL"],["LHR","TPE"],["LHR","MNL"],["LHR","BLR"],["LHR","KWI"],["LHR","MCT"],["LHR","AMM"],["LHR","TLV"],["LHR","PTY"],["LHR","LGW"],
+    ["CDG","FRA"],["CDG","MAD"],["CDG","BCN"],["CDG","FCO"],["CDG","JFK"],["CDG","LAX"],["CDG","DXB"],["CDG","SIN"],["CDG","IST"],["CDG","CAI"],["CDG","DEL"],["CDG","BOM"],["CDG","BKK"],["CDG","NRT"],["CDG","JNB"],["CDG","CPT"],["CDG","YYZ"],["CDG","MEX"],["CDG","GRU"],["CDG","EZE"],["CDG","LOS"],["CDG","NBO"],["CDG","AUH"],["CDG","DOH"],["CDG","DUB"],["CDG","ZRH"],["CDG","VIE"],["CDG","LIS"],["CDG","ATH"],["CDG","LHR"],
+    ["FRA","JFK"],["FRA","LAX"],["FRA","DXB"],["FRA","SIN"],["FRA","IST"],["FRA","MAD"],["FRA","FCO"],["FRA","ZRH"],["FRA","VIE"],["FRA","CPH"],["FRA","ARN"],["FRA","OSL"],["FRA","HEL"],["FRA","DUB"],["FRA","LIS"],["FRA","ATH"],["FRA","CAI"],["FRA","DEL"],["FRA","BOM"],["FRA","BKK"],["FRA","HKG"],["FRA","PEK"],["FRA","NRT"],["FRA","ICN"],["FRA","JNB"],["FRA","CPT"],["FRA","YYZ"],["FRA","MEX"],["FRA","GRU"],["FRA","EZE"],["FRA","SCL"],["FRA","LIM"],["FRA","BOG"],["FRA","LOS"],["FRA","NBO"],["FRA","AUH"],["FRA","DOH"],["FRA","MUC"],["FRA","ORD"],["FRA","IAD"],["FRA","ATL"],["FRA","MIA"],["FRA","BOS"],["FRA","YVR"],["FRA","HNL"],["FRA","KUL"],["FRA","CGK"],["FRA","SYD"],["FRA","MEL"],["FRA","AKL"],["FRA","MNL"],["FRA","TPE"],["FRA","BLR"],["FRA","KWI"],["FRA","MCT"],["FRA","RUH"],["FRA","AMM"],["FRA","TLV"],["FRA","LHR"],["FRA","CDG"],["FRA","AMS"],
+    ["JFK","LAX"],["JFK","SFO"],["JFK","ORD"],["JFK","ATL"],["JFK","MIA"],["JFK","MCO"],["JFK","DFW"],["JFK","IAH"],["JFK","DEN"],["JFK","LAS"],["JFK","PHX"],["JFK","SEA"],["JFK","BOS"],["JFK","IAD"],["JFK","EWR"],["JFK","YYZ"],["JFK","MEX"],["JFK","DUB"],["JFK","MAD"],["JFK","BCN"],["JFK","FCO"],["JFK","ZRH"],["JFK","IST"],["JFK","CAI"],["JFK","DXB"],["JFK","DOH"],["JFK","AUH"],["JFK","GRU"],["JFK","EZE"],["JFK","SCL"],["JFK","LIM"],["JFK","BOG"],["JFK","JNB"],["JFK","CPT"],["JFK","NBO"],["JFK","LOS"],["JFK","SIN"],["JFK","BKK"],["JFK","HKG"],["JFK","PEK"],["JFK","NRT"],["JFK","HND"],["JFK","ICN"],["JFK","KUL"],["JFK","CGK"],["JFK","SYD"],["JFK","MEL"],["JFK","AKL"],["JFK","HNL"],["JFK","YVR"],["JFK","GIG"],["JFK","PTY"],["JFK","LHR"],["JFK","CDG"],["JFK","FRA"],["JFK","AMS"],
+    ["LAX","SFO"],["LAX","SEA"],["LAX","LAS"],["LAX","PHX"],["LAX","DEN"],["LAX","ORD"],["LAX","DFW"],["LAX","IAH"],["LAX","ATL"],["LAX","MIA"],["LAX","HNL"],["LAX","YVR"],["LAX","MEX"],["LAX","SIN"],["LAX","BKK"],["LAX","HKG"],["LAX","PEK"],["LAX","PVG"],["LAX","NRT"],["LAX","HND"],["LAX","ICN"],["LAX","SYD"],["LAX","MEL"],["LAX","AKL"],["LAX","KUL"],["LAX","CGK"],["LAX","LHR"],["LAX","CDG"],["LAX","FRA"],["LAX","AMS"],["LAX","DXB"],["LAX","DOH"],["LAX","MNL"],["LAX","TPE"],["LAX","GRU"],["LAX","SCL"],["LAX","LIM"],["LAX","BOG"],["LAX","EZE"],["LAX","YYZ"],["LAX","JFK"],
+    ["DXB","SIN"],["DXB","BKK"],["DXB","HKG"],["DXB","PEK"],["DXB","DEL"],["DXB","BOM"],["DXB","BLR"],["DXB","JNB"],["DXB","CPT"],["DXB","CAI"],["DXB","LOS"],["DXB","NBO"],["DXB","IST"],["DXB","AUH"],["DXB","DOH"],["DXB","RUH"],["DXB","KWI"],["DXB","MCT"],["DXB","MNL"],["DXB","CGK"],["DXB","KUL"],["DXB","SYD"],["DXB","MEL"],["DXB","AKL"],["DXB","TPE"],["DXB","ICN"],["DXB","NRT"],["DXB","MEX"],["DXB","GRU"],["DXB","EZE"],["DXB","MAD"],["DXB","FCO"],["DXB","ZRH"],["DXB","MUC"],["DXB","VIE"],["DXB","ATH"],["DXB","AMM"],["DXB","TLV"],["DXB","LHR"],["DXB","CDG"],["DXB","FRA"],["DXB","AMS"],["DXB","JFK"],["DXB","LAX"],
+    ["SIN","BKK"],["SIN","HKG"],["SIN","PEK"],["SIN","PVG"],["SIN","ICN"],["SIN","NRT"],["SIN","HND"],["SIN","KUL"],["SIN","CGK"],["SIN","DEL"],["SIN","BOM"],["SIN","BLR"],["SIN","MNL"],["SIN","TPE"],["SIN","SYD"],["SIN","MEL"],["SIN","AKL"],["SIN","JNB"],["SIN","LAX"],["SIN","SFO"],["SIN","JFK"],["SIN","AUH"],["SIN","DOH"],["SIN","MCT"],["SIN","KWI"],["SIN","RUH"],["SIN","IST"],["SIN","CAI"],["SIN","NBO"],["SIN","LOS"],["SIN","GRU"],["SIN","EZE"],["SIN","LHR"],["SIN","CDG"],["SIN","FRA"],["SIN","AMS"],["SIN","DXB"],
+    ["JNB","CDG"],["JNB","FRA"],["JNB","AMS"],["JNB","DXB"],["JNB","SIN"],["JNB","IST"],["JNB","CAI"],["JNB","NBO"],["JNB","LOS"],["JNB","CPT"],["JNB","ADD"],["JNB","ACC"],["JNB","DAR"],["JNB","DOH"],["JNB","AUH"],["JNB","BKK"],["JNB","HKG"],["JNB","LHR"],["JNB","MEX"],["JNB","GRU"],
+    ["GRU","CDG"],["GRU","FRA"],["GRU","AMS"],["GRU","MAD"],["GRU","BCN"],["GRU","LIS"],["GRU","JFK"],["GRU","LAX"],["GRU","MIA"],["GRU","MEX"],["GRU","SCL"],["GRU","LIM"],["GRU","BOG"],["GRU","EZE"],["GRU","GIG"],["GRU","DXB"],["GRU","IST"],["GRU","JNB"],["GRU","CPT"],["GRU","LOS"],["GRU","NBO"],["GRU","AUH"],["GRU","DOH"],["GRU","MCT"],["GRU","PTY"],["GRU","LHR"],
+    ["IST","CDG"],["IST","FRA"],["IST","AMS"],["IST","DXB"],["IST","CAI"],["IST","ATH"],["IST","LOS"],["IST","NBO"],["IST","JNB"],["IST","DEL"],["IST","BOM"],["IST","BKK"],["IST","SIN"],["IST","AUH"],["IST","DOH"],["IST","RUH"],["IST","KWI"],["IST","AMM"],["IST","TLV"],["IST","LHR"],
+    ["NRT","JFK"],["NRT","LAX"],["NRT","SIN"],["NRT","BKK"],["NRT","HKG"],["NRT","PEK"],["NRT","PVG"],["NRT","ICN"],["NRT","KUL"],["NRT","CGK"],["NRT","SYD"],["NRT","MEL"],["NRT","AKL"],["NRT","DXB"],["NRT","LHR"],["NRT","CDG"],["NRT","FRA"],["NRT","AMS"],["NRT","HNL"],["NRT","YVR"],["NRT","MNL"],["NRT","TPE"],["NRT","DEL"],["NRT","BOM"],["NRT","MIA"],["NRT","ORD"],["NRT","ATL"],["NRT","SEA"],["NRT","HND"],
+    ["SYD","SIN"],["SYD","BKK"],["SYD","HKG"],["SYD","DXB"],["SYD","LHR"],["SYD","LAX"],["SYD","SFO"],["SYD","MEL"],["SYD","AKL"],["SYD","NRT"],["SYD","KUL"],["SYD","CGK"],["SYD","JNB"],["SYD","NBO"],["SYD","YVR"],["SYD","HNL"],["SYD","JFK"],["SYD","DEL"],["SYD","BOM"],["SYD","MEX"],
+    ["CAI","CDG"],["CAI","FRA"],["CAI","AMS"],["CAI","DXB"],["CAI","IST"],["CAI","JNB"],["CAI","LOS"],["CAI","NBO"],["CAI","AUH"],["CAI","DOH"],["CAI","RUH"],["CAI","KWI"],["CAI","AMM"],["CAI","TLV"],["CAI","LHR"],
+    ["DEL","SIN"],["DEL","BKK"],["DEL","DXB"],["DEL","BOM"],["DEL","BLR"],["DEL","IST"],["DEL","AUH"],["DEL","DOH"],["DEL","JNB"],["DEL","NBO"],["DEL","LOS"],["DEL","MUC"],["DEL","ZRH"],["DEL","VIE"],["DEL","JFK"],["DEL","LAX"],["DEL","HKG"],["DEL","PEK"],["DEL","NRT"],["DEL","ICN"],["DEL","MIA"],["DEL","YVR"],["DEL","YYZ"],["DEL","CPH"],["DEL","ARN"],["DEL","OSL"],["DEL","HEL"],["DEL","DUB"],["DEL","MAD"],["DEL","BCN"],["DEL","FCO"],["DEL","LIS"],["DEL","ATH"],["DEL","KWI"],["DEL","MCT"],["DEL","RUH"],["DEL","AMM"],["DEL","TLV"],["DEL","LHR"],["DEL","CDG"],["DEL","FRA"],["DEL","AMS"],
+    ["BOM","CDG"],["BOM","FRA"],["BOM","AMS"],["BOM","DXB"],["BOM","SIN"],["BOM","BKK"],["BOM","HKG"],["BOM","DEL"],["BOM","BLR"],["BOM","IST"],["BOM","AUH"],["BOM","DOH"],["BOM","KWI"],["BOM","MCT"],["BOM","RUH"],["BOM","JNB"],["BOM","NBO"],["BOM","LOS"],["BOM","CAI"],["BOM","JFK"],["BOM","LAX"],["BOM","MUC"],["BOM","ZRH"],["BOM","VIE"],["BOM","PEK"],["BOM","NRT"],["BOM","ICN"],["BOM","KUL"],["BOM","CGK"],["BOM","SYD"],["BOM","MEL"],["BOM","MNL"],["BOM","TPE"],["BOM","GRU"],["BOM","EZE"],["BOM","MEX"],["BOM","SCL"],["BOM","LIM"],["BOM","BOG"],["BOM","GIG"],["BOM","LHR"],
+    ["BKK","CDG"],["BKK","FRA"],["BKK","AMS"],["BKK","DXB"],["BKK","SIN"],["BKK","HKG"],["BKK","PEK"],["BKK","PVG"],["BKK","ICN"],["BKK","NRT"],["BKK","HND"],["BKK","KUL"],["BKK","CGK"],["BKK","DEL"],["BKK","BOM"],["BKK","BLR"],["BKK","MNL"],["BKK","TPE"],["BKK","SYD"],["BKK","MEL"],["BKK","AKL"],["BKK","JNB"],["BKK","IST"],["BKK","AUH"],["BKK","DOH"],["BKK","KWI"],["BKK","MCT"],["BKK","RUH"],["BKK","CAI"],["BKK","LOS"],["BKK","NBO"],["BKK","JFK"],["BKK","LAX"],["BKK","SFO"],["BKK","YVR"],["BKK","GRU"],["BKK","EZE"],["BKK","LHR"],
+    ["HKG","CDG"],["HKG","FRA"],["HKG","AMS"],["HKG","DXB"],["HKG","SIN"],["HKG","BKK"],["HKG","PEK"],["HKG","PVG"],["HKG","ICN"],["HKG","NRT"],["HKG","HND"],["HKG","KUL"],["HKG","CGK"],["HKG","DEL"],["HKG","BOM"],["HKG","MNL"],["HKG","TPE"],["HKG","SYD"],["HKG","MEL"],["HKG","AKL"],["HKG","JNB"],["HKG","LAX"],["HKG","SFO"],["HKG","JFK"],["HKG","YVR"],["HKG","GRU"],["HKG","MEX"],["HKG","LHR"],
+    ["PEK","CDG"],["PEK","FRA"],["PEK","AMS"],["PEK","DXB"],["PEK","SIN"],["PEK","BKK"],["PEK","HKG"],["PEK","PVG"],["PEK","ICN"],["PEK","NRT"],["PEK","HND"],["PEK","KUL"],["PEK","CGK"],["PEK","DEL"],["PEK","BOM"],["PEK","MNL"],["PEK","TPE"],["PEK","SYD"],["PEK","LAX"],["PEK","JFK"],["PEK","YVR"],["PEK","MEX"],["PEK","GRU"],["PEK","EZE"],["PEK","JNB"],["PEK","IST"],["PEK","AUH"],["PEK","DOH"],["PEK","LHR"],
+    ["ICN","JFK"],["ICN","LAX"],["ICN","SIN"],["ICN","BKK"],["ICN","HKG"],["ICN","PEK"],["ICN","PVG"],["ICN","NRT"],["ICN","HND"],["ICN","KUL"],["ICN","CGK"],["ICN","DEL"],["ICN","BOM"],["ICN","DXB"],["ICN","LHR"],["ICN","CDG"],["ICN","FRA"],["ICN","AMS"],["ICN","SYD"],["ICN","MEL"],["ICN","AKL"],["ICN","YVR"],["ICN","MNL"],["ICN","TPE"],["ICN","MEX"],["ICN","GRU"],["ICN","IST"],["ICN","AUH"],["ICN","DOH"],
+    ["DOH","CDG"],["DOH","FRA"],["DOH","AMS"],["DOH","DXB"],["DOH","SIN"],["DOH","BKK"],["DOH","DEL"],["DOH","BOM"],["DOH","IST"],["DOH","JNB"],["DOH","CAI"],["DOH","NBO"],["DOH","LOS"],["DOH","AUH"],["DOH","KWI"],["DOH","MCT"],["DOH","RUH"],["DOH","AMM"],["DOH","TLV"],["DOH","JFK"],["DOH","LAX"],["DOH","MEX"],["DOH","GRU"],["DOH","EZE"],["DOH","SYD"],["DOH","MEL"],["DOH","MNL"],["DOH","TPE"],["DOH","ICN"],["DOH","PEK"],["DOH","NRT"],["DOH","KUL"],["DOH","CGK"],["DOH","YVR"],["DOH","HNL"],["DOH","SFO"],["DOH","ORD"],["DOH","ATL"],["DOH","MIA"],["DOH","SEA"],["DOH","BOS"],["DOH","IAD"],["DOH","YYZ"],["DOH","MUC"],["DOH","ZRH"],["DOH","VIE"],["DOH","MAD"],["DOH","BCN"],["DOH","FCO"],["DOH","LIS"],["DOH","ATH"],["DOH","DUB"],["DOH","CPH"],["DOH","ARN"],["DOH","OSL"],["DOH","HEL"],["DOH","LHR"]
+];
+
+function parseCSV(text) {
+    const rows = [];
+    let row = [], field = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQ) {
+            if (c === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else inQ = false;
+            } else field += c;
+        } else {
+            if (c === '"') inQ = true;
+            else if (c === ',') { row.push(field); field = ""; }
+            else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+            else if (c !== '\r') field += c;
+        }
+    }
+    if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+    return rows;
+}
+
+function parseAirports(text) {
+    const map = new Map();
+    for (const r of parseCSV(text)) {
+        if (r.length < 8) continue;
+        const iata = r[4];
+        if (!iata || iata === "\\N") continue;
+        const lat = parseFloat(r[6]), lon = parseFloat(r[7]);
+        if (!isFinite(lat) || !isFinite(lon)) continue;
+        if (map.has(iata)) continue;
+        map.set(iata, { iata, name: r[1] || iata, city: r[2] || "", country: r[3] || "", icao: r[5] || "", lat, lon });
+    }
+    return map;
+}
+
+function parseRoutes(text, amap) {
+    const seen = new Set();
+    const pairs = [];
+    const lines = text.split("\n");
+    for (const line of lines) {
+        if (!line) continue;
+        const f = line.split(",");
+        if (f.length < 5) continue;
+        const a = f[2], b = f[4];
+        if (!a || !b || a === b) continue;
+        if (!amap.has(a) || !amap.has(b)) continue;
+        const key = a < b ? a + "|" + b : b + "|" + a;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        pairs.push([a, b]);
+    }
+    return pairs;
+}
+
+function buildDataset(amap, pairs) {
+    const deg = new Map();
+    for (const p of pairs) {
+        deg.set(p[0], (deg.get(p[0]) || 0) + 1);
+        deg.set(p[1], (deg.get(p[1]) || 0) + 1);
+    }
+    const kept = [...deg.keys()].sort((x, y) => deg.get(y) - deg.get(x)).slice(0, TOP_N);
+    const index = new Map();
+    const list = kept.map((iata, i) => {
+        index.set(iata, i);
+        const a = amap.get(iata);
+        return { iata: a.iata, name: a.name, city: a.city, country: a.country, icao: a.icao, lat: a.lat, lon: a.lon, d: deg.get(iata) };
+    });
+    const edges = [];
+    const adj = list.map(() => []);
+    const eseen = new Set();
+    for (const p of pairs) {
+        const i = index.get(p[0]), j = index.get(p[1]);
+        if (i === undefined || j === undefined) continue;
+        const key = i < j ? i + "," + j : j + "," + i;
+        if (eseen.has(key)) continue;
+        eseen.add(key);
+        edges.push([i, j]);
+        adj[i].push(j);
+        adj[j].push(i);
+    }
+    return { list, index, edges, adj, totalAirports: amap.size, totalRoutes: pairs.length };
+}
+
+function bfs2(adj, s) {
+    const direct = adj[s];
+    const dset = new Set(direct);
+    const ind = new Set();
+    for (const d of direct) {
+        for (const n of adj[d]) {
+            if (n !== s && !dset.has(n)) ind.add(n);
+        }
+    }
+    return { direct, indirect: [...ind] };
+}
+
+const RAD = Math.PI / 180;
+function unitVec(lat, lon) {
+    const p = lat * RAD, l = lon * RAD;
+    return [Math.cos(p) * Math.cos(l), Math.sin(p), Math.cos(p) * Math.sin(l)];
+}
+function rotPoint(v, yaw, pitch) {
+    const x = v[0], y = v[1], z = v[2];
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const x1 = x * cy + z * sy;
+    const z1 = -x * sy + z * cy;
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const y2 = y * cp - z1 * sp;
+    const z2 = y * sp + z1 * cp;
+    return [x1, y2, z2];
+}
+function slerpArc(a, b) {
+    const va = unitVec(a.lat, a.lon), vb = unitVec(b.lat, b.lon);
+    let dot = va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2];
+    dot = Math.max(-1, Math.min(1, dot));
+    const om = Math.acos(dot);
+    if (om < 1e-5) return [va];
+    const so = Math.sin(om);
+    const pts = [];
+    const N = 40;
+    const h = 0.04 + 0.30 * (om / Math.PI);
+    for (let k = 0; k <= N; k++) {
+        const t = k / N;
+        const w1 = Math.sin((1 - t) * om) / so;
+        const w2 = Math.sin(t * om) / so;
+        const alt = 1 + Math.sin(Math.PI * t) * h;
+        pts.push([(va[0] * w1 + vb[0] * w2) * alt, (va[1] * w1 + vb[1] * w2) * alt, (va[2] * w1 + vb[2] * w2) * alt]);
+    }
+    return pts;
+}
+function citySlug(city) {
+    return (city || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+function fcAirportUrl(ap) {
+    const slug = citySlug(ap.city);
+    const code = ap.iata.toLowerCase();
+    return slug ? "https://www.flightconnections.com/flights-from-" + slug + "-" + code + "/" : "https://www.flightconnections.com/flights-from-" + code + "/";
+}
+function fcRouteUrl(a, b) {
+    return "https://www.flightconnections.com/flights-from-" + a.toLowerCase() + "-to-" + b.toLowerCase() + "/";
+}
+function fallbackDataset() {
+    const amap = new Map();
+    for (const row of FALLBACK_AIRPORTS) {
+        amap.set(row[0], { iata: row[0], name: row[1], city: row[2], country: row[3], icao: "", lat: row[4], lon: row[5] });
+    }
+    const pairs = FALLBACK_ROUTES.filter(p => amap.has(p[0]) && amap.has(p[1]));
+    return buildDataset(amap, pairs);
+}
+async function fetchFirst(urls, timeoutMs) {
+    let lastErr = null;
+    for (const u of urls) {
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+            const res = await fetch(u, { signal: ctrl.signal });
+            clearTimeout(timer);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return await res.text();
+        } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+}
+async function loadData() {
+    try {
+        const [aText, rText] = await Promise.all([
+            fetchFirst(DATA.airports, 25000),
+            fetchFirst(DATA.routes, 30000)
+        ]);
+        const amap = parseAirports(aText);
+        const pairs = parseRoutes(rText, amap);
+        return { ds: buildDataset(amap, pairs), offline: false };
+    } catch (e) {
+        return { ds: fallbackDataset(), offline: true };
+    }
+}
+
+const state = {
+    ds: null,
+    yaw: -2.09,
+    pitch: 0.35,
+    zoom: 1,
+    spin: false,
+    showAll: false,
+    showDirect: true,
+    showIndirect: true,
+    selected: null,
+    hover: null,
+    conn: { direct: [], indirect: [] },
+    tween: null,
+    maxD: 1,
+    sx: [],
+    sy: [],
+    front: []
+};
+
+const canvas = document.getElementById("globe");
+const ctx = canvas.getContext("2d");
+const el = id => document.getElementById(id);
+const ui = {
+    loading: el("loading"), screen: el("screen"),
+    statAirports: el("stat-airports"), statRoutes: el("stat-routes"),
+    statSelected: el("stat-selected"), statZoom: el("stat-zoom"),
+    search: el("search"), results: el("results"),
+    btnReset: el("btn-reset"), btnSpin: el("btn-spin"), btnAll: el("btn-all"),
+    btnDirect: el("btn-direct"), btnIndirect: el("btn-indirect"),
+    feedback: el("feedback"),
+    selName: el("sel-name"), selCity: el("sel-city"), selIata: el("sel-iata"),
+    miniDirect: el("mini-direct"), miniIndirect: el("mini-indirect"),
+    fcLink: el("fc-link"),
+    directList: el("direct-list"), indirectList: el("indirect-list"),
+    directCount: el("direct-count"), indirectCount: el("indirect-count")
+};
+
+let stars = [];
+function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+        canvas.width = w;
+        canvas.height = h;
+        stars = [];
+        for (let i = 0; i < 70; i++) {
+            stars.push({ x: Math.random() * w, y: Math.random() * h, s: Math.random() * 1.6 + 0.6, ph: Math.random() * 6.28 });
+        }
+    }
+}
+
+function project(lat, lon, alt, cx, cy, R, yaw, pitch) {
+    const v = unitVec(lat, lon);
+    const s = 1 + (alt || 0);
+    const r = rotPoint([v[0] * s, v[1] * s, v[2] * s], yaw, pitch);
+    return { x: cx + r[0] * R, y: cy - r[1] * R, z: r[2] };
+}
+
+function drawArc(pts, cx, cy, R, yaw, pitch, style, width, dash, dashOff, glow, glowColor) {
+    ctx.strokeStyle = style;
+    ctx.lineWidth = width;
+    ctx.setLineDash(dash || []);
+    ctx.lineDashOffset = dashOff || 0;
+    if (glow) { ctx.shadowBlur = glow; ctx.shadowColor = glowColor || style; } else ctx.shadowBlur = 0;
+    ctx.beginPath();
+    let pen = false;
+    for (const v of pts) {
+        const r = rotPoint(v, yaw, pitch);
+        if (r[2] > 0.02) {
+            const x = cx + r[0] * R, y = cy - r[1] * R;
+            if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
+        } else pen = false;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+}
+
+function label(text, x, y) {
+    ctx.font = "19px 'VT323', monospace";
+    ctx.fillStyle = "#000";
+    ctx.fillText(text, x + 2, y + 2);
+    ctx.fillStyle = "#FFFAEB";
+    ctx.fillText(text, x, y);
+}
+
+function draw(now) {
+    resize();
+    const w = canvas.width, h = canvas.height;
+    if (!w || !h) return;
+    const cx = w / 2, cy = h / 2;
+    const R = Math.min(w, h) * 0.40 * state.zoom;
+    const yaw = state.yaw, pitch = state.pitch;
+
+    ctx.fillStyle = "#150C24";
+    ctx.fillRect(0, 0, w, h);
+    for (const st of stars) {
+        const a = 0.15 + 0.45 * (0.5 + 0.5 * Math.sin(now / 500 + st.ph));
+        ctx.fillStyle = "rgba(255,250,235," + a.toFixed(3) + ")";
+        ctx.fillRect(st.x, st.y, st.s, st.s);
+    }
+
+    const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R * 1.05);
+    g.addColorStop(0, "#2A1846");
+    g.addColorStop(0.6, "#150C24");
+    g.addColorStop(1, "#0B0714");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineWidth = 1;
+    for (let lat = -60; lat <= 60; lat += 30) {
+        const bright = lat === 0 ? 0.34 : 0.16;
+        for (let lon = -180; lon < 180; lon += 5) {
+            const p1 = project(lat, lon, 0, cx, cy, R, yaw, pitch);
+            const p2 = project(lat, lon + 5, 0, cx, cy, R, yaw, pitch);
+            if (p1.z > 0.02 && p2.z > 0.02) {
+                const a = bright * Math.min(p1.z, p2.z);
+                ctx.strokeStyle = "rgba(255,250,235," + a.toFixed(3) + ")";
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+        }
+    }
+    for (let lon = 0; lon < 360; lon += 30) {
+        const bright = lon % 90 === 0 ? 0.30 : 0.16;
+        for (let lat = -90; lat < 90; lat += 5) {
+            const p1 = project(lat, lon, 0, cx, cy, R, yaw, pitch);
+            const p2 = project(lat + 5, lon, 0, cx, cy, R, yaw, pitch);
+            if (p1.z > 0.02 && p2.z > 0.02) {
+                const a = bright * Math.min(p1.z, p2.z);
+                ctx.strokeStyle = "rgba(255,250,235," + a.toFixed(3) + ")";
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+        }
+    }
+
+    const ds = state.ds;
+    if (ds) {
+        const off = now / 45;
+        if (state.showAll) {
+            const stride = Math.max(1, Math.ceil(ds.edges.length / 3000));
+            for (let i = 0; i < ds.edges.length; i += stride) {
+                const e = ds.edges[i];
+                drawArc(slerpArc(ds.list[e[0]], ds.list[e[1]]), cx, cy, R, yaw, pitch, "rgba(255,250,235,0.055)", 1, null, 0, 0);
+            }
+        }
+        if (state.selected !== null) {
+            const sel = ds.list[state.selected];
+            const dirIdx = state.conn.direct;
+            const indIdx = state.conn.indirect;
+            if (state.showIndirect && state.zoom >= 2.5 && indIdx.length <= 300) {
+                for (const j of indIdx) {
+                    drawArc(slerpArc(sel, ds.list[j]), cx, cy, R, yaw, pitch, "rgba(225,5,0,0.45)", 1.5, [4, 6], -off, 0);
+                }
+            }
+            if (state.showDirect) {
+                for (const j of dirIdx) {
+                    drawArc(slerpArc(sel, ds.list[j]), cx, cy, R, yaw, pitch, "#FFAF00", 2, [7, 5], -off, 9, "#FF8205");
+                }
+            }
+        }
+
+        state.sx = new Array(ds.list.length);
+        state.sy = new Array(ds.list.length);
+        state.front = new Array(ds.list.length);
+        for (let i = 0; i < ds.list.length; i++) {
+            const a = ds.list[i];
+            const p = project(a.lat, a.lon, 0, cx, cy, R, yaw, pitch);
+            state.sx[i] = p.x; state.sy[i] = p.y; state.front[i] = p.z > 0.02;
+            if (!state.front[i]) continue;
+            const t = a.d / state.maxD;
+            const s = 2 + 3.2 * Math.sqrt(t);
+            if (state.selected === i) continue;
+            if (state.hover === i) {
+                ctx.fillStyle = "#FFFAEB";
+                ctx.fillRect(p.x - s / 2 - 1, p.y - s / 2 - 1, s + 2, s + 2);
+            }
+            if (state.selected !== null && state.showIndirect && state.conn.indirect.includes(i)) {
+                ctx.fillStyle = "#E10500";
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(Math.PI / 4);
+                ctx.fillRect(-2.4, -2.4, 4.8, 4.8);
+                ctx.restore();
+            } else if (state.selected !== null && state.showDirect && state.conn.direct.includes(i)) {
+                ctx.fillStyle = "#FFD800";
+                ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+            } else {
+                ctx.fillStyle = t > 0.5 ? "#FF8205" : "#FFD800";
+                ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+            }
+        }
+        if (state.selected !== null && state.front[state.selected]) {
+            const i = state.selected;
+            const x = state.sx[i], y = state.sy[i];
+            const blink = (Math.floor(now / 260) % 2) === 0;
+            ctx.fillStyle = "#FFFAEB";
+            ctx.fillRect(x - 6, y - 6, 12, 12);
+            ctx.fillStyle = blink ? "#E10500" : "#FF8205";
+            ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
+            const a = ds.list[i];
+            label(a.iata + " · " + a.city, x + 10, y - 10);
+        }
+        if (state.hover !== null && state.hover !== state.selected && state.front[state.hover]) {
+            const i = state.hover;
+            const a = ds.list[i];
+            label(a.iata + " · " + a.city, state.sx[i] + 9, state.sy[i] - 9);
+        }
+    }
+
+    const sh = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
+    sh.addColorStop(0, "rgba(0,0,0,0)");
+    sh.addColorStop(1, "rgba(0,0,0,0.55)");
+    ctx.fillStyle = sh;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,216,0,0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#FF8205";
+    ctx.lineWidth = 3;
+    ctx.shadowColor = "#FF8205";
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+}
+
+function update(now) {
+    if (state.spin && !dragging) state.yaw += 0.0022;
+    if (state.tween) {
+        const t = state.tween;
+        const k = Math.min(1, (now - t.t0) / t.dur);
+        const e = 1 - Math.pow(1 - k, 3);
+        let dy = t.to.yaw - t.from.yaw;
+        while (dy > Math.PI) dy -= Math.PI * 2;
+        while (dy < -Math.PI) dy += Math.PI * 2;
+        state.yaw = t.from.yaw + dy * e;
+        state.pitch = t.from.pitch + (t.to.pitch - t.from.pitch) * e;
+        state.zoom = t.from.zoom + (t.to.zoom - t.from.zoom) * e;
+        if (k >= 1) state.tween = null;
+        ui.statZoom.textContent = state.zoom.toFixed(1) + "×";
+    }
+}
+
+function frame(now) {
+    update(now);
+    draw(now);
+    requestAnimationFrame(frame);
+}
+
+function pick(x, y) {
+    const ds = state.ds;
+    if (!ds) return -1;
+    let best = -1, bestD = 14;
+    for (let i = 0; i < ds.list.length; i++) {
+        if (!state.front[i]) continue;
+        const dx = state.sx[i] - x, dy = state.sy[i] - y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+}
+
+function flyTo(lat, lon) {
+    const targetYaw = lon * RAD - Math.PI / 2;
+    const targetPitch = Math.max(-1.45, Math.min(1.45, lat * RAD));
+    state.tween = {
+        t0: performance.now(),
+        dur: 750,
+        from: { yaw: state.yaw, pitch: state.pitch, zoom: state.zoom },
+        to: { yaw: targetYaw, pitch: targetPitch, zoom: Math.max(state.zoom, 1.7) }
+    };
+}
+
+function chipFor(idx, kind) {
+    const a = state.ds.list[idx];
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.dataset.kind = kind;
+    b.textContent = a.iata;
+    b.title = a.name + ", " + a.city + (a.country ? ", " + a.country : "") + (kind === "direct" && state.selected !== null ? " — " + fcRouteUrl(state.ds.list[state.selected].iata, a.iata) : "");
+    b.addEventListener("click", () => { selectAirport(idx); flyTo(a.lat, a.lon); });
+    return b;
+}
+
+function renderLists() {
+    const ds = state.ds;
+    ui.directList.innerHTML = "";
+    ui.indirectList.innerHTML = "";
+    if (state.selected === null) {
+        ui.directList.innerHTML = '<div class="empty-note">click an airport to list its direct routes</div>';
+        ui.indirectList.innerHTML = '<div class="empty-note">one-stop destinations appear here</div>';
+        return;
+    }
+    const byD = (x, y) => ds.list[y].d - ds.list[x].d;
+    const dir = [...state.conn.direct].sort(byD);
+    const ind = [...state.conn.indirect].sort(byD);
+    ui.directCount.textContent = dir.length;
+    ui.indirectCount.textContent = ind.length;
+    for (const j of dir) ui.directList.appendChild(chipFor(j, "direct"));
+    const CAP = 160;
+    for (const j of ind.slice(0, CAP)) ui.indirectList.appendChild(chipFor(j, "indirect"));
+    if (ind.length > CAP) {
+        const more = document.createElement("span");
+        more.className = "chip more";
+        more.textContent = "+" + (ind.length - CAP) + " MORE";
+        ui.indirectList.appendChild(more);
+    }
+    if (ind.length === 0) ui.indirectList.innerHTML = '<div class="empty-note">no 1-stop destinations</div>';
+}
+
+function selectAirport(idx) {
+    const ds = state.ds;
+    if (!ds || idx === null || idx === undefined || idx < 0) {
+        state.selected = null;
+        state.conn = { direct: [], indirect: [] };
+        ui.selName.textContent = "NONE — CLICK AN AIRPORT ON THE GLOBE";
+        ui.selCity.textContent = "";
+        ui.selIata.textContent = "---";
+        ui.miniDirect.textContent = "0";
+        ui.miniIndirect.textContent = "0";
+        ui.fcLink.classList.remove("visible");
+        ui.statSelected.textContent = "NONE";
+        renderLists();
+        return;
+    }
+    state.selected = idx;
+    const c = bfs2(ds.adj, idx);
+    state.conn = c;
+    const a = ds.list[idx];
+    ui.selName.textContent = a.name.toUpperCase();
+    ui.selCity.textContent = (a.city ? a.city + " · " : "") + a.country + (a.icao ? " · ICAO " + a.icao : "");
+    ui.selIata.textContent = a.iata;
+    ui.miniDirect.textContent = c.direct.length;
+    ui.miniIndirect.textContent = c.indirect.length;
+    ui.fcLink.href = fcAirportUrl(a);
+    ui.fcLink.textContent = "FLIGHTS FROM " + a.iata + " ON FLIGHTCONNECTIONS ↗";
+    ui.fcLink.classList.add("visible");
+    ui.statSelected.textContent = a.iata;
+    renderLists();
+}
+
+let dragging = false, moved = 0, lastX = 0, lastY = 0;
+canvas.addEventListener("pointerdown", e => {
+    dragging = true;
+    moved = 0;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.classList.add("dragging");
+    canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (dragging) {
+        const dx = e.clientX - lastX, dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        moved += Math.abs(dx) + Math.abs(dy);
+        const R = Math.min(canvas.width, canvas.height) * 0.40 * state.zoom;
+        state.yaw += dx / R;
+        state.pitch = Math.max(-1.45, Math.min(1.45, state.pitch + dy / R));
+        state.tween = null;
+    } else {
+        const hov = pick(x, y);
+        state.hover = hov >= 0 ? hov : null;
+        canvas.classList.toggle("pick", hov >= 0);
+    }
+});
+canvas.addEventListener("pointerup", e => {
+    dragging = false;
+    canvas.classList.remove("dragging");
+    if (moved < 6) {
+        const rect = canvas.getBoundingClientRect();
+        const idx = pick(e.clientX - rect.left, e.clientY - rect.top);
+        if (idx >= 0) {
+            selectAirport(idx);
+            flyTo(state.ds.list[idx].lat, state.ds.list[idx].lon);
+        } else {
+            selectAirport(null);
+        }
+    }
+});
+canvas.addEventListener("pointerleave", () => { state.hover = null; });
+canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    state.zoom = Math.max(1, Math.min(6, state.zoom * Math.exp(-e.deltaY * 0.0012)));
+    ui.statZoom.textContent = state.zoom.toFixed(1) + "×";
+    state.tween = null;
+}, { passive: false });
+
+window.addEventListener("keydown", e => {
+    if (e.target && e.target.tagName === "INPUT") return;
+    const step = 0.09;
+    if (e.key === "ArrowLeft") { state.yaw -= step; state.tween = null; }
+    else if (e.key === "ArrowRight") { state.yaw += step; state.tween = null; }
+    else if (e.key === "ArrowUp") { state.pitch = Math.max(-1.45, state.pitch + step); state.tween = null; }
+    else if (e.key === "ArrowDown") { state.pitch = Math.min(1.45, state.pitch - step); state.tween = null; }
+    else if (e.key === "+" || e.key === "=") { state.zoom = Math.min(6, state.zoom * 1.2); ui.statZoom.textContent = state.zoom.toFixed(1) + "×"; }
+    else if (e.key === "-") { state.zoom = Math.max(1, state.zoom / 1.2); ui.statZoom.textContent = state.zoom.toFixed(1) + "×"; }
+    else if (e.key === "Escape") selectAirport(null);
+});
+
+function setToggle(btn, on, labelOn, labelOff) {
+    btn.classList.toggle("active", on);
+    btn.textContent = on ? labelOn : labelOff;
+}
+ui.btnReset.addEventListener("click", () => {
+    state.tween = { t0: performance.now(), dur: 600, from: { yaw: state.yaw, pitch: state.pitch, zoom: state.zoom }, to: { yaw: -2.09, pitch: 0.35, zoom: 1 } };
+    selectAirport(null);
+});
+ui.btnSpin.addEventListener("click", () => {
+    state.spin = !state.spin;
+    setToggle(ui.btnSpin, state.spin, "SPIN: ON", "SPIN: OFF");
+});
+ui.btnAll.addEventListener("click", () => {
+    state.showAll = !state.showAll;
+    setToggle(ui.btnAll, state.showAll, "ALL ROUTES: ON", "ALL ROUTES: OFF");
+});
+ui.btnDirect.addEventListener("click", () => {
+    state.showDirect = !state.showDirect;
+    setToggle(ui.btnDirect, state.showDirect, "DIRECT: ON", "DIRECT: OFF");
+});
+ui.btnIndirect.addEventListener("click", () => {
+    state.showIndirect = !state.showIndirect;
+    setToggle(ui.btnIndirect, state.showIndirect, "1-STOP: ON", "1-STOP: OFF");
+});
+
+ui.search.addEventListener("input", () => {
+    const q = ui.search.value.trim().toLowerCase();
+    ui.results.innerHTML = "";
+    if (!state.ds || q.length < 2) { ui.results.classList.remove("visible"); return; }
+    const matches = state.ds.list
+        .filter(a => (a.iata + " " + a.name + " " + a.city + " " + a.country).toLowerCase().includes(q))
+        .sort((x, y) => y.d - x.d)
+        .slice(0, 10);
+    if (!matches.length) { ui.results.classList.remove("visible"); return; }
+    for (const a of matches) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "result-btn";
+        b.innerHTML = "<b>" + a.iata + "</b> — " + a.name + (a.city ? ", " + a.city : "") + (a.country ? " (" + a.country + ")" : "");
+        b.addEventListener("click", () => {
+            ui.results.classList.remove("visible");
+            selectAirport(state.ds.index.get(a.iata));
+            flyTo(a.lat, a.lon);
+        });
+        ui.results.appendChild(b);
+    }
+    ui.results.classList.add("visible");
+});
+ui.search.addEventListener("blur", () => {
+    setTimeout(() => ui.results.classList.remove("visible"), 150);
+});
+
+async function init() {
+    requestAnimationFrame(frame);
+    const res = await loadData();
+    state.ds = res.ds;
+    state.maxD = 1;
+    for (const a of state.ds.list) if (a.d > state.maxD) state.maxD = a.d;
+    ui.statAirports.textContent = state.ds.list.length.toLocaleString();
+    ui.statAirports.title = state.ds.totalAirports.toLocaleString() + " airports with IATA in source data";
+    ui.statRoutes.textContent = state.ds.edges.length.toLocaleString();
+    ui.statRoutes.title = state.ds.totalRoutes.toLocaleString() + " unique routes in source data";
+    ui.loading.style.display = "none";
+    if (res.offline) {
+        ui.feedback.textContent = "LIVE DATA UNREACHABLE — SHOWING BUILT-IN OFFLINE SAMPLE (" + state.ds.list.length + " AIRPORTS). THE GLOBE STILL WORKS; LINKS STILL GO TO FLIGHTCONNECTIONS.COM.";
+        ui.feedback.classList.add("visible");
+    }
+}
+init();
+</script>
+</body>
+</html>
