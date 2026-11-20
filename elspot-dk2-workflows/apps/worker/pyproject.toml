@@ -11,7 +11,7 @@ dependencies = [
     "numpy>=2",
     "pydantic>=2.14.1",
     "structlog>=25.5.0",
-    "timestral @ git+https://github.com/mistralai/timestral.git",
+    "timestral",
     "torch>=2.4",
 ]
 
@@ -26,7 +26,7 @@ module-name = "worker"
 utils = { workspace = true }
 env = { workspace = true }
 mistralai-workflows = { index = "pypi" }
-timestral = { git = "https://github.com/mistralai/timestral.git" }
+timestral = { workspace = true }
 # CPU-only torch wheels keep the worker image small; the PyTorch CPU index is linux-only,
 # so other platforms (local dev on macOS) fall back to the default PyPI torch.
 torch = [

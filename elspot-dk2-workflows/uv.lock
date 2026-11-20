@@ -26,6 +26,7 @@ members = [
     "app-workspace",
     "cli",
     "env",
+    "timestral",
     "utils",
     "workflows-app",
 ]
@@ -1814,13 +1815,22 @@ wheels = [
 [[package]]
 name = "timestral"
 version = "1.0.0"
-source = { git = "https://github.com/mistralai/timestral.git#a534bdbd244d64f3d9d743f46c7bf6fc330ed4ff" }
+source = { editable = "packages/py/timestral" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "numpy" },
     { name = "safetensors" },
     { name = "torch", version = "2.15.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "huggingface-hub", specifier = ">=0.23" },
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "safetensors", specifier = ">=0.4" },
+    { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.4" },
+    { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
 ]
 
 [[package]]
@@ -2078,7 +2088,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "structlog", specifier = ">=25.5.0" },
-    { name = "timestral", git = "https://github.com/mistralai/timestral.git" },
+    { name = "timestral", editable = "packages/py/timestral" },
     { name = "torch", marker = "sys_platform != 'linux'", specifier = ">=2.4" },
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
     { name = "utils", editable = "packages/py/utils" },
