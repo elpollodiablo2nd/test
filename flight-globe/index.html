@@ -536,7 +536,7 @@
         <div class="screen" id="screen">
             <canvas id="globe"></canvas>
             <div class="globe-loading" id="loading">LOADING ROUTE DATA<span class="cursor"></span></div>
-            <div class="globe-hint">DRAG = ROTATE &nbsp;·&nbsp; SCROLL = ZOOM &nbsp;·&nbsp; CLICK AN AIRPORT</div>
+            <div class="globe-hint">DRAG = ROTATE &nbsp;·&nbsp; PINCH / SCROLL = ZOOM &nbsp;·&nbsp; CLICK AN AIRPORT</div>
         </div>
 
         <div>
@@ -1449,17 +1449,40 @@ function selectAirport(idx) {
 }
 
 let dragging = false, moved = 0, lastX = 0, lastY = 0;
+const pointers = new Map();
+let pinchDist = 0, pinchZoom = 1, pinched = false;
 canvas.addEventListener("pointerdown", e => {
-    dragging = true;
-    moved = 0;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    canvas.classList.add("dragging");
     canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) {
+        const pts = [...pointers.values()];
+        pinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        pinchZoom = state.zoom;
+        pinched = true;
+        dragging = false;
+        moved = 999;
+        state.tween = null;
+        canvas.classList.add("dragging");
+    } else if (pointers.size === 1) {
+        dragging = true;
+        moved = 0;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        canvas.classList.add("dragging");
+    }
 });
 canvas.addEventListener("pointermove", e => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (pointers.size >= 2) {
+        const pts = [...pointers.values()];
+        const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+        state.zoom = Math.max(1, Math.min(6, pinchZoom * d / pinchDist));
+        ui.statZoom.textContent = state.zoom.toFixed(1) + "×";
+        return;
+    }
     if (dragging) {
         const dx = e.clientX - lastX, dy = e.clientY - lastY;
         lastX = e.clientX;
@@ -1475,10 +1498,23 @@ canvas.addEventListener("pointermove", e => {
         canvas.classList.toggle("pick", hov >= 0);
     }
 });
-canvas.addEventListener("pointerup", e => {
+function endPointer(e) {
+    const wasPinch = pinched;
+    pointers.delete(e.pointerId);
+    if (pointers.size === 1 && wasPinch) {
+        const p = [...pointers.values()][0];
+        lastX = p.x;
+        lastY = p.y;
+        dragging = true;
+        moved = 999;
+        pinched = false;
+        canvas.classList.add("dragging");
+        return;
+    }
+    pinched = false;
     dragging = false;
     canvas.classList.remove("dragging");
-    if (moved < 6) {
+    if (pointers.size === 0 && !wasPinch && moved < 6) {
         const rect = canvas.getBoundingClientRect();
         const idx = pick(e.clientX - rect.left, e.clientY - rect.top);
         if (idx >= 0) {
@@ -1488,7 +1524,9 @@ canvas.addEventListener("pointerup", e => {
             selectAirport(null);
         }
     }
-});
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
 canvas.addEventListener("pointerleave", () => { state.hover = null; });
 canvas.addEventListener("wheel", e => {
     e.preventDefault();
