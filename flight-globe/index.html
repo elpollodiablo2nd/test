@@ -591,6 +591,12 @@ const DATA = {
     routes: [
         "https://cdn.jsdelivr.net/gh/jpatokal/openflights@master/data/routes.dat",
         "https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat"
+    ],
+    land: [
+        "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_50m_land.geojson",
+        "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson",
+        "https://cdn.jsdelivr.net/gh/nvkelso/natural-earth-vector@master/geojson/ne_110m_land.geojson",
+        "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.geojson"
     ]
 };
 
@@ -869,7 +875,142 @@ async function fetchFirst(urls, timeoutMs) {
     }
     throw lastErr;
 }
+function rdpRing(pts, eps) {
+    const n = pts.length;
+    if (n < 3) return pts.slice();
+    const keep = new Array(n).fill(false);
+    keep[0] = keep[n - 1] = true;
+    const stack = [[0, n - 1]];
+    while (stack.length) {
+        const seg = stack.pop();
+        const a = seg[0], b = seg[1];
+        const ax = pts[a][0], ay = pts[a][1];
+        const bx = pts[b][0], by = pts[b][1];
+        const dx = bx - ax, dy = by - ay;
+        const norm = Math.hypot(dx, dy);
+        let maxd = -1, maxi = -1;
+        for (let i = a + 1; i < b; i++) {
+            const px = pts[i][0], py = pts[i][1];
+            const d = norm === 0 ? Math.hypot(px - ax, py - ay) : Math.abs(dy * px - dx * py + bx * ay - by * ax) / norm;
+            if (d > maxd) { maxd = d; maxi = i; }
+        }
+        if (maxd > eps) {
+            keep[maxi] = true;
+            stack.push([a, maxi], [maxi, b]);
+        }
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) if (keep[i]) out.push(pts[i]);
+    return out;
+}
+function simplifyLand(land, eps) {
+    const out = [];
+    for (const poly of land) {
+        const rings = [];
+        for (const ring of poly) {
+            let r = ring;
+            if (r.length > 1 && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1]) r = r.slice(0, -1);
+            const s = rdpRing(r, eps);
+            if (s.length >= 3) rings.push(s);
+        }
+        if (rings.length) out.push(rings);
+    }
+    return out;
+}
+function countLandPts(land) {
+    let n = 0;
+    for (const p of land) for (const r of p) n += r.length;
+    return n;
+}
+function unwrapRing(ring) {
+    const out = [[ring[0][0], ring[0][1]]];
+    for (let i = 1; i < ring.length; i++) {
+        let x = ring[i][0];
+        const prev = out[i - 1][0];
+        while (x - prev > 180) x -= 360;
+        while (x - prev < -180) x += 360;
+        out.push([x, ring[i][1]]);
+    }
+    return out;
+}
+function ringContains(lon, lat, ring) {
+    const r = unwrapRing(ring);
+    const base = r[0][0];
+    let l = lon;
+    while (l - base > 180) l -= 360;
+    while (l - base < -180) l += 360;
+    let inside = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        const xi = r[i][0], yi = r[i][1];
+        const xj = r[j][0], yj = r[j][1];
+        if (((yi > lat) !== (yj > lat)) && (l < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+}
+function polyContains(lon, lat, poly) {
+    let crossings = 0;
+    for (const ring of poly) if (ringContains(lon, lat, ring)) crossings++;
+    return crossings % 2 === 1;
+}
+function landBBox(poly) {
+    let x0 = 180, y0 = 90, x1 = -180, y1 = -90;
+    for (const ring of poly) for (const p of ring) {
+        if (p[0] < x0) x0 = p[0];
+        if (p[0] > x1) x1 = p[0];
+        if (p[1] < y0) y0 = p[1];
+        if (p[1] > y1) y1 = p[1];
+    }
+    return [x0, y0, x1, y1];
+}
+function landContains(lon, lat) {
+    for (let i = 0; i < state.land.length; i++) {
+        const b = state.landBBox[i];
+        if (!b) continue;
+        let l = lon;
+        if (b[2] - b[0] > 180) {
+            if (l < b[0]) l += 360;
+            if (!(l >= b[0] && l <= b[2] + 360 && lat >= b[1] && lat <= b[3])) continue;
+        } else if (!(lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3])) continue;
+        if (polyContains(lon, lat, state.land[i])) return true;
+    }
+    return false;
+}
+function landCheck() {
+    const ds = state.ds;
+    if (!ds || !state.land.length) return null;
+    let n = 0, on = 0;
+    const step = Math.max(1, Math.floor(ds.list.length / 400));
+    for (let i = 0; i < ds.list.length; i += step) {
+        const a = ds.list[i];
+        n++;
+        if (landContains(a.lon, a.lat)) on++;
+    }
+    const pct = n ? Math.round(100 * on / n) : 0;
+    return { n, on, pct };
+}
+function parseLand(text) {
+    const land = [];
+    try {
+        const gj = JSON.parse(text);
+        for (const f of gj.features || []) {
+            const g = f.geometry;
+            if (!g || !g.coordinates) continue;
+            const polys = g.type === "MultiPolygon" ? g.coordinates : [g.coordinates];
+            for (const poly of polys) {
+                const rings = (poly || []).filter(r => r && r.length >= 3);
+                if (rings.length) land.push(rings);
+            }
+        }
+    } catch (e) { return []; }
+    return land;
+}
 async function loadData() {
+    let land = [];
+    try {
+        const rawLand = parseLand(await fetchFirst(DATA.land, 30000));
+        land = simplifyLand(rawLand, 0.12);
+        if (countLandPts(land) > 40000) land = simplifyLand(rawLand, 0.4);
+    } catch (e) { land = []; }
     try {
         const [aText, rText] = await Promise.all([
             fetchFirst(DATA.airports, 25000),
@@ -877,14 +1018,17 @@ async function loadData() {
         ]);
         const amap = parseAirports(aText);
         const pairs = parseRoutes(rText, amap);
-        return { ds: buildDataset(amap, pairs), offline: false };
+        return { ds: buildDataset(amap, pairs), land, offline: false };
     } catch (e) {
-        return { ds: fallbackDataset(), offline: true };
+        return { ds: fallbackDataset(), land, offline: true };
     }
 }
 
 const state = {
     ds: null,
+    land: [],
+    landBBox: [],
+    pads: [],
     yaw: -2.09,
     pitch: 0.35,
     zoom: 1,
@@ -968,6 +1112,53 @@ function label(text, x, y) {
     ctx.fillText(text, x, y);
 }
 
+function drawPads(cx, cy, R, yaw, pitch) {
+    if (!state.pads.length) return;
+    const r = Math.max(3, R * 0.008);
+    for (const a of state.pads) {
+        const p = project(a.lat, a.lon, 0, cx, cy, R, yaw, pitch);
+        if (p.z <= 0.02) continue;
+        ctx.fillStyle = "rgba(255,216,0,0.10)";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,250,235,0.5)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+}
+
+function drawLand(cx, cy, R, yaw, pitch) {
+    const land = state.land;
+    if (!land || !land.length) return;
+    ctx.beginPath();
+    for (const poly of land) {
+        for (const ring of poly) {
+            let anyFront = false;
+            const pts = [];
+            for (let i = 0; i < ring.length; i++) {
+                let p = project(ring[i][0], ring[i][1], 0, cx, cy, R, yaw, pitch);
+                if (p.z > 0.02) anyFront = true;
+                else {
+                    const dx = p.x - cx, dy = p.y - cy;
+                    const len = Math.hypot(dx, dy) || 1;
+                    p = { x: cx + dx / len * R * 0.998, y: cy + dy / len * R * 0.998 };
+                }
+                pts.push(p);
+            }
+            if (!anyFront) continue;
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+            ctx.closePath();
+        }
+    }
+    ctx.fillStyle = "rgba(255,216,0,0.10)";
+    ctx.fill("evenodd");
+    ctx.strokeStyle = "rgba(255,250,235,0.5)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
 function draw(now) {
     resize();
     const w = canvas.width, h = canvas.height;
@@ -992,6 +1183,9 @@ function draw(now) {
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.fill();
+
+    drawLand(cx, cy, R, yaw, pitch);
+    drawPads(cx, cy, R, yaw, pitch);
 
     ctx.lineWidth = 1;
     for (let lat = -60; lat <= 60; lat += 30) {
@@ -1355,10 +1549,27 @@ async function init() {
     requestAnimationFrame(frame);
     const res = await loadData();
     state.ds = res.ds;
+    state.land = res.land || [];
+    state.landBBox = state.land.map(landBBox);
+    state.pads = [];
+    if (state.land.length && state.ds) {
+        for (const a of state.ds.list) {
+            if (!landContains(a.lon, a.lat)) state.pads.push(a);
+        }
+    }
     state.maxD = 1;
     for (const a of state.ds.list) if (a.d > state.maxD) state.maxD = a.d;
     ui.statAirports.textContent = state.ds.list.length.toLocaleString();
+    const lc = landCheck();
     ui.statAirports.title = state.ds.totalAirports.toLocaleString() + " airports with IATA in source data";
+    if (lc) {
+        console.log("[flight-globe] land alignment check: " + lc.on + "/" + lc.n + " sampled airports fall on the rendered landmass (" + lc.pct + "%)" + (state.pads.length ? "; " + state.pads.length + " airports got a micro-island land pad" : ""));
+        ui.statAirports.title += " · land check: " + lc.on + "/" + lc.n + " airports on land (" + lc.pct + "%)" + (state.pads.length ? " · " + state.pads.length + " micro-island pads" : "");
+        if (lc.pct < 80) {
+            ui.feedback.textContent = "LAND CHECK: only " + lc.pct + "% of sampled airports fall on the rendered landmass — the land layer may be misaligned or too coarse for this view.";
+            ui.feedback.classList.add("visible");
+        }
+    }
     ui.statRoutes.textContent = state.ds.edges.length.toLocaleString();
     ui.statRoutes.title = state.ds.totalRoutes.toLocaleString() + " unique routes in source data";
     ui.loading.style.display = "none";
