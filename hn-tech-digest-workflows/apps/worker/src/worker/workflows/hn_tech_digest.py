@@ -8,10 +8,14 @@ import mistralai.workflows as workflows
 from mistralai.workflows import Depends
 from mistralai.workflows.plugins.mistralai import (
     ChatCompletionRequest,
+    ResponseFormat,
     SystemMessage,
     UserMessage,
-    chat_parse_to_model,
     get_mistral_client,
+    mistralai_chat_complete,
+)
+from mistralai.workflows.plugins.mistralai.activities import (
+    response_format_from_pydantic_model,
 )
 from mistralai.workflows.plugins.mistralai.connectors import (
     ToolCallClient,
@@ -180,6 +184,26 @@ def build_story_listing(stories: list[HnStory]) -> str:
     )
 
 
+def extract_text_content(content: object) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            chunk.text
+            for chunk in content
+            if getattr(chunk, "type", None) == "text" and getattr(chunk, "text", None)
+        )
+    return str(content)
+
+
+def extract_json_object(text: str) -> str:
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError(f"no JSON object in model output: {text[:200]}")
+    return text[start : end + 1]
+
+
 @workflows.activity(
     name="fetch-front-page-stories",
     start_to_close_timeout=timedelta(seconds=90),
@@ -225,8 +249,14 @@ async def build_tech_digest(
             UserMessage(content=user_prompt),
         ],
         temperature=0.2,
+        reasoning_effort="none",
+        response_format=ResponseFormat.model_validate(
+            response_format_from_pydantic_model(Digest)
+        ),
     )
-    digest = await chat_parse_to_model(Digest, request)
+    response = await mistralai_chat_complete(request)
+    content = extract_text_content(response.choices[0].message.content)
+    digest = Digest.model_validate_json(extract_json_object(content))
     digest.date = today
     digest.stories = digest.stories[:max_stories]
     for rank, story in enumerate(digest.stories, start=1):

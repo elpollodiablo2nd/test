@@ -12,7 +12,9 @@ from worker.workflows.hn_tech_digest import (
     HnTechDigestInput,
     HnTechDigestWorkflow,
     build_story_listing,
+    extract_json_object,
     extract_sent_message,
+    extract_text_content,
     parse_algolia_hit,
     render_digest_html,
     story_domain,
@@ -126,6 +128,29 @@ def test_extract_sent_message_handles_plain_and_mcp_shapes():
         extract_sent_message({"content": [{"type": "text", "text": "not json"}]}) == {}
     )
     assert extract_sent_message(None) == {}
+
+
+def test_extract_text_content_handles_str_and_chunks():
+    assert extract_text_content("plain") == "plain"
+    chunks = [
+        {"type": "think", "thinking": "hmm"},
+        type("C", (), {"type": "text", "text": '{"a": 1}'})(),
+        type("C", (), {"type": "text", "text": " tail"})(),
+    ]
+    assert extract_text_content(chunks) == '{"a": 1} tail'
+    assert extract_text_content(None) == "None"
+
+
+def test_extract_json_object_finds_object_in_prose_and_fences():
+    assert extract_json_object('{"a": 1}') == '{"a": 1}'
+    assert extract_json_object('```json\n{"a": 1}\n```') == '{"a": 1}'
+    assert extract_json_object('Here you go: {"a": {"b": 2}} thanks') == '{"a": {"b": 2}}'
+    try:
+        extract_json_object("no json here")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError")
 
 
 def test_input_defaults():
