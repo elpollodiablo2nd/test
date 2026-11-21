@@ -14,19 +14,31 @@ Plain HTML — no build step. GitHub Pages serves this folder once the branch is
 
 ## Use it
 
-1. **LOAD PRICES** — fetches the last ~10 days of hourly DK2 day-ahead prices live from
+All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 1000.
+
+1. Prices load automatically on page open; **LOAD PRICES** refreshes them. It fetches the last
+   ~10 days of hourly DK2 day-ahead prices live from
    [Energi Data Service](https://www.energidataservice.dk/tso-electricity/DayAheadPrices)
    (`DayAheadPrices`, `PriceArea=DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
-   Day-ahead prices for tomorrow are published **once a day (~13:00 CET)**, and tomorrow usually
-   tracks today: the chart always shows the **lag-1 baseline** (tomorrow ≈ today), and the HUD shows
-   the day-to-day correlation and the lag-1 backtest MAE.
-2. Paste your **Mistral API key** (stored only in `localStorage`, sent only to `api.mistral.ai`) and
-   press **RUN TIMESTRAL** — the page calls the deployed `dk2-elspot-forecast` workflow
-   (`POST /v1/workflows/dk2-elspot-forecast/execute`, `wait_for_result`), which runs Timestral
-   (default 28M checkpoint; 5M/123M/209M selectable) on the last 30 days and returns the next 24h
-   with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
-3. The chart overlays the **Timestral median** (orange dashes) and its **q10–q90 band** (red), and the
-   hourly grid below lists all 24 forecast hours, cheapest highlighted.
+   Energinet occasionally answers **429 (rate limited)** — the page retries with backoff up to 4
+   times and, if that still fails, falls back to the **cached copy** from the last successful load
+   (kept in `localStorage`) with a warning banner. Day-ahead prices for tomorrow are published
+   **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
+   **lag-1 baseline** (tomorrow ≈ today), and the HUD shows the day-to-day correlation and the
+   lag-1 backtest MAE.
+2. Paste your **Mistral API key** (stored only in `localStorage`, sent only to `api.mistral.ai`),
+   pick the **horizon** (24/48/72h — beyond 24h there is no published day-ahead price to check
+   against and the q10–q90 band widens) and press **RUN TIMESTRAL** — the page starts an async
+   execution of the deployed `dk2-elspot-forecast` workflow
+   (`POST /v1/workflows/dk2-elspot-forecast/execute` with `wait_for_result:false`, then polls
+   `GET /v1/workflows/executions/{id}` every 3 s, showing progress in the banner), which runs
+   Timestral (default 28M checkpoint; 5M/123M/209M selectable) on the last 30 days and returns the
+   forecast with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
+3. The chart then overlays the **Timestral median** (orange dashes) and its **q10–q90 band** (red)
+   over the full horizon, and the hourly grid below lists every forecast hour in kr/kWh with its
+   q10–q90 range, cheapest highlighted.
+4. **EV charging**: the HUD stat `EV {4/6/8}H FROM …` (window length selectable) shows the cheapest
+   contiguous charging window in the forecast and its average price in kr/kWh.
 
 No retraining is involved: Timestral is zero-shot — the price history is the inference context
 (up to 32K steps), with hour-of-day/weekday passed as known-future covariates.
@@ -37,7 +49,8 @@ No retraining is involved: Timestral is zero-shot — the price history is the i
   — keyless, CORS-enabled; bucketed to hourly UTC (DST-proof), labels shown in Europe/Copenhagen.
 - **Model**: the managed workflow deployment `dk2-elspot-forecast` (source: `elspot-dk2-workflows/` in
   this repo) runs `TimestralForecaster.from_pretrained("mistralai/Timestral-<size>")` (open weights,
-  Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts 24 steps ahead. Hour-of-day and
+  Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts `horizon_hours` steps ahead
+  (24/48/72 from the UI). Hour-of-day and
   weekday are passed as categorical known-future covariates, and the **weather forecast** (wind speed,
   temperature, solar radiation from [Open-Meteo](https://open-meteo.com/), keyless, for Zealand) as
   numeric known-future covariates over context + horizon — weather drives both generation and prices

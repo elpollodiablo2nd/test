@@ -77,5 +77,24 @@ const ws = Core.summarizeWeather(hourly, now);
 check("summarizeWeather next-24h window", ws.windAvg === 20 && ws.tempMin === 1 && ws.tempMax === 4 && ws.solarPeak === 500);
 check("summarizeWeather null when empty", Core.summarizeWeather({}, now) === null);
 
+// fmtKwh: DKK/MWh -> kr/kWh
+check("fmtKwh divides by 1000", Core.fmtKwh(1234) === "1.23");
+check("fmtKwh rounds to 2 decimals", Core.fmtKwh(500.55) === "0.50");
+check("fmtKwh negative prices", Core.fmtKwh(-250) === "-0.25");
+
+// bestWindow: cheapest contiguous window by median
+const fc = [
+    { hour_dk: "2026-11-22 00:00", median: 900 },
+    { hour_dk: "2026-11-22 01:00", median: 100 },
+    { hour_dk: "2026-11-22 02:00", median: 50 },
+    { hour_dk: "2026-11-22 03:00", median: 80 },
+    { hour_dk: "2026-11-22 04:00", median: 700 },
+];
+const bw = Core.bestWindow(fc, 3);
+check("bestWindow finds cheapest 3h run", bw.start === "2026-11-22 01:00" && bw.end === "2026-11-22 03:00");
+check("bestWindow avg", close(bw.avg, (100 + 50 + 80) / 3));
+check("bestWindow clamps to forecast length", Core.bestWindow(fc, 99).end === "2026-11-22 04:00");
+check("bestWindow empty -> null", Core.bestWindow([], 6) === null && Core.bestWindow(null, 6) === null);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

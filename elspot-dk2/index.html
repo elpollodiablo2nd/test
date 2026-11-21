@@ -232,7 +232,7 @@
         <div class="stats" id="stats"></div>
 
         <section class="card">
-            <h2>PRICE CHART · DKK/MWh</h2>
+            <h2>PRICE CHART · KR/KWH</h2>
             <div class="screen">
                 <svg id="chart" viewBox="0 0 760 320" role="img" aria-label="Hourly DK2 day-ahead prices and forecast"></svg>
                 <div class="legend">
@@ -249,12 +249,17 @@
 
         <section class="card">
             <h2>RUN THE MODEL</h2>
-            <p>Day-ahead prices for DK2 are published once a day by Energinet, and tomorrow usually tracks today.
-                This page loads the recent hourly prices itself and calls the deployed <b>dk2-elspot-forecast</b>
-                workflow, which runs Mistral's <b>Timestral</b> time-series model on them (no retraining — the history
-                is the context) with the <b>weather forecast</b> (wind, temperature, solar radiation from
-                Open-Meteo) as known-future covariates, since weather drives both generation and prices.
-                Your API key is only stored in this browser and sent to api.mistral.ai.</p>
+            <p><b>What to push:</b> 1) paste your Mistral API key (stored only in this browser's localStorage, sent only to
+                api.mistral.ai); 2) prices load automatically — <b>LOAD PRICES</b> just refreshes them (a cached copy is shown if
+                Energinet rate-limits); 3) optionally pick the Timestral checkpoint (28M default) and the <b>horizon</b>
+                (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
+                4) press <b>RUN TIMESTRAL</b>.</p>
+            <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
+                Timestral on the managed worker (~10–30 s, the banner shows progress), and this page then overlays the orange dashed
+                <b>median</b> forecast with the red <b>q10–q90 confidence band</b> on the chart, fills the hourly grid below
+                (cheapest hour highlighted), and updates the HUD: backtest MAE of Timestral vs the lag-1 baseline, the forecast
+                average, and the cheapest <b>EV charging window</b> (EV 4/6/8h). All prices are shown in <b>kr/kWh</b> — the source
+                data is DKK/MWh, divided by 1000.</p>
             <div class="controls">
                 <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
@@ -263,6 +268,16 @@
                     <option value="123M">123M</option>
                     <option value="209M">209M</option>
                 </select>
+                <select id="horizon" class="pixel" title="Forecast horizon">
+                    <option value="24" selected>24h ahead</option>
+                    <option value="48">48h ahead</option>
+                    <option value="72">72h ahead</option>
+                </select>
+                <select id="evHours" class="pixel" title="EV charging window length">
+                    <option value="4">EV 4h</option>
+                    <option value="6" selected>EV 6h</option>
+                    <option value="8">EV 8h</option>
+                </select>
                 <button id="loadBtn" class="btn-alt">LOAD PRICES</button>
                 <button id="runBtn" class="btn-primary">RUN TIMESTRAL</button>
             </div>
@@ -270,7 +285,7 @@
         </section>
 
         <section class="card">
-            <h2>NEXT 24H — HOURLY FORECAST · DKK/MWh</h2>
+            <h2 id="hoursTitle">NEXT 24H — HOURLY FORECAST · KR/KWH</h2>
             <div id="hours" class="hours-grid"></div>
         </section>
 
@@ -409,6 +424,25 @@
             };
         }
 
+        function fmtKwh(dkkMwh) { return (dkkMwh / 1000).toFixed(2); }
+
+        function bestWindow(forecast, winHours) {
+            // cheapest contiguous winHours window in the forecast, by median price
+            if (!forecast || !forecast.length) return null;
+            var w = Math.min(winHours, forecast.length);
+            var best = 0, bestSum = Infinity;
+            for (var i = 0; i + w <= forecast.length; i++) {
+                var sum = 0;
+                for (var j = 0; j < w; j++) sum += forecast[i + j].median;
+                if (sum < bestSum) { bestSum = sum; best = i; }
+            }
+            return {
+                start: forecast[best].hour_dk,
+                end: forecast[Math.min(best + w, forecast.length) - 1].hour_dk,
+                avg: bestSum / w
+            };
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -418,7 +452,9 @@
             lag1Forecast: lag1Forecast,
             mae: mae,
             backtestMae: backtestMae,
-            summarizeWeather: summarizeWeather
+            summarizeWeather: summarizeWeather,
+            fmtKwh: fmtKwh,
+            bestWindow: bestWindow
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -437,7 +473,8 @@
             document.getElementById("loadBtn").disabled = busy;
         }
 
-        function fetchPrices(days) {
+        function fetchPrices(days, attempt) {
+            attempt = attempt || 1;
             var start = new Date(Date.now() - (days + 2) * 86400000).toISOString().slice(0, 16);
             var params = new URLSearchParams({
                 filter: JSON.stringify({ PriceArea: ["DK2"] }),
@@ -446,7 +483,12 @@
                 limit: (days + 2) * 96 + 200
             });
             return fetch(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
-                if (!resp.ok) throw new Error("Energinet API " + resp.status);
+                if (!resp.ok) {
+                    if ((resp.status === 429 || resp.status >= 500) && attempt < 4) {
+                        return sleep(1500 * attempt).then(function () { return fetchPrices(days, attempt + 1); });
+                    }
+                    throw new Error("Energinet API " + resp.status + (resp.status === 429 ? " (rate limited)" : ""));
+                }
                 return resp.json();
             }).then(function (data) {
                 var points = aggregateHourlyUtc(data.records || []);
@@ -465,14 +507,14 @@
                     sum += f.median;
                     if (f.median < minF.median) minF = f;
                 });
-                tomorrowAvg = Math.round(sum / state.forecast.length) + " kr";
-                cheapest = minF.hour_dk.slice(11, 16);
+                tomorrowAvg = fmtKwh(sum / state.forecast.length);
+                cheapest = minF.hour_dk.slice(5, 16);
             }
             var items = [
                 ["CORR LAG-1", corr.toFixed(3), "var(--m-yellow)"],
-                ["MAE LAG-1", maeLag1 == null ? "—" : Math.round(maeLag1) + " kr", "var(--m-amber)"],
-                ["MAE TIMESTRAL", maeTimestral, "var(--m-orange)"],
-                ["NEXT 24H AVG", tomorrowAvg, "var(--cream)"],
+                ["MAE LAG-1 KR/KWH", maeLag1 == null ? "—" : fmtKwh(maeLag1), "var(--m-amber)"],
+                ["MAE TIMESTRAL KR/KWH", maeTimestral, "var(--m-orange)"],
+                ["FC AVG KR/KWH", tomorrowAvg, "var(--cream)"],
                 ["CHEAPEST HR", cheapest, "#8CFF6B"]
             ];
             if (state.workflowStats && state.workflowStats.wind_avg_ms != null) {
@@ -480,7 +522,12 @@
             }
             if (state.workflowStats) {
                 var t = state.workflowStats.mae_timestral_dkk;
-                items[2][1] = t == null ? "—" : Math.round(t) + " kr";
+                items[2][1] = t == null ? "—" : fmtKwh(t);
+            }
+            if (state.forecast && state.forecast.length) {
+                var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+                var bw = bestWindow(state.forecast, evH);
+                if (bw) items.push(["EV " + evH + "H FROM " + bw.start.slice(11, 16), fmtKwh(bw.avg) + " KR/KWH", "#8CFF6B"]);
             }
             document.getElementById("stats").innerHTML = items.map(function (it) {
                 return '<div class="stat-item"><div class="stat-value" style="color:' + it[2] + '">' + it[1] +
@@ -495,10 +542,11 @@
             if (!history.length) { svg.innerHTML = ""; return; }
             var hist = history.slice(-5 * HOURS_PER_DAY);
             var lastUtc = history[history.length - 1].utc.getTime();
-            var x1 = lastUtc + HOURS_PER_DAY * HOUR_MS;
+            var fcLen = state.forecast ? state.forecast.length : HOURS_PER_DAY;
+            var x1 = lastUtc + Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
             var x0 = hist[0].utc.getTime();
             var allVals = hist.map(function (p) { return p.price; });
-            var lag1 = lag1Forecast(history, HOURS_PER_DAY);
+            var lag1 = lag1Forecast(history, Math.max(HOURS_PER_DAY, fcLen));
             allVals = allVals.concat(lag1);
             if (state.forecast) {
                 state.forecast.forEach(function (f) { allVals.push(f.median, f.q10, f.q90); });
@@ -509,9 +557,9 @@
             function X(t) { return padL + (t - x0) / (x1 - x0) * (W - padL - padR); }
             function Y(v) { return H - padB - (v - y0) / (y1 - y0) * (H - padT - padB); }
             var s = "";
-            for (var v = Math.ceil(y0 / 500) * 500; v <= y1; v += 500) {
+            for (var v = Math.ceil(y0 / 1000) * 1000; v <= y1; v += 1000) {
                 s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
-                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + v + "</text>";
+                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + (v / 1000).toFixed(1) + "</text>";
             }
             for (var t = x0; t <= x1; t += HOURS_PER_DAY * HOUR_MS) {
                 s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
@@ -543,16 +591,18 @@
         function renderHours() {
             var el = document.getElementById("hours");
             if (!state.forecast || !state.forecast.length) {
-                el.innerHTML = '<p class="dim">No forecast yet — press RUN TIMESTRAL (needs your API key) or LOAD PRICES for the lag-1 baseline.</p>';
+                el.innerHTML = '<p class="dim">No forecast yet — press RUN TIMESTRAL (needs your API key); LOAD PRICES shows the lag-1 baseline on the chart.</p>';
                 return;
             }
+            document.getElementById("hoursTitle").textContent =
+                "NEXT " + state.forecast.length + "H — HOURLY FORECAST · KR/KWH";
             var minF = state.forecast[0];
             state.forecast.forEach(function (f) { if (f.median < minF.median) minF = f; });
             el.innerHTML = state.forecast.map(function (f) {
                 var cls = f === minF ? "hour-cell cheapest" : "hour-cell";
-                return '<div class="' + cls + '"><span class="h">' + f.hour_dk.slice(11) + '</span>' +
-                    '<span class="v">' + Math.round(f.median) + ' kr</span>' +
-                    '<span class="r">q10–q90: ' + Math.round(f.q10) + "–" + Math.round(f.q90) + "</span></div>";
+                return '<div class="' + cls + '"><span class="h">' + f.hour_dk.slice(5) + '</span>' +
+                    '<span class="v">' + fmtKwh(f.median) + ' kr/kWh</span>' +
+                    '<span class="r">q10–q90: ' + fmtKwh(f.q10) + "–" + fmtKwh(f.q90) + "</span></div>";
             }).join("");
         }
 
@@ -569,11 +619,49 @@
                 state.history = points;
                 state.forecast = null;
                 state.workflowStats = null;
+                try {
+                    localStorage.setItem("elspot_dk2_history", JSON.stringify(
+                        points.map(function (p) { return [p.utc.toISOString(), p.price]; })));
+                } catch (e) {}
                 renderAll();
-                feedback("Loaded " + points.length + " hourly DK2 prices, last " + dkLabel(points[points.length - 1].utc) + " (DK time).", "correct");
+                feedback("Loaded " + points.length + " hourly DK2 prices, last " + dkLabel(points[points.length - 1].utc) +
+                    " (DK). Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
             }).catch(function (err) {
-                feedback("Could not load prices: " + err.message, "wrong");
+                var cached = null;
+                try { cached = JSON.parse(localStorage.getItem("elspot_dk2_history") || "null"); } catch (e) {}
+                if (cached && cached.length) {
+                    state.history = cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; });
+                    renderAll();
+                    feedback("Energinet failed (" + err.message + ") — showing cached prices from the last successful load.", "wrong");
+                } else {
+                    feedback("Could not load prices: " + err.message, "wrong");
+                }
             }).finally(function () { setBusy(false); });
+        }
+
+        function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+        function pollExecution(key, executionId) {
+            var waited = 0;
+            function step() {
+                return fetch(MISTRAL_API + "/v1/workflows/executions/" + executionId, {
+                    headers: { "Authorization": "Bearer " + key }
+                }).then(function (resp) {
+                    if (!resp.ok) throw new Error("status check HTTP " + resp.status);
+                    return resp.json();
+                }).then(function (data) {
+                    var status = String(data.status || "").toUpperCase();
+                    if (status === "COMPLETED") return data.result;
+                    if (status === "FAILED" || status === "CANCELED" || status === "TERMINATED" || status === "TIMED_OUT") {
+                        throw new Error("execution " + status.toLowerCase() + (data.error ? ": " + data.error : ""));
+                    }
+                    waited += 3;
+                    if (waited % 15 === 0) feedback("Still running… " + waited + "s elapsed (fetch + Timestral on the worker)", "correct");
+                    if (waited >= 300) throw new Error("timed out after 300s waiting for the execution");
+                    return sleep(3000).then(step);
+                });
+            }
+            return step();
         }
 
         function runTimestral() {
@@ -581,15 +669,15 @@
             if (!key) { feedback("Paste your Mistral API key first — it is stored only in this browser.", "wrong"); return; }
             try { localStorage.setItem("elspot_dk2_api_key", key); } catch (e) {}
             var modelSize = document.getElementById("modelSize").value;
+            var horizon = parseInt(document.getElementById("horizon").value, 10) || 24;
             setBusy(true);
-            feedback("Running workflow '" + WORKFLOW_NAME + "' (Timestral " + modelSize + ") on the managed deployment…", "correct");
+            feedback("Starting '" + WORKFLOW_NAME + "' (Timestral " + modelSize + ", " + horizon + "h horizon) on deployment '" + DEPLOYMENT_NAME + "'…", "correct");
             fetch(MISTRAL_API + "/v1/workflows/" + WORKFLOW_NAME + "/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
                 body: JSON.stringify({
-                    input: { days: 30, horizon_hours: 24, model_size: modelSize, backtest_days: 7, dry_run: false },
-                    wait_for_result: true,
-                    timeout_seconds: 300,
+                    input: { days: 30, horizon_hours: horizon, model_size: modelSize, backtest_days: 7, use_weather: true, dry_run: false },
+                    wait_for_result: false,
                     deployment_name: DEPLOYMENT_NAME
                 })
             }).then(function (resp) {
@@ -597,21 +685,25 @@
                     return resp.json().catch(function () { return null; }).then(function (body) {
                         var msg = (body && (body.detail || body.message)) || ("HTTP " + resp.status);
                         if (typeof msg !== "string") { try { msg = JSON.stringify(msg); } catch (e) { msg = "HTTP " + resp.status; } }
-                        if (resp.status === 401 || resp.status === 403) msg = "API key rejected (" + resp.status + ") — check the key";
+                        if (resp.status === 401 || resp.status === 403) msg = "API key rejected (" + resp.status + ") — check the key and that it can execute workflows";
                         if (resp.status === 404) msg = "workflow '" + WORKFLOW_NAME + "' not found — deploy elspot-dk2-workflows first";
                         throw new Error(msg);
                     });
                 }
                 return resp.json();
             }).then(function (out) {
-                var result = out && out.result;
+                var executionId = out && out.execution_id;
+                if (!executionId) throw new Error("no execution_id in response");
+                return pollExecution(key, executionId);
+            }).then(function (result) {
                 if (!result || !result.forecast) throw new Error("execution returned no forecast");
                 state.forecast = result.forecast;
                 state.workflowStats = result.stats || null;
                 renderAll();
-                feedback("Forecast ready — " + result.model + ", generated " + String(result.generated_at).slice(0, 16) + "Z. MAE Timestral " +
-                    (result.stats && result.stats.mae_timestral_dkk != null ? Math.round(result.stats.mae_timestral_dkk) + " kr" : "n/a") +
-                    " vs lag-1 " + (result.stats && result.stats.mae_lag1_dkk != null ? Math.round(result.stats.mae_lag1_dkk) + " kr" : "n/a") + ".", "correct");
+                var st = result.stats || {};
+                feedback("Forecast ready — " + result.model + ", " + result.forecast.length + "h, " + String(result.generated_at).slice(0, 16) +
+                    "Z. Backtest MAE: Timestral " + (st.mae_timestral_dkk != null ? fmtKwh(st.mae_timestral_dkk) : "n/a") +
+                    " vs lag-1 " + (st.mae_lag1_dkk != null ? fmtKwh(st.mae_lag1_dkk) : "n/a") + " kr/kWh.", "correct");
             }).catch(function (err) {
                 feedback("Timestral run failed: " + err.message, "wrong");
             }).finally(function () { setBusy(false); });
