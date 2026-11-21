@@ -1,0 +1,25 @@
+{
+  "name": "elspot-dk2-android",
+  "version": "0.1.0",
+  "description": "Elspot DK2 Android app: Timestral ONNX inference on-device (Capacitor + onnxruntime-web WASM)",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "sync:www": "./tools/sync-www.sh",
+    "sync": "npx cap sync android",
+    "build:android": "npm run sync:www && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "export:onnx": "../elspot-dk2-workflows/.venv/bin/python export_onnx.py",
+    "test": "node test/ort-wasm-test.js 5m fp32 && node test/ort-wasm-test.js 28m fp32 && node ../elspot-dk2/test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "onnxruntime-web": "^1.23.2"
+  }
+}

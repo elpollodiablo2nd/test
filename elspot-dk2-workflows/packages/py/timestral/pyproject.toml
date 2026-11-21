@@ -1,0 +1,25 @@
+[project]
+name = "timestral"
+version = "1.0.0"
+description = "Vendored standalone inference for Mistral's Timestral time-series foundation models (Apache-2.0, github.com/mistralai/timestral @ a534bdbd)"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "huggingface_hub>=0.23",
+    "numpy>=1.24",
+    "safetensors>=0.4",
+    "torch>=2.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.0,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "timestral"
+
+[tool.uv.sources]
+# CPU-only torch wheels keep the worker image small; the PyTorch CPU index is linux-only,
+# so other platforms (local dev on macOS) fall back to the default PyPI torch.
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]

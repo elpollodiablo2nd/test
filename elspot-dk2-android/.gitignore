@@ -1,0 +1,4 @@
+dist/
+www/vendor/
+android/
+node_modules/
