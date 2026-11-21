@@ -166,5 +166,34 @@ check("xAxisStep 8d window -> 24h", Core.xAxisStep(8 * 24 * 3600e3, 12) === 24);
 check("xAxisStep 1h window -> 1h", Core.xAxisStep(3600e3, 12) === 1);
 check("xAxisStep huge window -> 96h cap", Core.xAxisStep(400 * 24 * 3600e3, 12) === 96);
 
+// utcHourKey / weekdayMon0
+check("utcHourKey", Core.utcHourKey(new Date(Date.UTC(2026, 10, 21, 7, 30))) === "2026-11-21T07:00");
+check("weekdayMon0 monday=0", Core.weekdayMon0(new Date(Date.UTC(2026, 10, 23))) === 0);
+check("weekdayMon0 saturday=5", Core.weekdayMon0(new Date(Date.UTC(2026, 10, 21))) === 5);
+
+// targetEncode vs python timestral.covariate_encoding.target_encode reference
+const enc = Core.targetEncode([100, 200, 300, NaN, 150, 250], [0, 1, 0, 1, NaN, 1], 1);
+const encVals = [0, 1, 0, 1, NaN, 1, 0, 2, NaN].map(c => enc(c));
+check("targetEncode matches python", close(encVals[0], 200) && close(encVals[1], 216.666672, 1e-4) && close(encVals[2], 200) && close(encVals[4], 175) && close(encVals[7], 200) && close(encVals[8], 175));
+
+// buildOnnxInputs: shapes, left NaN padding, weather/encoding rows
+const h0 = Date.UTC(2026, 10, 20, 0, 0, 0);
+const hist = [];
+for (let i = 0; i < 800; i++) hist.push({ utc: new Date(h0 + i * 3600e3), price: 400 + (i % 24) * 10 });
+const wmap = {};
+for (let i = 0; i < 900; i++) { const d = new Date(h0 + i * 3600e3); wmap[Core.utcHourKey(d)] = [5, 2, 100]; }
+const inp = Core.buildOnnxInputs(hist, wmap);
+check("buildOnnxInputs context len", inp.context.length === 768);
+check("buildOnnxInputs known len", inp.known.length === 5 * 864);
+check("buildOnnxInputs hours len", inp.hours.length === 864);
+check("buildOnnxInputs no pad when 800h", isFinite(inp.context[0]));
+check("buildOnnxInputs last ctx price", close(inp.context[767], hist[799].price, 1e-3));
+check("buildOnnxInputs weather row", inp.known[0] === 5 && inp.known[864] === 2 && inp.known[2 * 864] === 100);
+check("buildOnnxInputs enc rows finite", isFinite(inp.known[3 * 864 + 700]) && isFinite(inp.known[4 * 864 + 700]));
+const inp2 = Core.buildOnnxInputs(hist.slice(0, 100), {});
+check("buildOnnxInputs left-pads NaN", isNaN(inp2.context[0]) && isFinite(inp2.context[668]));
+check("buildOnnxInputs weather NaN when missing", isNaN(inp2.known[0]) && isNaN(inp2.known[864]));
+check("buildOnnxInputs enc NaN in padding", isNaN(inp2.known[3 * 864 + 10]) && isFinite(inp2.known[3 * 864 + 700]));
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

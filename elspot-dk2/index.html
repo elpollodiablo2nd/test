@@ -282,6 +282,10 @@
             </details>
             <div class="controls">
                 <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
+                <select id="runMode" class="pixel" title="Where the model runs">
+                    <option value="server" selected>SERVER · WORKFLOW (API KEY)</option>
+                    <option value="local">ON-DEVICE · ONNX (NO KEY)</option>
+                </select>
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
                     <option value="5M">5M</option>
                     <option value="28M" selected>28M</option>
@@ -342,6 +346,11 @@
                 Price18: 0.7907, Price19: 0.7907, Price20: 0.7907, Price21: 0.7907,
                 Price22: 0.2636, Price23: 0.2636, Price24: 0.2636 }]
         };
+        var ONNX_T = 768, ONNX_H = 96, ONNX_Q = 21; // fixed export shapes (patch 32 | 768, 96)
+        var ONNX_MED_I = 10, ONNX_Q10_I = 2, ONNX_Q90_I = 18; // quantile levels 0.01..0.99
+        var ONNX_MODEL_URLS = { "5M": "assets/timestral-5m.onnx" }; // bundled in the APK
+        var PAGES_BASE = "https://elpollodiablo2nd.github.io/test/";
+        var ONNX_MODEL_PARTS = { "28M": [0, 1, 2, 3].map(function (i) { return PAGES_BASE + "elspot-dk2-android/models/timestral-28m.part" + i; }) };
 
         // ---------- pure core (unit-tested by test.js) ----------
 
@@ -575,6 +584,82 @@
             return steps[steps.length - 1];
         }
 
+        function utcHourKey(d) {
+            function p2(n) { return (n < 10 ? "0" : "") + n; }
+            return d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate()) + "T" + p2(d.getUTCHours()) + ":00";
+        }
+
+        function weekdayMon0(d) { return (d.getUTCDay() + 6) % 7; }
+
+        function targetEncode(target, codes, smooth) {
+            // mirrors timestral.covariate_encoding.target_encode (smoothed per-series mean encoding)
+            smooth = smooth == null ? 1 : smooth;
+            var n = target.length, i;
+            var t = new Array(n), observed = new Array(n), sum = 0, cnt = 0;
+            for (i = 0; i < n; i++) {
+                observed[i] = isFinite(target[i]);
+                t[i] = observed[i] ? target[i] : 0;
+                if (observed[i]) { sum += t[i]; cnt++; }
+            }
+            var itemMean = cnt > 0 ? sum / cnt : 0;
+            var cats = [];
+            for (i = 0; i < n; i++) if (isFinite(codes[i]) && cats.indexOf(codes[i]) < 0) cats.push(codes[i]);
+            cats.sort(function (a, b) { return a - b; });
+            var nanSlot = cats.length, unseen = nanSlot + 1;
+            var sums = new Array(nanSlot + 1).fill(0), counts = new Array(nanSlot + 1).fill(0);
+            for (i = 0; i < n; i++) {
+                var slot = isFinite(codes[i]) ? cats.indexOf(codes[i]) : nanSlot;
+                if (observed[i]) { sums[slot] += t[i]; counts[slot]++; }
+            }
+            var lookup = [];
+            for (i = 0; i <= nanSlot; i++) lookup.push((smooth * itemMean + sums[i]) / (smooth + counts[i]));
+            lookup.push(itemMean);
+            return function (code) {
+                if (!isFinite(code)) return lookup[nanSlot];
+                var idx = cats.indexOf(code);
+                return idx < 0 ? lookup[unseen] : lookup[idx];
+            };
+        }
+
+        function buildOnnxInputs(history, weatherMap) {
+            // last ONNX_T hours (NaN left-padded) + ONNX_H future hours; known covariates
+            // rows = [wind, temp, solar, enc_hour, enc_weekday] over T+H, NaN = missing
+            var pts = (history || []).slice(-ONNX_T);
+            var pad = ONNX_T - pts.length, i;
+            var hours = [], prices = [];
+            for (i = 0; i < pad; i++) { hours.push(null); prices.push(NaN); }
+            pts.forEach(function (p) { hours.push(p.utc); prices.push(p.price); });
+            var last = hours[ONNX_T - 1];
+            for (i = 1; i <= ONNX_H; i++) hours.push(new Date(last.getTime() + i * HOUR_MS));
+            var L = ONNX_T + ONNX_H;
+            var context = new Float32Array(ONNX_T);
+            for (i = 0; i < ONNX_T; i++) context[i] = prices[i];
+            var hourCodes = new Array(L), weekCodes = new Array(L);
+            for (i = 0; i < L; i++) {
+                var h = hours[i];
+                if (h) { hourCodes[i] = h.getUTCHours(); weekCodes[i] = weekdayMon0(h); }
+                else { hourCodes[i] = NaN; weekCodes[i] = NaN; }
+            }
+            var target = new Array(ONNX_T);
+            for (i = 0; i < ONNX_T; i++) target[i] = isFinite(prices[i]) ? prices[i] : NaN;
+            var encHour = targetEncode(target, hourCodes.slice(0, ONNX_T));
+            var encWeek = targetEncode(target, weekCodes.slice(0, ONNX_T));
+            var known = new Float32Array(5 * L);
+            for (i = 0; i < L; i++) {
+                var hh = hours[i];
+                var w = hh ? weatherMap[utcHourKey(hh)] : null;
+                known[0 * L + i] = w ? w[0] : NaN;
+                known[1 * L + i] = w ? w[1] : NaN;
+                known[2 * L + i] = w ? w[2] : NaN;
+                var eh = encHour(hourCodes[i]), ew = encWeek(weekCodes[i]);
+                if (i < ONNX_T && !isFinite(target[i]) && !isFinite(hourCodes[i])) eh = NaN;
+                if (i < ONNX_T && !isFinite(target[i]) && !isFinite(weekCodes[i])) ew = NaN;
+                known[3 * L + i] = eh;
+                known[4 * L + i] = ew;
+            }
+            return { context: context, known: known, hours: hours };
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -595,7 +680,11 @@
             dispDkkMwh: dispDkkMwh,
             combinedSeries: combinedSeries,
             bestWindowEntries: bestWindowEntries,
-            xAxisStep: xAxisStep
+            xAxisStep: xAxisStep,
+            utcHourKey: utcHourKey,
+            weekdayMon0: weekdayMon0,
+            targetEncode: targetEncode,
+            buildOnnxInputs: buildOnnxInputs
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -938,7 +1027,122 @@
             return step();
         }
 
+        function onnxAvailable() { return typeof ort !== "undefined"; }
+
+        function getOnnxSession(modelSize) {
+            if (state.onnxSession && state.onnxSessionSize === modelSize) return Promise.resolve(state.onnxSession);
+            var url = ONNX_MODEL_URLS[modelSize];
+            var p;
+            if (url) {
+                p = fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
+            } else if (ONNX_MODEL_PARTS[modelSize]) {
+                feedback("Downloading on-device model " + modelSize + " (~113 MB in 4 parts, one time)…", "correct");
+                p = Promise.all(ONNX_MODEL_PARTS[modelSize].map(function (u) {
+                    return fetch(u).then(function (r) { if (!r.ok) throw new Error("model part HTTP " + r.status + " " + u); return r.arrayBuffer(); });
+                })).then(function (bufs) {
+                    var total = bufs.reduce(function (a, b) { return a + b.byteLength; }, 0);
+                    var out = new Uint8Array(total), off = 0;
+                    bufs.forEach(function (b) { out.set(new Uint8Array(b), off); off += b.byteLength; });
+                    return out.buffer;
+                });
+            } else {
+                return Promise.reject(new Error("no on-device model for " + modelSize + " — use 5M/28M or SERVER mode"));
+            }
+            return p.then(function (buf) {
+                if (typeof ort !== "undefined") {
+                    ort.env.wasm.wasmPaths = "vendor/ort/";
+                    ort.env.wasm.numThreads = 1;
+                }
+                return ort.InferenceSession.create(buf, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+            }).then(function (session) {
+                state.onnxSession = session;
+                state.onnxSessionSize = modelSize;
+                return session;
+            });
+        }
+
+        function fetchWeatherMap(daysBack) {
+            var hourly = "wind_speed_10m,temperature_2m,shortwave_radiation";
+            var common = { latitude: WEATHER_LAT, longitude: WEATHER_LON, timezone: "UTC", hourly: hourly };
+            function q(base, extra) {
+                var params = new URLSearchParams(Object.assign({}, common, extra));
+                return fetch(base + "?" + params.toString()).then(function (r) {
+                    if (!r.ok) throw new Error("Open-Meteo " + r.status);
+                    return r.json();
+                });
+            }
+            var end = new Date(), start = new Date(Date.now() - daysBack * 86400000);
+            return Promise.all([
+                q("https://archive-api.open-meteo.com/v1/archive", { start_date: start.toISOString().slice(0, 10), end_date: end.toISOString().slice(0, 10) }),
+                q("https://api.open-meteo.com/v1/forecast", { forecast_days: 7 })
+            ]).then(function (resps) {
+                var map = {};
+                resps.forEach(function (data) {
+                    var h = data.hourly || {}, times = h.time || [];
+                    ["wind_speed_10m", "temperature_2m", "shortwave_radiation"].forEach(function (v, vi) {
+                        var col = h[v] || [];
+                        times.forEach(function (t, i) {
+                            var key = utcHourKey(parseHourUtc(String(t)));
+                            if (!map[key]) map[key] = [NaN, NaN, NaN];
+                            if (i < col.length && col[i] != null) map[key][vi] = Number(col[i]);
+                        });
+                    });
+                });
+                return map;
+            });
+        }
+
+        function runLocal() {
+            if (!state.history.length) { feedback("No prices loaded yet — wait for LOAD PRICES (or the cached copy) first.", "wrong"); return; }
+            var modelSize = document.getElementById("modelSize").value;
+            var horizon = parseInt(document.getElementById("horizon").value, 10) || 24;
+            setBusy(true);
+            var t0 = Date.now();
+            feedback("Loading on-device ONNX model " + modelSize + " (WASM)…", "correct");
+            getOnnxSession(modelSize).then(function (session) {
+                feedback("Fetching weather (Open-Meteo)…", "correct");
+                return fetchWeatherMap(32).catch(function () { return {}; }).then(function (weatherMap) {
+                    return { session: session, weatherMap: weatherMap };
+                });
+            }).then(function (env) {
+                var inputs = buildOnnxInputs(state.history, env.weatherMap);
+                return env.session.run({
+                    context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
+                    known_covariates: new ort.Tensor("float32", inputs.known, [1, 5, ONNX_T + ONNX_H])
+                });
+            }).then(function (out) {
+                var q = out.quantiles.data;
+                var last = state.history[state.history.length - 1].utc;
+                var lag1 = lag1Forecast(state.history, horizon);
+                var forecast = [];
+                for (var i = 0; i < horizon; i++) {
+                    var t = new Date(last.getTime() + (i + 1) * HOUR_MS);
+                    forecast.push({
+                        hour_utc: utcHourKey(t) + ":00",
+                        hour_dk: dkLabel(t),
+                        median: q[i * ONNX_Q + ONNX_MED_I],
+                        q10: q[i * ONNX_Q + ONNX_Q10_I],
+                        q90: q[i * ONNX_Q + ONNX_Q90_I],
+                        lag1: lag1[i]
+                    });
+                }
+                state.forecast = forecast;
+                state.workflowStats = {
+                    corr_lag1: corrLag1(state.history),
+                    mae_lag1_dkk: backtestMae(state.history, lag1Forecast, 7, HOURS_PER_DAY),
+                    mae_timestral_dkk: null,
+                    wind_avg_ms: (state.workflowStats && state.workflowStats.wind_avg_ms) || null
+                };
+                renderAll();
+                feedback("On-device ONNX forecast ready — Timestral " + modelSize + ", " + horizon + "h, " +
+                    ((Date.now() - t0) / 1000).toFixed(1) + "s on this device. No API key used.", "correct");
+            }).catch(function (err) {
+                feedback("On-device run failed: " + err.message, "wrong");
+            }).finally(function () { setBusy(false); });
+        }
+
         function runTimestral() {
+            if (document.getElementById("runMode").value === "local") { runLocal(); return; }
             var key = document.getElementById("apiKey").value.trim();
             if (!key) { feedback("Paste your Mistral API key first — it is stored only in this browser.", "wrong"); return; }
             try { localStorage.setItem("elspot_dk2_api_key", key); } catch (e) {}
@@ -1021,6 +1225,10 @@
                 renderAll();
             });
             document.getElementById("evHours").addEventListener("change", renderAll);
+            if (!onnxAvailable()) {
+                var lo = document.querySelector('#runMode option[value="local"]');
+                if (lo) { lo.disabled = true; lo.textContent = "ON-DEVICE · ONNX (ANDROID APP ONLY)"; }
+            }
             loadWeatherLine();
             loadTariffs();
             try {
