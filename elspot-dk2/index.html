@@ -556,6 +556,14 @@
             };
         }
 
+        function xAxisStep(spanMs, maxTicks) {
+            var steps = [1, 2, 3, 4, 6, 12, 24, 48, 72, 96];
+            for (var i = 0; i < steps.length; i++) {
+                if (spanMs / (steps[i] * HOUR_MS) <= maxTicks) return steps[i];
+            }
+            return steps[steps.length - 1];
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -575,7 +583,8 @@
             allInDkkMwh: allInDkkMwh,
             dispDkkMwh: dispDkkMwh,
             combinedSeries: combinedSeries,
-            bestWindowEntries: bestWindowEntries
+            bestWindowEntries: bestWindowEntries,
+            xAxisStep: xAxisStep
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -658,7 +667,7 @@
 
         function renderChart() {
             var svg = document.getElementById("chart");
-            var W = 760, H = 320, padL = 60, padR = 14, padT = 16, padB = 32;
+            var W = 760, H = 320, padL = 60, padR = 14, padT = 16, padB = 46;
             var history = state.history;
             var fc = state.forecast;
             if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
@@ -697,9 +706,12 @@
                 s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
                      '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
             }
-            for (var t = x0; t <= x1; t += HOURS_PER_DAY * HOUR_MS) {
+            var xStep = xAxisStep(x1 - x0, 12), stepMs = xStep * HOUR_MS;
+            for (var t = Math.ceil(x0 / stepMs) * stepMs; t <= x1; t += stepMs) {
+                var dl = dkLabel(new Date(t));
                 s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
-                     '<text class="axis" x="' + (X(t) + 4) + '" y="' + (H - padB + 18) + '">' + dkLabel(new Date(t)).slice(5, 10) + "</text>";
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 15) + '" text-anchor="middle">' + dl.slice(5, 10) + '</text>' +
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 33) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
             }
             s += '<line class="now" x1="' + X(nowMs) + '" y1="' + padT + '" x2="' + X(nowMs) + '" y2="' + (H - padB) + '"/>' +
                  '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + 12) + '" text-anchor="middle">NOW</text>';

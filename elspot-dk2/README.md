@@ -39,8 +39,10 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    forecast with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
 3. The chart shows **from the current hour only**: published day-ahead prices ahead of now (green),
    then the **Timestral median** (orange dashes) with its **q10–q90 band** (red) over the full
-   horizon. The hourly grid below lists every hour from now (published + forecast) in kr/kWh with its
-   q10–q90 range, cheapest highlighted.
+   horizon. The x-axis is adaptive — two-line labels with date **and** time of day (DK), with the
+   finest tick step that fits the window (2h for a 24h view, up to 24h for multi-day views). The
+   hourly grid below lists every hour from now (published + forecast) in kr/kWh with its q10–q90
+   range, cheapest highlighted.
 4. **EV charging**: the green shaded **EV window** on the chart marks the cheapest contiguous
    `EV 4/6/8h` run from now (over published + forecast), and the HUD stat `EV {n}H FROM …` gives its
    start time and average price.

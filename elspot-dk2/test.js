@@ -158,5 +158,13 @@ check("bestWindowEntries cheapest pair", bw2.idx === 2 && bw2.len === 2 && close
 check("bestWindowEntries endT is hour end", bw2.endT === Core.parseHourUtc("2026-11-21T16:00:00").getTime() + 3600e3);
 check("bestWindowEntries empty -> null", Core.bestWindowEntries([], 4) === null);
 
+// xAxisStep: finest step that fits maxTicks labels in the window
+check("xAxisStep 24h window -> 2h", Core.xAxisStep(24 * 3600e3, 12) === 2);
+check("xAxisStep 48h window -> 4h", Core.xAxisStep(48 * 3600e3, 12) === 4);
+check("xAxisStep 72h window -> 6h", Core.xAxisStep(72 * 3600e3, 12) === 6);
+check("xAxisStep 8d window -> 24h", Core.xAxisStep(8 * 24 * 3600e3, 12) === 24);
+check("xAxisStep 1h window -> 1h", Core.xAxisStep(3600e3, 12) === 1);
+check("xAxisStep huge window -> 96h cap", Core.xAxisStep(400 * 24 * 3600e3, 12) === 96);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
