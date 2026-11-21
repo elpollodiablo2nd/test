@@ -40,6 +40,14 @@ check("dkLabel summer CEST (+2, next day)", summer === "2026-07-21 00:00");
 check("dkWeekday winter CET", Core.dkWeekday(Core.parseHourUtc("2026-11-20T22:00:00")) === "Fri");
 check("dkWeekday summer CEST (next day)", Core.dkWeekday(Core.parseHourUtc("2026-07-20T22:00:00")) === "Tue");
 
+// zones: DK2 east default, DK1 west with TREFOR DSO
+check("ZONES DK2 east default", Core.ZONES.DK2.label === "EAST" && Core.ZONES.DK2.gln === "5790001089030" && Core.ZONES.DK2.area === "DK2");
+check("ZONES DK1 west TREFOR", Core.ZONES.DK1.label === "WEST" && Core.ZONES.DK1.gln === "5790000392261" && Core.ZONES.DK1.area === "DK1");
+check("zoneConfig falls back to DK2", Core.zoneConfig("XX").area === "DK2" && Core.zoneConfig("DK1").area === "DK1");
+check("per-zone snapshots differ", Core.ZONES.DK1.snapshot !== Core.ZONES.DK2.snapshot);
+check("DK1 default TREFOR tariff (night 0.0429, peak 0.3863)", Core.DEFAULT_TARIFFS.DK1["Nettarif C"][0].Price1 === 0.0429 && Core.DEFAULT_TARIFFS.DK1["Nettarif C"][0].Price18 === 0.3863);
+check("national fees present in both zones", !!(Core.DEFAULT_TARIFFS.DK1["Systemtarif"] && Core.DEFAULT_TARIFFS.DK1["Elafgift"] && Core.DEFAULT_TARIFFS.DK2["Transmissions nettarif"]));
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 

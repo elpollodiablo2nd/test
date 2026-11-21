@@ -1,7 +1,9 @@
 {
   "appId": "dk.elspot.app",
-  "appName": "Elspot DK2",
+  "appName": "elspot",
   "webDir": "www",
   "bundledWebRuntime": false,
-  "android": { "allowMixedContent": false }
+  "android": {
+    "allowMixedContent": false
+  }
 }

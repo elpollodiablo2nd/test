@@ -1,6 +1,6 @@
-# ELSPOT DK2 — Timestral Forecast
+# elspot — Timestral price forecast (DK1/DK2)
 
-A single-file, pixel-art web app that forecasts **day-ahead electricity prices in East Denmark (DK2)**
+A single-file, pixel-art web app that forecasts **day-ahead electricity prices in Denmark — East (DK2, default) or West (DK1), selectable in the app**
 with Mistral's **Timestral** time-series foundation model, deployed as a managed workflow in this repo
 (`elspot-dk2-workflows/`).
 
@@ -17,13 +17,13 @@ Plain HTML — no build step. GitHub Pages serves this folder once the branch is
 All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 1000.
 
 1. Prices load automatically on page open; **LOAD PRICES** retries them. It fetches the last
-   35 days of hourly DK2 day-ahead prices live from
+   35 days of hourly day-ahead prices (selected area) live from
    [Energi Data Service](https://www.energidataservice.dk/tso-electricity/DayAheadPrices)
-   (`DayAheadPrices`, `PriceArea=DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
+   (`DayAheadPrices`, `PriceArea=DK1|DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
    Energinet occasionally answers **429 (rate limited)** or is unreachable from the device — the page
    retries up to 6 times, honoring `Retry-After` (capped at 60 s) with jittered backoff, and then falls
    back, in order, to the **cached copy** from the last successful load (`localStorage`, with timestamp)
-   and to a **bundled snapshot** (`elspot-dk2-android/www/assets/prices-dk2.json`, refreshed at app
+   and to a **bundled snapshot** (`assets/prices-dk1.json` / `prices-dk2.json`, refreshed at app
    build time by `tools/fetch_prices_snapshot.py`). The banner always says which source was used.
    Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
@@ -55,12 +55,12 @@ No retraining is involved: Timestral is zero-shot — the price history is the i
 
 ## How it works
 
-- **Data**: `GET https://api.energidataservice.dk/dataset/DayAheadPrices?filter={"PriceArea":["DK2"]}&start=…&sort=TimeUTC asc`
+- **Data**: `GET https://api.energidataservice.dk/dataset/DayAheadPrices?filter={"PriceArea":["DK1 or DK2"]}&start=…&sort=TimeUTC asc`
   — keyless, CORS-enabled; bucketed to hourly UTC (DST-proof), labels shown in Europe/Copenhagen.
 - **Fees**: `GET https://api.energidataservice.dk/dataset/DatahubPricelist?filter={"GLN_Number":[…],"Note":[…]}…`
   — keyless, CORS-enabled. Energinet GLN `5790000432752` provides `Transmissions nettarif`,
-  `Systemtarif`, `Elafgift`; N1 A/S GLN `5790001089030` (Zealand/Copenhagen, DK2) provides the
-  household distribution tariff `Nettarif C`. Records carry `ValidFrom`/`ValidTo` validity windows
+  `Systemtarif`, `Elafgift`; N1 A/S GLN `5790001089030` (Zealand/Copenhagen, DK2) provides the household distribution tariff `Nettarif C` for DK2;
+  TREFOR El-net GLN `5790000392261` (Jutland) provides it for DK1. Records carry `ValidFrom`/`ValidTo` validity windows
   and `Price1..Price24` = local Danish hours 00–01 … 23–24 (flat charges set `Price1` only).
 - **Model**: the managed workflow deployment `dk2-elspot-forecast` (source: `elspot-dk2-workflows/` in
   this repo) runs `TimestralForecaster.from_pretrained("mistralai/Timestral-<size>")` (open weights,
@@ -90,8 +90,8 @@ cd elspot-dk2-workflows && uv run pytest apps/worker/tests   # workflow tests (m
 
 ## Credits
 
-- Prices: [Energi Data Service (Energinet)](https://www.energidataservice.dk/) — `DayAheadPrices`, DK2
-- Weather: [Open-Meteo](https://open-meteo.com/) (ERA5 archive + forecast), Copenhagen/Zealand, keyless
+- Prices: [Energi Data Service (Energinet)](https://www.energidataservice.dk/) — `DayAheadPrices`, DK1/DK2
+- Weather: [Open-Meteo](https://open-meteo.com/) (ERA5 archive + forecast), Zealand (DK2) / Esbjerg-Jutland (DK1), keyless
 - Model: [Mistral Timestral 1.0](https://docs.mistral.ai/models/timestral-1-0-28m) —
   [weights](https://huggingface.co/mistralai/Timestral-28M) (Modified MIT),
   [inference code](https://github.com/mistralai/timestral) (Apache 2.0)

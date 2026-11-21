@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elspot DK2 — Timestral Forecast</title>
+    <title>elspot — Timestral price forecast (DK1/DK2)</title>
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -228,9 +228,9 @@
 <body>
     <div class="container">
         <header>
-            <img class="logo-m" src="icon.svg" alt="ELSPOT DK2 lightning bolt">
-            <h1>ELSPOT DK2</h1>
-            <span class="badge">Timestral 1.0 · East Denmark</span>
+            <img class="logo-m" src="icon.svg" alt="elspot lightning bolt">
+            <h1>ELSPOT</h1>
+            <span class="badge">Timestral 1.0 · Denmark</span>
             <button id="aboutBtn" class="btn-alt about-btn" title="About / how it works / sources">? ABOUT</button>
         </header>
 
@@ -248,10 +248,10 @@
             forecast with the red <b>q10–q90 confidence band</b>, and the green shaded <b>EV charge window</b> (start =
             cheapest EV 4/6/8h run). The hourly grid and HUD update too: backtest MAE of Timestral vs lag-1, cheapest hour,
             EV window. Prices are in <b>kr/kWh</b> (source data is DKK/MWh ÷ 1000); with <b>INCL. FEES+VAT</b> ticked they
-            include the mandatory fees — Energinet transmission+system tariff, N1 Nettarif C (low at night, peak 17–21),
+            include the mandatory fees — Energinet transmission+system tariff, DSO Nettarif C (N1 for DK2, TREFOR for DK1; low at night, peak 17–21),
             electricity tax — plus 25% VAT, i.e. what you actually pay per kWh.</p>
-            <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.
-            Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">DatahubPricelist</a> (Energinet transmission+system tariff, N1 Nettarif C, elafgift) + 25% VAT.
+            <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK1/DK2)</a>, day-ahead, published daily ~13:00 CET.
+            Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">DatahubPricelist</a> (Energinet transmission+system tariff, DSO Nettarif C, elafgift) + 25% VAT.
             Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX export running on-device
             in the Android app (<b>elspot-dk2-android/</b>; the <b>dk2-elspot-forecast</b> workflow in <b>elspot-dk2-workflows/</b> remains available via API).
             Weather: Open-Meteo. Full docs: <a href="README.md">README.md</a>.</p>
@@ -264,7 +264,7 @@
         <section class="card">
             <h2 id="chartTitle">PRICE CHART · KR/KWH</h2>
             <div class="screen">
-                <svg id="chart" viewBox="0 0 760 460" role="img" aria-label="Hourly DK2 day-ahead prices and forecast"></svg>
+                <svg id="chart" viewBox="0 0 760 460" role="img" aria-label="Hourly day-ahead prices and forecast"></svg>
                 <div class="legend">
                     <span class="l-actual">published ahead (day-ahead)</span>
                     <span class="l-lag1">lag-1 baseline</span>
@@ -278,6 +278,10 @@
         <section class="card">
             <h2>RUN</h2>
             <div class="controls">
+                <select id="zone" class="pixel" title="Price area: DK2 East (default) or DK1 West">
+                    <option value="DK2" selected>DK2 · EAST</option>
+                    <option value="DK1">DK1 · WEST</option>
+                </select>
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
                     <option value="5M">5M</option>
                     <option value="28M" selected>28M</option>
@@ -314,24 +318,35 @@
 
         var ENERGINET_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices";
         var OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
-        var WEATHER_LAT = 55.6761, WEATHER_LON = 12.5683; // Copenhagen, Zealand (DK2)
         var HOURS_PER_DAY = 24;
         var HOUR_MS = 3600 * 1000;
         var DATAHUB_URL = "https://api.energidataservice.dk/dataset/DatahubPricelist";
         var ENERGINET_GLN = "5790000432752";
-        var N1_GLN = "5790001089030";
         var FEE_NOTES = ["Elafgift", "Systemtarif", "Transmissions nettarif", "Nettarif C"];
         var VAT_RATE = 0.25;
-        var DEFAULT_TARIFFS = {
+        var ZONES = {
+            DK2: { area: "DK2", label: "EAST", dso: "N1 A/S", gln: "5790001089030", lat: 55.6761, lon: 12.5683, place: "Zealand", snapshot: "assets/prices-dk2.json" },
+            DK1: { area: "DK1", label: "WEST", dso: "TREFOR El-net", gln: "5790000392261", lat: 55.4669, lon: 8.4515, place: "Jutland", snapshot: "assets/prices-dk1.json" }
+        };
+        function zoneConfig(zone) { return ZONES[zone] || ZONES.DK2; }
+        var NATIONAL_FEE_DEFAULTS = {
             "Elafgift": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.008 }],
             "Systemtarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.072 }],
-            "Transmissions nettarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.043 }],
-            "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
+            "Transmissions nettarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.043 }]
+        };
+        var DEFAULT_TARIFFS = {
+            DK2: Object.assign({}, NATIONAL_FEE_DEFAULTS, { "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
                 Price1: 0.0879, Price2: 0.0879, Price3: 0.0879, Price4: 0.0879, Price5: 0.0879, Price6: 0.0879,
                 Price7: 0.2636, Price8: 0.2636, Price9: 0.2636, Price10: 0.2636, Price11: 0.2636, Price12: 0.2636,
                 Price13: 0.2636, Price14: 0.2636, Price15: 0.2636, Price16: 0.2636, Price17: 0.2636,
                 Price18: 0.7907, Price19: 0.7907, Price20: 0.7907, Price21: 0.7907,
-                Price22: 0.2636, Price23: 0.2636, Price24: 0.2636 }]
+                Price22: 0.2636, Price23: 0.2636, Price24: 0.2636 }] }),
+            DK1: Object.assign({}, NATIONAL_FEE_DEFAULTS, { "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
+                Price1: 0.0429, Price2: 0.0429, Price3: 0.0429, Price4: 0.0429, Price5: 0.0429, Price6: 0.0429,
+                Price7: 0.1288, Price8: 0.1288, Price9: 0.1288, Price10: 0.1288, Price11: 0.1288, Price12: 0.1288,
+                Price13: 0.1288, Price14: 0.1288, Price15: 0.1288, Price16: 0.1288, Price17: 0.1288,
+                Price18: 0.3863, Price19: 0.3863, Price20: 0.3863, Price21: 0.3863,
+                Price22: 0.1288, Price23: 0.1288, Price24: 0.1288 }] })
         };
         var ONNX_T = 768, ONNX_H = 96, ONNX_Q = 21; // fixed export shapes (patch 32 | 768, 96)
         var ONNX_MED_I = 10, ONNX_Q10_I = 2, ONNX_Q90_I = 18; // quantile levels 0.01..0.99
@@ -676,13 +691,18 @@
             utcHourKey: utcHourKey,
             weekdayMon0: weekdayMon0,
             targetEncode: targetEncode,
-            buildOnnxInputs: buildOnnxInputs
+            buildOnnxInputs: buildOnnxInputs,
+            ZONES: ZONES,
+            DEFAULT_TARIFFS: DEFAULT_TARIFFS,
+            zoneConfig: zoneConfig
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
         // ---------- app (browser only) ----------
 
-        var state = { history: [], forecast: null, tariffs: DEFAULT_TARIFFS, showFees: true };
+        var state = { zone: "DK2", history: [], forecast: null, tariffs: null, showFees: true };
+
+        function tariffsFor() { return state.tariffs || DEFAULT_TARIFFS[state.zone] || DEFAULT_TARIFFS.DK2; }
 
         function feedback(message, kind) {
             var el = document.getElementById("feedback");
@@ -699,7 +719,7 @@
             attempt = attempt || 1;
             var start = new Date(Date.now() - (days + 2) * 86400000).toISOString().slice(0, 16);
             var params = new URLSearchParams({
-                filter: JSON.stringify({ PriceArea: ["DK2"] }),
+                filter: JSON.stringify({ PriceArea: [state.zone] }),
                 start: start,
                 sort: "TimeUTC asc",
                 limit: (days + 2) * 96 + 200
@@ -717,7 +737,7 @@
                 return resp.json();
             }).then(function (data) {
                 var points = aggregateHourlyUtc(data.records || []);
-                if (points.length < 7 * HOURS_PER_DAY) throw new Error("not enough DK2 history from Energinet");
+                if (points.length < 7 * HOURS_PER_DAY) throw new Error("not enough " + state.zone + " history from Energinet");
                 return points;
             });
         }
@@ -725,7 +745,7 @@
         function renderStats() {
             var corr = corrLag1(state.history);
             var maeLag1 = backtestMae(state.history, lag1Forecast, 7, HOURS_PER_DAY);
-            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var tariffs = tariffsFor();
             var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
             var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
             var avg = "—", cheapest = "—", maeTimestral = "—";
@@ -766,7 +786,7 @@
             var history = state.history;
             var fc = state.forecast;
             if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
-            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var tariffs = tariffsFor();
             var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
             var fcLen = fc && fc.length ? fc.length : HOURS_PER_DAY;
             var lastUtc = history.length ? history[history.length - 1].utc.getTime()
@@ -848,11 +868,11 @@
 
         function renderHours() {
             var el = document.getElementById("hours");
-            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var tariffs = tariffsFor();
             var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
             var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
             if (!series.length) {
-                el.innerHTML = '<p class="dim">Nothing to show yet — LOAD PRICES (or RUN TIMESTRAL with your API key) fills the chart from the current hour.</p>';
+                el.innerHTML = '<p class="dim">Nothing to show yet — LOAD PRICES fills the chart from the current hour.</p>';
                 return;
             }
             var nPub = series.filter(function (e) { return e.kind === "pub"; }).length;
@@ -878,7 +898,7 @@
 
         function renderAll() {
             document.getElementById("chartTitle").textContent =
-                "PRICE CHART · KR/KWH" + (state.showFees ? " · INCL. FEES+VAT" : " · SPOT ONLY");
+                "PRICE CHART · " + state.zone + " " + zoneConfig(state.zone).label + " · KR/KWH" + (state.showFees ? " · INCL. FEES+VAT" : " · SPOT ONLY");
             renderStats();
             renderChart();
             renderHours();
@@ -913,20 +933,22 @@
 
         function loadTariffs() {
             var el = document.getElementById("feesLine");
+            var z = zoneConfig(state.zone);
+            var cacheKey = "elspot_tariffs_" + z.area;
             Promise.all([
                 fetchTariffRecords(ENERGINET_GLN, ["Elafgift", "Systemtarif", "Transmissions nettarif"]),
-                fetchTariffRecords(N1_GLN, ["Nettarif C"])
+                fetchTariffRecords(z.gln, ["Nettarif C"])
             ]).then(function (results) {
                 state.tariffs = groupTariffs(results[0].concat(results[1]));
-                try { localStorage.setItem("elspot_dk2_tariffs", JSON.stringify({ at: Date.now(), tariffs: state.tariffs })); } catch (e) {}
-                el.textContent = "Fees (live, DatahubPricelist): Energinet transmission+system tariff, N1 Nettarif C (night 00–06 low, peak 17–21), elafgift, +25% VAT.";
+                try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), tariffs: state.tariffs })); } catch (e) {}
+                el.textContent = "Fees (live, DatahubPricelist): Energinet transmission+system tariff, " + z.dso + " Nettarif C (" + z.area + "; night low, peak 17–21), elafgift, +25% VAT.";
                 renderAll();
             }).catch(function (err) {
                 var cached = null;
-                try { cached = JSON.parse(localStorage.getItem("elspot_dk2_tariffs") || "null"); } catch (e) {}
-                state.tariffs = (cached && cached.tariffs) || DEFAULT_TARIFFS;
-                el.textContent = "Fees (" + (cached ? "cached" : "built-in 2026 defaults") + "; DatahubPricelist unreachable: " + err.message +
-                    "): transmission+system, N1 Nettarif C, elafgift, +25% VAT.";
+                try { cached = JSON.parse(localStorage.getItem(cacheKey) || "null"); } catch (e) {}
+                state.tariffs = (cached && cached.tariffs) || DEFAULT_TARIFFS[z.area] || DEFAULT_TARIFFS.DK2;
+                el.textContent = "Fees (" + (cached ? "cached" : "built-in defaults") + "; DatahubPricelist unreachable: " + err.message +
+                    "): transmission+system, " + z.dso + " Nettarif C, elafgift, +25% VAT.";
                 renderAll();
             });
         }
@@ -936,9 +958,9 @@
             state.forecast = null;
             state.workflowStats = null;
             try {
-                localStorage.setItem("elspot_dk2_history", JSON.stringify(
+                localStorage.setItem("elspot_history_" + state.zone, JSON.stringify(
                     points.map(function (p) { return [p.utc.toISOString(), p.price]; })));
-                localStorage.setItem("elspot_dk2_history_at", new Date().toISOString());
+                localStorage.setItem("elspot_history_at_" + state.zone, new Date().toISOString());
             } catch (e) {}
             renderAll();
             feedback(sourceMsg + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
@@ -946,15 +968,15 @@
 
         function loadPrices() {
             setBusy(true);
-            feedback("Fetching DK2 day-ahead prices from Energinet (last 35 days)…", "correct");
+            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days)…", "correct");
             return fetchPrices(35).then(function (points) {
-                applyHistory(points, "Loaded " + points.length + " hourly DK2 prices live from Energinet, last " +
+                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet, last " +
                     dkLabel(points[points.length - 1].utc) + " (DK).");
             }).catch(function (err) {
                 var cached = null, cachedAt = null;
                 try {
-                    cached = JSON.parse(localStorage.getItem("elspot_dk2_history") || "null");
-                    cachedAt = localStorage.getItem("elspot_dk2_history_at");
+                    cached = JSON.parse(localStorage.getItem("elspot_history_" + state.zone) || "null");
+                    cachedAt = localStorage.getItem("elspot_history_at_" + state.zone);
                 } catch (e) {}
                 if (cached && cached.length) {
                     state.history = cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; });
@@ -966,13 +988,13 @@
                     return;
                 }
                 feedback("Energinet failed (" + err.message + ") and no cache — trying the bundled snapshot…", "wrong");
-                return fetch("assets/prices-dk2.json").then(function (r) {
+                return fetch(zoneConfig(state.zone).snapshot).then(function (r) {
                     if (!r.ok) throw new Error("snapshot HTTP " + r.status);
                     return r.json();
                 }).then(function (snap) {
                     var points = aggregateHourlyUtc(snap.records || []);
                     if (points.length < 7 * HOURS_PER_DAY) throw new Error("bundled snapshot too small");
-                    applyHistory(points, "Loaded " + points.length + " hourly DK2 prices from the bundled snapshot (built " +
+                    applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices from the bundled snapshot (built " +
                         String(snap.generated_at || "?").slice(0, 16) + "Z). Energinet error: " + err.message + ".");
                 }).catch(function (err2) {
                     feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
@@ -1024,7 +1046,8 @@
 
         function fetchWeatherMap(daysBack) {
             var hourly = "wind_speed_10m,temperature_2m,shortwave_radiation";
-            var common = { latitude: WEATHER_LAT, longitude: WEATHER_LON, timezone: "UTC", hourly: hourly };
+            var zw = zoneConfig(state.zone);
+            var common = { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: hourly };
             function q(base, extra) {
                 var params = new URLSearchParams(Object.assign({}, common, extra));
                 return fetch(base + "?" + params.toString()).then(function (r) {
@@ -1112,8 +1135,9 @@
 
         function loadWeatherLine() {
             var el = document.getElementById("weatherLine");
+            var zw = zoneConfig(state.zone);
             var params = new URLSearchParams({
-                latitude: WEATHER_LAT, longitude: WEATHER_LON, timezone: "UTC",
+                latitude: zw.lat, longitude: zw.lon, timezone: "UTC",
                 hourly: "wind_speed_10m,temperature_2m,shortwave_radiation", forecast_days: "2"
             });
             fetch(OPEN_METEO_FORECAST_URL + "?" + params.toString()).then(function (r) {
@@ -1122,12 +1146,23 @@
             }).then(function (data) {
                 var s = summarizeWeather(data.hourly, Date.now());
                 el.textContent = s
-                    ? "Weather next 24h (Open-Meteo · Zealand): wind ~" + s.windAvg + " m/s · temp " +
+                    ? "Weather next 24h (Open-Meteo · " + zw.place + "): wind ~" + s.windAvg + " m/s · temp " +
                       s.tempMin + "–" + s.tempMax + " °C · solar peak " + s.solarPeak + " W/m²"
                     : "Weather forecast unavailable.";
             }).catch(function () {
                 el.textContent = "Weather forecast unavailable (Open-Meteo).";
             });
+        }
+
+        function setZone(zone) {
+            if (!ZONES[zone] || zone === state.zone) return;
+            state.zone = zone;
+            try { localStorage.setItem("elspot_zone", zone); } catch (e) {}
+            state.history = []; state.forecast = null; state.workflowStats = null; state.tariffs = null;
+            renderAll();
+            loadWeatherLine();
+            loadTariffs();
+            loadPrices();
         }
 
         function init() {
@@ -1136,6 +1171,11 @@
                 panel.hidden = !panel.hidden;
                 this.textContent = panel.hidden ? "? ABOUT" : "× CLOSE";
             });
+            var zoneSel = document.getElementById("zone");
+            try { state.zone = localStorage.getItem("elspot_zone") || "DK2"; } catch (e) {}
+            if (!ZONES[state.zone]) state.zone = "DK2";
+            zoneSel.value = state.zone;
+            zoneSel.addEventListener("change", function () { setZone(this.value); });
             document.getElementById("loadBtn").addEventListener("click", loadPrices);
             document.getElementById("runBtn").addEventListener("click", runTimestral);
             document.getElementById("feesToggle").addEventListener("change", function (ev) {
