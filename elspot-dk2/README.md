@@ -16,27 +16,25 @@ Plain HTML — no build step. GitHub Pages serves this folder once the branch is
 
 All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 1000.
 
-1. Prices load automatically on page open; **LOAD PRICES** refreshes them. It fetches the last
-   ~10 days of hourly DK2 day-ahead prices live from
+1. Prices load automatically on page open; **LOAD PRICES** retries them. It fetches the last
+   35 days of hourly DK2 day-ahead prices live from
    [Energi Data Service](https://www.energidataservice.dk/tso-electricity/DayAheadPrices)
    (`DayAheadPrices`, `PriceArea=DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
-   Energinet occasionally answers **429 (rate limited)** or is unreachable from the browser — the page
-   retries with backoff up to 4 times and then falls back, in order, to the **cached copy** from the
-   last successful load (`localStorage`) and, if an API key is entered, to a **dry-run execution of
-   the workflow itself** (`dry_run=true`, which fetches the prices server-side without loading the
-   model). Either way the chart fills in; a successful RUN TIMESTRAL also adopts the server-side
-   history from the result. Day-ahead prices for tomorrow are published
+   Energinet occasionally answers **429 (rate limited)** or is unreachable from the device — the page
+   retries up to 6 times, honoring `Retry-After` (capped at 60 s) with jittered backoff, and then falls
+   back, in order, to the **cached copy** from the last successful load (`localStorage`, with timestamp)
+   and to a **bundled snapshot** (`elspot-dk2-android/www/assets/prices-dk2.json`, refreshed at app
+   build time by `tools/fetch_prices_snapshot.py`). The banner always says which source was used.
+   Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
    **lag-1 baseline** (tomorrow ≈ today), and the HUD shows the day-to-day correlation and the
    lag-1 backtest MAE.
-2. Paste your **Mistral API key** (stored only in `localStorage`, sent only to `api.mistral.ai`),
-   pick the **horizon** (24/48/72h — beyond 24h there is no published day-ahead price to check
-   against and the q10–q90 band widens) and press **RUN TIMESTRAL** — the page starts an async
-   execution of the deployed `dk2-elspot-forecast` workflow
-   (`POST /v1/workflows/dk2-elspot-forecast/execute` with `wait_for_result:false`, then polls
-   `GET /v1/workflows/executions/{id}` every 3 s, showing progress in the banner), which runs
-   Timestral (default 28M checkpoint; 5M/123M/209M selectable) on the last 30 days and returns the
-   forecast with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
+2. Press **RUN TIMESTRAL** — in the Android app (`elspot-dk2-android/app-debug.apk`) the
+   ONNX-exported Timestral runs **on-device** (no API key): pick the checkpoint (5M bundled, 28M
+   downloaded once in 4 parts) and the **horizon** (24/48/72h — beyond 24h there is no published
+   day-ahead price to check against and the q10–q90 band widens). In a plain browser the button
+   explains that on-device ONNX needs the app. The server-side `dk2-elspot-forecast` workflow
+   (`elspot-dk2-workflows/`) is still available via the Mistral API for anyone who wants it.
 3. The chart shows **from the current hour only**: published day-ahead prices ahead of now (green),
    then the **Timestral median** (orange dashes) with its **q10–q90 band** (red) over the full
    horizon. The x-axis is adaptive — two-line labels with date **and** time of day (DK), with the

@@ -10,7 +10,10 @@ mode (API key) also works and is the default in the browser.
 
 - `www/` — built by `tools/sync-www.sh` from `../elspot-dk2/index.html` (the ORT loader
   `vendor/ort/ort.min.js` is injected before the app script) + `vendor/ort/` (wasm
-  runtime) + `assets/timestral-5m.onnx` (bundled fp32 model, ~22 MB).
+  runtime) + `assets/timestral-5m.onnx` (bundled fp32 model, ~22 MB) + `assets/prices-dk2.json`
+  (bundled price snapshot, refreshed by `tools/fetch_prices_snapshot.py` — the app's last-resort
+  price source when Energinet rate-limits) + `icon.svg` (pixel lightning-bolt icon, also the
+  Android launcher icon via `mipmap-*/ic_launcher*.png` generated from the same 8×8 grid).
 - `models/timestral-28m.part{0..3}` — the 28M fp32 ONNX export (~113 MB) split into
   4 × ~28 MB parts so it can live in git and be served by GitHub Pages; the app
   downloads and reassembles it on first use (28M on-device). Split/join is plain
@@ -26,6 +29,9 @@ mode (API key) also works and is the default in the browser.
   repeat_interleave, index_put) into equivalent supported ops.
 - `test/ort-wasm-test.js` — runs the exported model under onnxruntime-web WASM in
   Node against a PyTorch reference (`test/reference-*.json`).
+- No remote execution: the UI has no API-key/server mode — RUN TIMESTRAL always runs the ONNX
+  model on-device. Price loading fallback chain: live Energinet (6 retries, Retry-After aware)
+  → `localStorage` cache → bundled `assets/prices-dk2.json` snapshot.
 
 ## Verified
 

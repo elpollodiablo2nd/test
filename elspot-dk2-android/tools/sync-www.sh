@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 cp ../elspot-dk2/index.html www/index.html
+cp ../elspot-dk2/icon.svg www/icon.svg
 python3 - <<'PY'
 import io
 p = "www/index.html"
@@ -18,4 +19,6 @@ PY
 cp node_modules/onnxruntime-web/dist/ort.min.js www/vendor/ort/
 cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs www/vendor/ort/
 cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm www/vendor/ort/
+python3 tools/fetch_prices_snapshot.py || true
 ls www/vendor/ort/
+ls www/assets/

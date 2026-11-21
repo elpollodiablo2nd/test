@@ -127,7 +127,6 @@
         }
         input.pixel:focus, select.pixel:focus { box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange); }
         input.pixel::placeholder { color: #444444; opacity: 1; }
-        #apiKey { flex: 1 1 260px; }
 
         .feedback {
             display: none;
@@ -223,18 +222,12 @@
             h1 { font-size: 1.05rem; }
         }
     </style>
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
 </head>
 <body>
     <div class="container">
         <header>
-            <svg class="logo-m" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
-                <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
-                <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
-                <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
-                <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
-                <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
-                <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
-            </svg>
+            <img class="logo-m" src="icon.svg" alt="ELSPOT DK2 lightning bolt">
             <h1>ELSPOT DK2</h1>
             <span class="badge">Timestral 1.0 · East Denmark</span>
         </header>
@@ -259,16 +252,16 @@
 
         <section class="card">
             <h2>RUN THE MODEL</h2>
-            <p class="dim" style="margin-top:0">Paste your Mistral API key (kept in localStorage only) — prices load automatically — then press <b>RUN TIMESTRAL</b>.</p>
+            <p class="dim" style="margin-top:0">Prices load automatically (live → cache → bundled snapshot) — then press <b>RUN TIMESTRAL</b>: Timestral runs on-device via ONNX, no API key.</p>
             <details class="about">
                 <summary>WHAT TO PUSH · WHAT TO EXPECT · SOURCES</summary>
-                <p><b>What to push:</b> 1) paste your Mistral API key (stored only in this browser's localStorage, sent only to
-                api.mistral.ai); 2) prices load automatically — <b>LOAD PRICES</b> just refreshes them (if Energinet rate-limits this browser it falls back to the
-                cached copy, or to the workflow itself when an API key is entered); 3) optionally pick the Timestral checkpoint (28M default) and the <b>horizon</b>
+                <p><b>What to push:</b> 1) prices load automatically from Energinet — with retries and Retry-After handling, then the
+                cached copy, then a bundled snapshot, so the chart fills even when Energinet rate-limits (<b>LOAD PRICES</b> just retries);
+                2) optionally pick the Timestral checkpoint (5M bundled in the app, 28M downloaded once) and the <b>horizon</b>
                 (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
-                4) press <b>RUN TIMESTRAL</b>.</p>
-                <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
-                Timestral on the managed worker (~10–30 s, the banner shows progress), and this page then shows the chart
+                3) press <b>RUN TIMESTRAL</b> — the ONNX-exported Timestral runs on this device, no API key.</p>
+                <p><b>What to expect:</b> the page fetches the weather forecast (Open-Meteo), runs the ONNX-exported Timestral
+                on this device (~1–5 s, the banner shows progress), and then shows the chart
                 <b>from the current hour</b>: published day-ahead prices ahead of now, then the orange dashed <b>median</b>
                 forecast with the red <b>q10–q90 confidence band</b>, and the green shaded <b>EV charge window</b> (start =
                 cheapest EV 4/6/8h run). The hourly grid and HUD update too: backtest MAE of Timestral vs lag-1, cheapest hour,
@@ -277,15 +270,11 @@
                 electricity tax — plus 25% VAT, i.e. what you actually pay per kWh.</p>
                 <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.
                 Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">DatahubPricelist</a> (Energinet transmission+system tariff, N1 Nettarif C, elafgift) + 25% VAT.
-                Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a> via the deployed <b>dk2-elspot-forecast</b> workflow (repo <b>elspot-dk2-workflows/</b>).
+                Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX export running on-device
+                in the Android app (<b>elspot-dk2-android/</b>; the <b>dk2-elspot-forecast</b> workflow in <b>elspot-dk2-workflows/</b> remains available via API).
                 Weather: Open-Meteo. Full docs: <a href="README.md">README.md</a>.</p>
             </details>
             <div class="controls">
-                <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
-                <select id="runMode" class="pixel" title="Where the model runs">
-                    <option value="server" selected>SERVER · WORKFLOW (API KEY)</option>
-                    <option value="local">ON-DEVICE · ONNX (NO KEY)</option>
-                </select>
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
                     <option value="5M">5M</option>
                     <option value="28M" selected>28M</option>
@@ -325,9 +314,6 @@
         var ENERGINET_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices";
         var OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
         var WEATHER_LAT = 55.6761, WEATHER_LON = 12.5683; // Copenhagen, Zealand (DK2)
-        var MISTRAL_API = "https://api.mistral.ai";
-        var WORKFLOW_NAME = "dk2-elspot-forecast";
-        var DEPLOYMENT_NAME = "dk2-elspot-forecast";
         var HOURS_PER_DAY = 24;
         var HOUR_MS = 3600 * 1000;
         var DATAHUB_URL = "https://api.energidataservice.dk/dataset/DatahubPricelist";
@@ -714,8 +700,11 @@
             });
             return fetch(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
                 if (!resp.ok) {
-                    if ((resp.status === 429 || resp.status >= 500) && attempt < 4) {
-                        return sleep(1500 * attempt).then(function () { return fetchPrices(days, attempt + 1); });
+                    if ((resp.status === 429 || resp.status >= 500) && attempt < 6) {
+                        var ra = parseFloat(resp.headers.get("Retry-After"));
+                        var delay = isFinite(ra) && ra > 0 ? Math.min(60000, ra * 1000)
+                                  : 2000 * attempt + Math.floor(Math.random() * 1500);
+                        return sleep(delay).then(function () { return fetchPrices(days, attempt + 1); });
                     }
                     throw new Error("Energinet API " + resp.status + (resp.status === 429 ? " (rate limited)" : ""));
                 }
@@ -933,99 +922,56 @@
             });
         }
 
-        function loadPricesViaWorkflow(key) {
-            // fallback when Energinet is unreachable/rate-limited from this browser: the
-            // workflow fetches the prices server-side (dry_run=true skips the model)
-            return fetch(MISTRAL_API + "/v1/workflows/" + WORKFLOW_NAME + "/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-                body: JSON.stringify({
-                    input: { days: 10, horizon_hours: 24, model_size: "28M", backtest_days: 7, use_weather: false, dry_run: true },
-                    wait_for_result: false,
-                    deployment_name: DEPLOYMENT_NAME
-                })
-            }).then(function (resp) {
-                if (!resp.ok) throw new Error("execute HTTP " + resp.status);
-                return resp.json();
-            }).then(function (out) {
-                if (!out || !out.execution_id) throw new Error("no execution_id in response");
-                return pollExecution(key, out.execution_id);
-            }).then(function (result) {
-                var hist = historyFromResult(result);
-                if (!hist.length) throw new Error("workflow returned no history");
-                state.history = hist;
-                state.forecast = null;
-                state.workflowStats = null;
-                try {
-                    localStorage.setItem("elspot_dk2_history", JSON.stringify(
-                        hist.map(function (p) { return [p.utc.toISOString(), p.price]; })));
-                } catch (e) {}
-                renderAll();
-                return hist.length;
-            });
+        function applyHistory(points, sourceMsg) {
+            state.history = points;
+            state.forecast = null;
+            state.workflowStats = null;
+            try {
+                localStorage.setItem("elspot_dk2_history", JSON.stringify(
+                    points.map(function (p) { return [p.utc.toISOString(), p.price]; })));
+                localStorage.setItem("elspot_dk2_history_at", new Date().toISOString());
+            } catch (e) {}
+            renderAll();
+            feedback(sourceMsg + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
         }
 
         function loadPrices() {
             setBusy(true);
-            feedback("Fetching DK2 day-ahead prices from Energinet…", "correct");
-            return fetchPrices(10).then(function (points) {
-                state.history = points;
-                state.forecast = null;
-                state.workflowStats = null;
-                try {
-                    localStorage.setItem("elspot_dk2_history", JSON.stringify(
-                        points.map(function (p) { return [p.utc.toISOString(), p.price]; })));
-                } catch (e) {}
-                renderAll();
-                feedback("Loaded " + points.length + " hourly DK2 prices, last " + dkLabel(points[points.length - 1].utc) +
-                    " (DK). Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
+            feedback("Fetching DK2 day-ahead prices from Energinet (last 35 days)…", "correct");
+            return fetchPrices(35).then(function (points) {
+                applyHistory(points, "Loaded " + points.length + " hourly DK2 prices live from Energinet, last " +
+                    dkLabel(points[points.length - 1].utc) + " (DK).");
             }).catch(function (err) {
-                var cached = null;
-                try { cached = JSON.parse(localStorage.getItem("elspot_dk2_history") || "null"); } catch (e) {}
+                var cached = null, cachedAt = null;
+                try {
+                    cached = JSON.parse(localStorage.getItem("elspot_dk2_history") || "null");
+                    cachedAt = localStorage.getItem("elspot_dk2_history_at");
+                } catch (e) {}
                 if (cached && cached.length) {
                     state.history = cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; });
+                    state.forecast = null;
+                    state.workflowStats = null;
                     renderAll();
-                    feedback("Energinet failed (" + err.message + ") — showing cached prices from the last successful load.", "wrong");
+                    feedback("Energinet failed (" + err.message + ") — showing cached prices from " +
+                        (cachedAt || "the last successful load") + ".", "wrong");
                     return;
                 }
-                var key = document.getElementById("apiKey").value.trim();
-                if (!key) {
-                    feedback("Could not load prices from Energinet (" + err.message + ") — paste your API key and press RUN TIMESTRAL: the workflow fetches the prices server-side and fills the chart.", "wrong");
-                    return;
-                }
-                feedback("Energinet failed (" + err.message + ") — loading prices via the workflow instead…", "correct");
-                loadPricesViaWorkflow(key).then(function (n) {
-                    feedback("Loaded " + n + " hourly DK2 prices via the dk2-elspot-forecast workflow (Energinet unreachable from this browser). Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
+                feedback("Energinet failed (" + err.message + ") and no cache — trying the bundled snapshot…", "wrong");
+                return fetch("assets/prices-dk2.json").then(function (r) {
+                    if (!r.ok) throw new Error("snapshot HTTP " + r.status);
+                    return r.json();
+                }).then(function (snap) {
+                    var points = aggregateHourlyUtc(snap.records || []);
+                    if (points.length < 7 * HOURS_PER_DAY) throw new Error("bundled snapshot too small");
+                    applyHistory(points, "Loaded " + points.length + " hourly DK2 prices from the bundled snapshot (built " +
+                        String(snap.generated_at || "?").slice(0, 16) + "Z). Energinet error: " + err.message + ".");
                 }).catch(function (err2) {
-                    feedback("Could not load prices: " + err.message + "; workflow fallback failed too: " + err2.message, "wrong");
+                    feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
                 });
             }).finally(function () { setBusy(false); });
         }
 
         function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
-
-        function pollExecution(key, executionId) {
-            var waited = 0;
-            function step() {
-                return fetch(MISTRAL_API + "/v1/workflows/executions/" + executionId, {
-                    headers: { "Authorization": "Bearer " + key }
-                }).then(function (resp) {
-                    if (!resp.ok) throw new Error("status check HTTP " + resp.status);
-                    return resp.json();
-                }).then(function (data) {
-                    var status = String(data.status || "").toUpperCase();
-                    if (status === "COMPLETED") return data.result;
-                    if (status === "FAILED" || status === "CANCELED" || status === "TERMINATED" || status === "TIMED_OUT") {
-                        throw new Error("execution " + status.toLowerCase() + (data.error ? ": " + data.error : ""));
-                    }
-                    waited += 3;
-                    if (waited % 15 === 0) feedback("Still running… " + waited + "s elapsed (fetch + Timestral on the worker)", "correct");
-                    if (waited >= 300) throw new Error("timed out after 300s waiting for the execution");
-                    return sleep(3000).then(step);
-                });
-            }
-            return step();
-        }
 
         function onnxAvailable() { return typeof ort !== "undefined"; }
 
@@ -1142,59 +1088,11 @@
         }
 
         function runTimestral() {
-            if (document.getElementById("runMode").value === "local") { runLocal(); return; }
-            var key = document.getElementById("apiKey").value.trim();
-            if (!key) { feedback("Paste your Mistral API key first — it is stored only in this browser.", "wrong"); return; }
-            try { localStorage.setItem("elspot_dk2_api_key", key); } catch (e) {}
-            var modelSize = document.getElementById("modelSize").value;
-            var horizon = parseInt(document.getElementById("horizon").value, 10) || 24;
-            setBusy(true);
-            feedback("Starting '" + WORKFLOW_NAME + "' (Timestral " + modelSize + ", " + horizon + "h horizon) on deployment '" + DEPLOYMENT_NAME + "'…", "correct");
-            fetch(MISTRAL_API + "/v1/workflows/" + WORKFLOW_NAME + "/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-                body: JSON.stringify({
-                    input: { days: 30, horizon_hours: horizon, model_size: modelSize, backtest_days: 7, use_weather: true, dry_run: false },
-                    wait_for_result: false,
-                    deployment_name: DEPLOYMENT_NAME
-                })
-            }).then(function (resp) {
-                if (!resp.ok) {
-                    return resp.json().catch(function () { return null; }).then(function (body) {
-                        var msg = (body && (body.detail || body.message)) || ("HTTP " + resp.status);
-                        if (typeof msg !== "string") { try { msg = JSON.stringify(msg); } catch (e) { msg = "HTTP " + resp.status; } }
-                        if (resp.status === 401 || resp.status === 403) msg = "API key rejected (" + resp.status + ") — check the key and that it can execute workflows";
-                        if (resp.status === 404) msg = "workflow '" + WORKFLOW_NAME + "' not found — deploy elspot-dk2-workflows first";
-                        throw new Error(msg);
-                    });
-                }
-                return resp.json();
-            }).then(function (out) {
-                var executionId = out && out.execution_id;
-                if (!executionId) throw new Error("no execution_id in response");
-                return pollExecution(key, executionId);
-            }).then(function (result) {
-                if (!result || !result.forecast) throw new Error("execution returned no forecast");
-                var hadHistory = state.history.length > 0;
-                var hist = historyFromResult(result);
-                if (hist.length) {
-                    state.history = hist;
-                    try {
-                        localStorage.setItem("elspot_dk2_history", JSON.stringify(
-                            hist.map(function (p) { return [p.utc.toISOString(), p.price]; })));
-                    } catch (e) {}
-                }
-                state.forecast = result.forecast;
-                state.workflowStats = result.stats || null;
-                renderAll();
-                var st = result.stats || {};
-                feedback("Forecast ready — " + result.model + ", " + result.forecast.length + "h, " + String(result.generated_at).slice(0, 16) +
-                    "Z." + (hadHistory ? "" : " Prices were fetched server-side by the workflow (Energinet unreachable from this browser).") +
-                    " Backtest MAE: Timestral " + (st.mae_timestral_dkk != null ? fmtKwh(st.mae_timestral_dkk) : "n/a") +
-                    " vs lag-1 " + (st.mae_lag1_dkk != null ? fmtKwh(st.mae_lag1_dkk) : "n/a") + " kr/kWh.", "correct");
-            }).catch(function (err) {
-                feedback("Timestral run failed: " + err.message, "wrong");
-            }).finally(function () { setBusy(false); });
+            if (!onnxAvailable()) {
+                feedback("RUN TIMESTRAL runs Timestral on-device (ONNX) in the Android app — grab elspot-dk2-android/app-debug.apk; a plain browser has no ONNX runtime.", "wrong");
+                return;
+            }
+            runLocal();
         }
 
         function loadWeatherLine() {
@@ -1225,16 +1123,8 @@
                 renderAll();
             });
             document.getElementById("evHours").addEventListener("change", renderAll);
-            if (!onnxAvailable()) {
-                var lo = document.querySelector('#runMode option[value="local"]');
-                if (lo) { lo.disabled = true; lo.textContent = "ON-DEVICE · ONNX (ANDROID APP ONLY)"; }
-            }
             loadWeatherLine();
             loadTariffs();
-            try {
-                var saved = localStorage.getItem("elspot_dk2_api_key");
-                if (saved) document.getElementById("apiKey").value = saved;
-            } catch (e) {}
             loadPrices();
         }
 
