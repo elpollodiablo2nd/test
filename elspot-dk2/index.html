@@ -243,6 +243,7 @@
                     <span class="l-fc">timestral median</span>
                     <span class="l-band">q10–q90</span>
                 </div>
+                <p id="weatherLine" class="dim" style="margin-top:0.6rem"></p>
             </div>
         </section>
 
@@ -251,7 +252,9 @@
             <p>Day-ahead prices for DK2 are published once a day by Energinet, and tomorrow usually tracks today.
                 This page loads the recent hourly prices itself and calls the deployed <b>dk2-elspot-forecast</b>
                 workflow, which runs Mistral's <b>Timestral</b> time-series model on them (no retraining — the history
-                is the context). Your API key is only stored in this browser and sent to api.mistral.ai.</p>
+                is the context) with the <b>weather forecast</b> (wind, temperature, solar radiation from
+                Open-Meteo) as known-future covariates, since weather drives both generation and prices.
+                Your API key is only stored in this browser and sent to api.mistral.ai.</p>
             <div class="controls">
                 <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
@@ -281,6 +284,8 @@
         "use strict";
 
         var ENERGINET_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices";
+        var OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+        var WEATHER_LAT = 55.6761, WEATHER_LON = 12.5683; // Copenhagen, Zealand (DK2)
         var MISTRAL_API = "https://api.mistral.ai";
         var WORKFLOW_NAME = "dk2-elspot-forecast";
         var DEPLOYMENT_NAME = "dk2-elspot-forecast";
@@ -379,6 +384,31 @@
             return errors.reduce(function (a, b) { return a + b; }, 0) / errors.length;
         }
 
+        function summarizeWeather(hourly, nowMs) {
+            // next-24h summary of an Open-Meteo hourly forecast; nulls when data is missing
+            var times = (hourly && hourly.time) || [];
+            var wind = (hourly && hourly.wind_speed_10m) || [];
+            var temp = (hourly && hourly.temperature_2m) || [];
+            var solar = (hourly && hourly.shortwave_radiation) || [];
+            var w = [], t = [], s = [];
+            var count = 0;
+            for (var i = 0; i < times.length && count < 24; i++) {
+                var ms = parseHourUtc(String(times[i])).getTime();
+                if (ms < nowMs - HOUR_MS) continue;
+                count++;
+                if (wind[i] != null) w.push(wind[i]);
+                if (temp[i] != null) t.push(temp[i]);
+                if (solar[i] != null) s.push(solar[i]);
+            }
+            if (!w.length && !t.length && !s.length) return null;
+            return {
+                windAvg: w.length ? Math.round(w.reduce(function (a, b) { return a + b; }, 0) / w.length * 10) / 10 : null,
+                tempMin: t.length ? Math.round(Math.min.apply(null, t) * 10) / 10 : null,
+                tempMax: t.length ? Math.round(Math.max.apply(null, t) * 10) / 10 : null,
+                solarPeak: s.length ? Math.round(Math.max.apply(null, s)) : null
+            };
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -387,7 +417,8 @@
             corrLag1: corrLag1,
             lag1Forecast: lag1Forecast,
             mae: mae,
-            backtestMae: backtestMae
+            backtestMae: backtestMae,
+            summarizeWeather: summarizeWeather
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -441,9 +472,12 @@
                 ["CORR LAG-1", corr.toFixed(3), "var(--m-yellow)"],
                 ["MAE LAG-1", maeLag1 == null ? "—" : Math.round(maeLag1) + " kr", "var(--m-amber)"],
                 ["MAE TIMESTRAL", maeTimestral, "var(--m-orange)"],
-                ["NEXT 24H AVG", tomorrowAvg, "var(--m-orange-dark)"],
-                ["CHEAPEST HR", cheapest, "var(--m-red)"]
+                ["NEXT 24H AVG", tomorrowAvg, "var(--cream)"],
+                ["CHEAPEST HR", cheapest, "#8CFF6B"]
             ];
+            if (state.workflowStats && state.workflowStats.wind_avg_ms != null) {
+                items.push(["WIND AVG", state.workflowStats.wind_avg_ms + " m/s", "var(--m-yellow)"]);
+            }
             if (state.workflowStats) {
                 var t = state.workflowStats.mae_timestral_dkk;
                 items[2][1] = t == null ? "—" : Math.round(t) + " kr";
@@ -583,9 +617,30 @@
             }).finally(function () { setBusy(false); });
         }
 
+        function loadWeatherLine() {
+            var el = document.getElementById("weatherLine");
+            var params = new URLSearchParams({
+                latitude: WEATHER_LAT, longitude: WEATHER_LON, timezone: "UTC",
+                hourly: "wind_speed_10m,temperature_2m,shortwave_radiation", forecast_days: "2"
+            });
+            fetch(OPEN_METEO_FORECAST_URL + "?" + params.toString()).then(function (r) {
+                if (!r.ok) throw new Error("Open-Meteo " + r.status);
+                return r.json();
+            }).then(function (data) {
+                var s = summarizeWeather(data.hourly, Date.now());
+                el.textContent = s
+                    ? "Weather next 24h (Open-Meteo · Zealand): wind ~" + s.windAvg + " m/s · temp " +
+                      s.tempMin + "–" + s.tempMax + " °C · solar peak " + s.solarPeak + " W/m²"
+                    : "Weather forecast unavailable.";
+            }).catch(function () {
+                el.textContent = "Weather forecast unavailable (Open-Meteo).";
+            });
+        }
+
         function init() {
             document.getElementById("loadBtn").addEventListener("click", loadPrices);
             document.getElementById("runBtn").addEventListener("click", runTimestral);
+            loadWeatherLine();
             try {
                 var saved = localStorage.getItem("elspot_dk2_api_key");
                 if (saved) document.getElementById("apiKey").value = saved;

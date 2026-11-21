@@ -65,5 +65,17 @@ for (let i = 0; i < 10 * 24; i++) longSeries.push({ utc: new Date(Date.UTC(2026,
 const shifted = Core.backtestMae(longSeries, Core.lag1Forecast, 2, 24);
 check("backtestMae returns a number", typeof shifted === "number" && shifted >= 0);
 
+// summarizeWeather: next-24h window from "now", null-safe
+const now = Core.parseHourUtc("2026-11-21T12:00:00").getTime();
+const hourly = {
+    time: ["2026-11-21T11:00", "2026-11-21T12:00", "2026-11-21T13:00", "2026-11-21T14:00"],
+    wind_speed_10m: [10, 20, 30, null],
+    temperature_2m: [1, 2, 3, 4],
+    shortwave_radiation: [0, 100, 500, 300],
+};
+const ws = Core.summarizeWeather(hourly, now);
+check("summarizeWeather next-24h window", ws.windAvg === 20 && ws.tempMin === 1 && ws.tempMax === 4 && ws.solarPeak === 500);
+check("summarizeWeather null when empty", Core.summarizeWeather({}, now) === null);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

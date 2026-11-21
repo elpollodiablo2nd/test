@@ -37,7 +37,11 @@ No retraining is involved: Timestral is zero-shot — the price history is the i
   — keyless, CORS-enabled; bucketed to hourly UTC (DST-proof), labels shown in Europe/Copenhagen.
 - **Model**: the managed workflow deployment `dk2-elspot-forecast` (source: `elspot-dk2-workflows/` in
   this repo) runs `TimestralForecaster.from_pretrained("mistralai/Timestral-<size>")` (open weights,
-  Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts 24 steps ahead.
+  Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts 24 steps ahead. Hour-of-day and
+  weekday are passed as categorical known-future covariates, and the **weather forecast** (wind speed,
+  temperature, solar radiation from [Open-Meteo](https://open-meteo.com/), keyless, for Zealand) as
+  numeric known-future covariates over context + horizon — weather drives both generation and prices
+  (`use_weather=false` disables it). The page also shows a next-24h weather line under the chart.
 - **Baseline**: lag-1 ("tomorrow = today, same hour"), scored against Timestral on a 7-day
   rolling-origin backtest — reported as MAE stats in both the workflow result and the HUD.
 - Styled with the **Mistral pixel UI** skill (Press Start 2P / VT323, rainbow gradient, chunky
@@ -59,6 +63,7 @@ cd elspot-dk2-workflows && uv run pytest apps/worker/tests   # workflow tests (m
 ## Credits
 
 - Prices: [Energi Data Service (Energinet)](https://www.energidataservice.dk/) — `DayAheadPrices`, DK2
+- Weather: [Open-Meteo](https://open-meteo.com/) (ERA5 archive + forecast), Copenhagen/Zealand, keyless
 - Model: [Mistral Timestral 1.0](https://docs.mistral.ai/models/timestral-1-0-28m) —
   [weights](https://huggingface.co/mistralai/Timestral-28M) (Modified MIT),
   [inference code](https://github.com/mistralai/timestral) (Apache 2.0)
