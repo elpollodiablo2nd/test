@@ -208,6 +208,11 @@
         .hour-cell .v { font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: var(--m-orange-dark); margin: 0.3rem 0; }
         .hour-cell .r { font-size: 1.05rem; opacity: 0.8; }
         .dim { font-size: 1.25rem; opacity: 0.75; }
+        details.about { margin: 0.4rem 0 0.9rem; }
+        details.about summary { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; cursor: pointer; color: var(--m-orange); list-style: none; }
+        details.about summary::before { content: "\25B6 "; }
+        details.about[open] summary::before { content: "\25BC "; }
+        details.about p { font-size: 1.15rem; line-height: 1.5; margin: 0.7rem 0; }
 
         footer { text-align: center; font-size: 1.15rem; opacity: 0.9; margin-top: 0.5rem; line-height: 1.5; }
         footer a { color: var(--m-orange); }
@@ -254,12 +259,15 @@
 
         <section class="card">
             <h2>RUN THE MODEL</h2>
-            <p><b>What to push:</b> 1) paste your Mistral API key (stored only in this browser's localStorage, sent only to
+            <p class="dim" style="margin-top:0">Paste your Mistral API key (kept in localStorage only) — prices load automatically — then press <b>RUN TIMESTRAL</b>.</p>
+            <details class="about">
+                <summary>WHAT TO PUSH · WHAT TO EXPECT · SOURCES</summary>
+                <p><b>What to push:</b> 1) paste your Mistral API key (stored only in this browser's localStorage, sent only to
                 api.mistral.ai); 2) prices load automatically — <b>LOAD PRICES</b> just refreshes them (if Energinet rate-limits this browser it falls back to the
                 cached copy, or to the workflow itself when an API key is entered); 3) optionally pick the Timestral checkpoint (28M default) and the <b>horizon</b>
                 (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
                 4) press <b>RUN TIMESTRAL</b>.</p>
-            <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
+                <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
                 Timestral on the managed worker (~10–30 s, the banner shows progress), and this page then shows the chart
                 <b>from the current hour</b>: published day-ahead prices ahead of now, then the orange dashed <b>median</b>
                 forecast with the red <b>q10–q90 confidence band</b>, and the green shaded <b>EV charge window</b> (start =
@@ -267,6 +275,11 @@
                 EV window. Prices are in <b>kr/kWh</b> (source data is DKK/MWh ÷ 1000); with <b>INCL. FEES+VAT</b> ticked they
                 include the mandatory fees — Energinet transmission+system tariff, N1 Nettarif C (low at night, peak 17–21),
                 electricity tax — plus 25% VAT, i.e. what you actually pay per kWh.</p>
+                <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.
+                Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">DatahubPricelist</a> (Energinet transmission+system tariff, N1 Nettarif C, elafgift) + 25% VAT.
+                Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a> via the deployed <b>dk2-elspot-forecast</b> workflow (repo <b>elspot-dk2-workflows/</b>).
+                Weather: Open-Meteo. Full docs: <a href="README.md">README.md</a>.</p>
+            </details>
             <div class="controls">
                 <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
@@ -298,9 +311,7 @@
         </section>
 
         <footer>
-            Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.<br>
-            Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">Energi Data Service — DatahubPricelist</a> (Energinet transmission+system tariff, N1 Nettarif C, elafgift) + 25% VAT.<br>
-            Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a> via the deployed <b>dk2-elspot-forecast</b> workflow (repo <b>elspot-dk2-workflows/</b>).
+            ELSPOT DK2 · Energinet DayAheadPrices + DatahubPricelist fees · Mistral Timestral 1.0 · <a href="README.md">more info</a>
         </footer>
     </div>
 
