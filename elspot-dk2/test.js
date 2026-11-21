@@ -36,6 +36,10 @@ const summer = Core.dkLabel(Core.parseHourUtc("2026-07-20T22:00:00"));
 check("dkLabel winter CET (+1)", winter === "2026-11-20 23:00");
 check("dkLabel summer CEST (+2, next day)", summer === "2026-07-21 00:00");
 
+// dkWeekday: short weekday in Europe/Copenhagen
+check("dkWeekday winter CET", Core.dkWeekday(Core.parseHourUtc("2026-11-20T22:00:00")) === "Fri");
+check("dkWeekday summer CEST (next day)", Core.dkWeekday(Core.parseHourUtc("2026-07-20T22:00:00")) === "Tue");
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 

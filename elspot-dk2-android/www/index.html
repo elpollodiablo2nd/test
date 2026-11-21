@@ -174,7 +174,7 @@
         #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
         #chart .axis {
             font-family: 'VT323', monospace;
-            font-size: 17px;
+            font-size: 20px;
             fill: var(--cream);
             opacity: 1;
             paint-order: stroke;
@@ -371,6 +371,10 @@
             var parts = {};
             f.formatToParts(date).forEach(function (p) { parts[p.type] = p.value; });
             return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":00";
+        }
+
+        function dkWeekday(date) {
+            return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(date);
         }
 
         function pearson(xs, ys) {
@@ -652,6 +656,7 @@
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
             dkLabel: dkLabel,
+            dkWeekday: dkWeekday,
             pearson: pearson,
             corrLag1: corrLag1,
             lag1Forecast: lag1Forecast,
@@ -758,7 +763,7 @@
 
         function renderChart() {
             var svg = document.getElementById("chart");
-            var W = 760, H = 460, padL = 60, padR = 14, padT = 16, padB = 46;
+            var W = 760, H = 460, padL = 60, padR = 14, padT = 16, padB = 52;
             var history = state.history;
             var fc = state.forecast;
             if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
@@ -800,9 +805,12 @@
             var xStep = xAxisStep(x1 - x0, 12), stepMs = xStep * HOUR_MS;
             for (var t = Math.ceil(x0 / stepMs) * stepMs; t <= x1; t += stepMs) {
                 var dl = dkLabel(new Date(t));
+                var dateLine = (xStep >= 24 || dl.slice(11, 16) === "00:00")
+                    ? dkWeekday(new Date(t)) + " " + dl.slice(5, 10)
+                    : (xStep >= 12 ? dl.slice(5, 10) : "");
                 s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
-                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 15) + '" text-anchor="middle">' + dl.slice(5, 10) + '</text>' +
-                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 33) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 17) + '" text-anchor="middle">' + dateLine + '</text>' +
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 40) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
             }
             s += '<line class="now" x1="' + X(nowMs) + '" y1="' + padT + '" x2="' + X(nowMs) + '" y2="' + (H - padB) + '"/>' +
                  '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + 12) + '" text-anchor="middle">NOW</text>';
