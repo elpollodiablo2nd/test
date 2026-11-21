@@ -250,8 +250,8 @@
         <section class="card">
             <h2>RUN THE MODEL</h2>
             <p><b>What to push:</b> 1) paste your Mistral API key (stored only in this browser's localStorage, sent only to
-                api.mistral.ai); 2) prices load automatically — <b>LOAD PRICES</b> just refreshes them (a cached copy is shown if
-                Energinet rate-limits); 3) optionally pick the Timestral checkpoint (28M default) and the <b>horizon</b>
+                api.mistral.ai); 2) prices load automatically — <b>LOAD PRICES</b> just refreshes them (if Energinet rate-limits this browser it falls back to the
+                cached copy, or to the workflow itself when an API key is entered); 3) optionally pick the Timestral checkpoint (28M default) and the <b>horizon</b>
                 (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
                 4) press <b>RUN TIMESTRAL</b>.</p>
             <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
@@ -443,6 +443,16 @@
             };
         }
 
+        function historyFromResult(result) {
+            // the workflow result carries the full hourly history it fetched server-side
+            var hist = (result && result.history) || [];
+            return hist.map(function (h) {
+                return { utc: parseHourUtc(h.hour_utc), price: h.price_dkk };
+            }).filter(function (p) {
+                return !isNaN(p.utc.getTime()) && p.price != null && isFinite(p.price);
+            }).sort(function (a, b) { return a.utc - b.utc; });
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -454,7 +464,8 @@
             backtestMae: backtestMae,
             summarizeWeather: summarizeWeather,
             fmtKwh: fmtKwh,
-            bestWindow: bestWindow
+            bestWindow: bestWindow,
+            historyFromResult: historyFromResult
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -539,17 +550,19 @@
             var svg = document.getElementById("chart");
             var W = 760, H = 320, padL = 60, padR = 14, padT = 16, padB = 32;
             var history = state.history;
-            if (!history.length) { svg.innerHTML = ""; return; }
+            var fc = state.forecast;
+            if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
+            var fcLen = fc && fc.length ? fc.length : HOURS_PER_DAY;
+            var lastUtc = history.length ? history[history.length - 1].utc.getTime()
+                                         : parseHourUtc(fc[0].hour_utc).getTime() - HOUR_MS;
             var hist = history.slice(-5 * HOURS_PER_DAY);
-            var lastUtc = history[history.length - 1].utc.getTime();
-            var fcLen = state.forecast ? state.forecast.length : HOURS_PER_DAY;
             var x1 = lastUtc + Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
-            var x0 = hist[0].utc.getTime();
+            var x0 = hist.length ? hist[0].utc.getTime() : lastUtc - Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
             var allVals = hist.map(function (p) { return p.price; });
-            var lag1 = lag1Forecast(history, Math.max(HOURS_PER_DAY, fcLen));
+            var lag1 = history.length ? lag1Forecast(history, Math.max(HOURS_PER_DAY, fcLen)) : [];
             allVals = allVals.concat(lag1);
-            if (state.forecast) {
-                state.forecast.forEach(function (f) { allVals.push(f.median, f.q10, f.q90); });
+            if (fc) {
+                fc.forEach(function (f) { allVals.push(f.median, f.q10, f.q90); });
             }
             var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
             var pad = (yMax - yMin) * 0.08 || 1;
@@ -567,17 +580,23 @@
             }
             s += '<line class="now" x1="' + X(lastUtc) + '" y1="' + padT + '" x2="' + X(lastUtc) + '" y2="' + (H - padB) + '"/>' +
                  '<text class="axis" x="' + X(lastUtc) + '" y="' + (padT + 12) + '" text-anchor="middle">LAST</text>';
-            s += '<polyline class="line-hist" points="' + hist.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            if (hist.length) {
+                s += '<polyline class="line-hist" points="' + hist.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            }
             var today = hist.slice(-HOURS_PER_DAY);
-            s += '<polyline class="line-today" points="' + today.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            if (today.length) {
+                s += '<polyline class="line-today" points="' + today.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            }
             var ahead = history.filter(function (p) { return p.utc.getTime() > lastUtc; });
             if (ahead.length) {
                 s += '<polyline class="line-actual" points="' + ahead.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
             }
-            var lagPts = lag1.map(function (val, i) { return { t: lastUtc + (i + 1) * HOUR_MS, v: val }; });
-            s += '<polyline class="line-lag1" points="' + lagPts.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
-            if (state.forecast) {
-                var fPts = state.forecast.map(function (f, i) {
+            if (lag1.length) {
+                var lagPts = lag1.map(function (val, i) { return { t: lastUtc + (i + 1) * HOUR_MS, v: val }; });
+                s += '<polyline class="line-lag1" points="' + lagPts.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
+            }
+            if (fc) {
+                var fPts = fc.map(function (f, i) {
                     return { t: lastUtc + (i + 1) * HOUR_MS, m: f.median, lo: f.q10, hi: f.q90 };
                 });
                 var band = fPts.map(function (p) { return X(p.t) + "," + Y(p.hi); }).join(" ") + " " +
@@ -612,6 +631,38 @@
             renderHours();
         }
 
+        function loadPricesViaWorkflow(key) {
+            // fallback when Energinet is unreachable/rate-limited from this browser: the
+            // workflow fetches the prices server-side (dry_run=true skips the model)
+            return fetch(MISTRAL_API + "/v1/workflows/" + WORKFLOW_NAME + "/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+                body: JSON.stringify({
+                    input: { days: 10, horizon_hours: 24, model_size: "28M", backtest_days: 7, use_weather: false, dry_run: true },
+                    wait_for_result: false,
+                    deployment_name: DEPLOYMENT_NAME
+                })
+            }).then(function (resp) {
+                if (!resp.ok) throw new Error("execute HTTP " + resp.status);
+                return resp.json();
+            }).then(function (out) {
+                if (!out || !out.execution_id) throw new Error("no execution_id in response");
+                return pollExecution(key, out.execution_id);
+            }).then(function (result) {
+                var hist = historyFromResult(result);
+                if (!hist.length) throw new Error("workflow returned no history");
+                state.history = hist;
+                state.forecast = null;
+                state.workflowStats = null;
+                try {
+                    localStorage.setItem("elspot_dk2_history", JSON.stringify(
+                        hist.map(function (p) { return [p.utc.toISOString(), p.price]; })));
+                } catch (e) {}
+                renderAll();
+                return hist.length;
+            });
+        }
+
         function loadPrices() {
             setBusy(true);
             feedback("Fetching DK2 day-ahead prices from Energinet…", "correct");
@@ -633,9 +684,19 @@
                     state.history = cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; });
                     renderAll();
                     feedback("Energinet failed (" + err.message + ") — showing cached prices from the last successful load.", "wrong");
-                } else {
-                    feedback("Could not load prices: " + err.message, "wrong");
+                    return;
                 }
+                var key = document.getElementById("apiKey").value.trim();
+                if (!key) {
+                    feedback("Could not load prices from Energinet (" + err.message + ") — paste your API key and press RUN TIMESTRAL: the workflow fetches the prices server-side and fills the chart.", "wrong");
+                    return;
+                }
+                feedback("Energinet failed (" + err.message + ") — loading prices via the workflow instead…", "correct");
+                loadPricesViaWorkflow(key).then(function (n) {
+                    feedback("Loaded " + n + " hourly DK2 prices via the dk2-elspot-forecast workflow (Energinet unreachable from this browser). Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
+                }).catch(function (err2) {
+                    feedback("Could not load prices: " + err.message + "; workflow fallback failed too: " + err2.message, "wrong");
+                });
             }).finally(function () { setBusy(false); });
         }
 
@@ -697,12 +758,22 @@
                 return pollExecution(key, executionId);
             }).then(function (result) {
                 if (!result || !result.forecast) throw new Error("execution returned no forecast");
+                var hadHistory = state.history.length > 0;
+                var hist = historyFromResult(result);
+                if (hist.length) {
+                    state.history = hist;
+                    try {
+                        localStorage.setItem("elspot_dk2_history", JSON.stringify(
+                            hist.map(function (p) { return [p.utc.toISOString(), p.price]; })));
+                    } catch (e) {}
+                }
                 state.forecast = result.forecast;
                 state.workflowStats = result.stats || null;
                 renderAll();
                 var st = result.stats || {};
                 feedback("Forecast ready — " + result.model + ", " + result.forecast.length + "h, " + String(result.generated_at).slice(0, 16) +
-                    "Z. Backtest MAE: Timestral " + (st.mae_timestral_dkk != null ? fmtKwh(st.mae_timestral_dkk) : "n/a") +
+                    "Z." + (hadHistory ? "" : " Prices were fetched server-side by the workflow (Energinet unreachable from this browser).") +
+                    " Backtest MAE: Timestral " + (st.mae_timestral_dkk != null ? fmtKwh(st.mae_timestral_dkk) : "n/a") +
                     " vs lag-1 " + (st.mae_lag1_dkk != null ? fmtKwh(st.mae_lag1_dkk) : "n/a") + " kr/kWh.", "correct");
             }).catch(function (err) {
                 feedback("Timestral run failed: " + err.message, "wrong");

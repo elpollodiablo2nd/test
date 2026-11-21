@@ -96,5 +96,17 @@ check("bestWindow avg", close(bw.avg, (100 + 50 + 80) / 3));
 check("bestWindow clamps to forecast length", Core.bestWindow(fc, 99).end === "2026-11-22 04:00");
 check("bestWindow empty -> null", Core.bestWindow([], 6) === null && Core.bestWindow(null, 6) === null);
 
+// historyFromResult: workflow payload history -> sorted {utc, price} points
+const res = { history: [
+    { hour_utc: "2026-11-21T02:00:00", hour_dk: "2026-11-21 03:00", price_dkk: 500 },
+    { hour_utc: "2026-11-21T00:00:00", hour_dk: "2026-11-21 01:00", price_dkk: 300 },
+    { hour_utc: "bogus", hour_dk: "", price_dkk: 1 },
+    { hour_utc: "2026-11-21T01:00:00", hour_dk: "2026-11-21 02:00", price_dkk: null },
+]};
+const hp = Core.historyFromResult(res);
+check("historyFromResult maps+sorts, skips bad rows", hp.length === 2 && hp[0].price === 300 && hp[1].price === 500);
+check("historyFromResult utc is a Date", hp[0].utc.toISOString() === "2026-11-21T00:00:00.000Z");
+check("historyFromResult empty/missing", Core.historyFromResult({}).length === 0 && Core.historyFromResult(null).length === 0);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

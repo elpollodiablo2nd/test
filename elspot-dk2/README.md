@@ -20,9 +20,12 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    ~10 days of hourly DK2 day-ahead prices live from
    [Energi Data Service](https://www.energidataservice.dk/tso-electricity/DayAheadPrices)
    (`DayAheadPrices`, `PriceArea=DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
-   Energinet occasionally answers **429 (rate limited)** — the page retries with backoff up to 4
-   times and, if that still fails, falls back to the **cached copy** from the last successful load
-   (kept in `localStorage`) with a warning banner. Day-ahead prices for tomorrow are published
+   Energinet occasionally answers **429 (rate limited)** or is unreachable from the browser — the page
+   retries with backoff up to 4 times and then falls back, in order, to the **cached copy** from the
+   last successful load (`localStorage`) and, if an API key is entered, to a **dry-run execution of
+   the workflow itself** (`dry_run=true`, which fetches the prices server-side without loading the
+   model). Either way the chart fills in; a successful RUN TIMESTRAL also adopts the server-side
+   history from the result. Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
    **lag-1 baseline** (tomorrow ≈ today), and the HUD shows the day-to-day correlation and the
    lag-1 backtest MAE.
