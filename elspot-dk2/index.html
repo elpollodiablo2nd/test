@@ -25,6 +25,7 @@
 
         body {
             font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.2rem;
             background-color: var(--night);
             background-image:
                 radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
@@ -51,11 +52,16 @@
         h1, .pixel-title {
             font-family: 'Press Start 2P', monospace;
             font-size: 1.5rem;
+            color: var(--m-yellow);
             background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
             -webkit-background-clip: text;
             background-clip: text;
+            -webkit-text-fill-color: transparent;
             color: transparent;
             filter: drop-shadow(4px 4px 0 #000);
+        }
+        @supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+            h1, .pixel-title { background: none; color: var(--m-yellow); -webkit-text-fill-color: var(--m-yellow); }
         }
 
         .logo-m { width: 96px; height: 96px; shape-rendering: crispEdges; filter: drop-shadow(5px 5px 0 rgba(0,0,0,0.8)); animation: bob 1.6s steps(2, jump-none) infinite; }
@@ -120,6 +126,7 @@
             outline: none;
         }
         input.pixel:focus, select.pixel:focus { box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange); }
+        input.pixel::placeholder { color: #444444; opacity: 1; }
         #apiKey { flex: 1 1 260px; }
 
         .feedback {
@@ -149,9 +156,10 @@
         }
         .stat-item { text-align: center; padding: 0.6rem 0.25rem; background: rgba(0, 0, 0, 0.35); border: 3px solid rgba(255, 250, 235, 0.25); }
         .stat-value { font-family: 'Press Start 2P', monospace; font-size: 0.95rem; color: var(--m-yellow); text-shadow: 3px 3px 0 #000; }
-        .stat-label { font-size: 1.05rem; opacity: 0.85; }
+        .stat-label { font-size: 1.05rem; opacity: 0.95; }
 
         .screen {
+            color: var(--cream);
             background:
                 repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
                 radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
@@ -161,9 +169,17 @@
         }
 
         #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; }
-        #chart .grid { stroke: rgba(255, 250, 235, 0.18); stroke-width: 2; }
+        #chart .grid { stroke: rgba(255, 250, 235, 0.25); stroke-width: 2; }
         #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
-        #chart .axis { font-family: 'VT323', monospace; font-size: 15px; fill: var(--cream); opacity: 0.85; }
+        #chart .axis {
+            font-family: 'VT323', monospace;
+            font-size: 17px;
+            fill: var(--cream);
+            opacity: 1;
+            paint-order: stroke;
+            stroke: #000000;
+            stroke-width: 3px;
+        }
         #chart .line-hist { stroke: var(--m-yellow); stroke-width: 3; fill: none; }
         #chart .line-today { stroke: var(--m-amber); stroke-width: 5; fill: none; }
         #chart .line-actual { stroke: #8CFF6B; stroke-width: 4; fill: none; }
@@ -171,7 +187,7 @@
         #chart .line-fc { stroke: var(--m-orange); stroke-width: 5; fill: none; stroke-dasharray: 14 8; }
         #chart .band { fill: rgba(225, 5, 0, 0.30); stroke: none; }
 
-        .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 1.15rem; }
+        .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 1.2rem; color: var(--cream); }
         .legend span::before { content: ""; display: inline-block; width: 18px; height: 6px; margin-right: 6px; vertical-align: middle; border: 2px solid var(--ink); }
         .legend .l-hist::before { background: var(--m-yellow); }
         .legend .l-today::before { background: var(--m-amber); }
@@ -188,7 +204,7 @@
         .hour-cell .r { font-size: 1.05rem; opacity: 0.8; }
         .dim { font-size: 1.25rem; opacity: 0.75; }
 
-        footer { text-align: center; font-size: 1.1rem; opacity: 0.8; margin-top: 0.5rem; line-height: 1.5; }
+        footer { text-align: center; font-size: 1.15rem; opacity: 0.9; margin-top: 0.5rem; line-height: 1.5; }
         footer a { color: var(--m-orange); }
 
         @media (max-width: 640px) {
