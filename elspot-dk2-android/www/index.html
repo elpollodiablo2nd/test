@@ -981,6 +981,7 @@
             var url = ONNX_MODEL_URLS[modelSize];
             var p;
             if (url) {
+                url = new URL(url, window.location.href).href; // absolute: WebView import()/fetch need it
                 p = fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
             } else if (ONNX_MODEL_PARTS[modelSize]) {
                 feedback("Downloading on-device model " + modelSize + " (~113 MB in 4 parts, one time)…", "correct");
@@ -997,7 +998,10 @@
             }
             return p.then(function (buf) {
                 if (typeof ort !== "undefined") {
-                    ort.env.wasm.wasmPaths = "vendor/ort/";
+                    // absolute URLs (bare "vendor/..." specifiers fail in a WebView dynamic import);
+                    // pin the plain threaded glue+wasm (ORT 1.23 defaults to the jsep variant otherwise)
+                    var base = new URL("vendor/ort/", window.location.href).href;
+                    ort.env.wasm.wasmPaths = { mjs: base + "ort-wasm-simd-threaded.mjs", wasm: base + "ort-wasm-simd-threaded.wasm" };
                     ort.env.wasm.numThreads = 1;
                 }
                 return ort.InferenceSession.create(buf, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });

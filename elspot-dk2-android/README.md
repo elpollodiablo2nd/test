@@ -29,6 +29,9 @@ mode (API key) also works and is the default in the browser.
   repeat_interleave, index_put) into equivalent supported ops.
 - `test/ort-wasm-test.js` — runs the exported model under onnxruntime-web WASM in
   Node against a PyTorch reference (`test/reference-*.json`).
+- WebView fix: ORT 1.23 loads its glue via dynamic `import()`, so `wasmPaths` must be
+  **absolute URLs** (`new URL("vendor/ort/", location.href)`) and pinned to the plain
+  threaded build via `{ mjs, wasm }` (the default would be the jsep variant we don't ship).
 - No remote execution: the UI has no API-key/server mode — RUN TIMESTRAL always runs the ONNX
   model on-device. Price loading fallback chain: live Energinet (6 retries, Retry-After aware)
   → `localStorage` cache → bundled `assets/prices-dk2.json` snapshot.
