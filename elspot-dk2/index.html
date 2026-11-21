@@ -195,6 +195,11 @@
         .legend .l-lag1::before { background: var(--cream); }
         .legend .l-fc::before { background: var(--m-orange); }
         .legend .l-band::before { background: rgba(225, 5, 0, 0.45); }
+        .legend .l-ev::before { background: rgba(140, 255, 107, 0.35); border-color: #8CFF6B; }
+        #chart .ev-window { fill: rgba(140, 255, 107, 0.16); stroke: #8CFF6B; stroke-width: 2; stroke-dasharray: 6 4; }
+        .hour-cell.ev { box-shadow: 0 0 0 3px #2E7D1E, 3px 3px 0 rgba(0,0,0,0.25); }
+        .chk { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+        .chk input { width: 1.4rem; height: 1.4rem; accent-color: var(--m-orange); }
 
         .hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
         .hour-cell { border: 3px solid var(--ink); padding: 0.45rem 0.6rem; background: #fff; display: flex; flex-direction: column; box-shadow: 3px 3px 0 rgba(0,0,0,0.25); }
@@ -232,18 +237,18 @@
         <div class="stats" id="stats"></div>
 
         <section class="card">
-            <h2>PRICE CHART · KR/KWH</h2>
+            <h2 id="chartTitle">PRICE CHART · KR/KWH</h2>
             <div class="screen">
                 <svg id="chart" viewBox="0 0 760 320" role="img" aria-label="Hourly DK2 day-ahead prices and forecast"></svg>
                 <div class="legend">
-                    <span class="l-hist">history</span>
-                    <span class="l-today">last 24h</span>
-                    <span class="l-actual">published ahead</span>
+                    <span class="l-actual">published ahead (day-ahead)</span>
                     <span class="l-lag1">lag-1 baseline</span>
                     <span class="l-fc">timestral median</span>
                     <span class="l-band">q10–q90</span>
+                    <span class="l-ev">EV charge window</span>
                 </div>
                 <p id="weatherLine" class="dim" style="margin-top:0.6rem"></p>
+                <p id="feesLine" class="dim" style="margin-top:0.3rem"></p>
             </div>
         </section>
 
@@ -255,11 +260,13 @@
                 (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
                 4) press <b>RUN TIMESTRAL</b>.</p>
             <p><b>What to expect:</b> the deployed workflow fetches 30 days of DK2 prices plus the weather forecast, runs
-                Timestral on the managed worker (~10–30 s, the banner shows progress), and this page then overlays the orange dashed
-                <b>median</b> forecast with the red <b>q10–q90 confidence band</b> on the chart, fills the hourly grid below
-                (cheapest hour highlighted), and updates the HUD: backtest MAE of Timestral vs the lag-1 baseline, the forecast
-                average, and the cheapest <b>EV charging window</b> (EV 4/6/8h). All prices are shown in <b>kr/kWh</b> — the source
-                data is DKK/MWh, divided by 1000.</p>
+                Timestral on the managed worker (~10–30 s, the banner shows progress), and this page then shows the chart
+                <b>from the current hour</b>: published day-ahead prices ahead of now, then the orange dashed <b>median</b>
+                forecast with the red <b>q10–q90 confidence band</b>, and the green shaded <b>EV charge window</b> (start =
+                cheapest EV 4/6/8h run). The hourly grid and HUD update too: backtest MAE of Timestral vs lag-1, cheapest hour,
+                EV window. Prices are in <b>kr/kWh</b> (source data is DKK/MWh ÷ 1000); with <b>INCL. FEES+VAT</b> ticked they
+                include the mandatory fees — Energinet transmission+system tariff, N1 Nettarif C (low at night, peak 17–21),
+                electricity tax — plus 25% VAT, i.e. what you actually pay per kWh.</p>
             <div class="controls">
                 <input id="apiKey" class="pixel" type="password" placeholder="MISTRAL API KEY (kept in localStorage)" autocomplete="off">
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
@@ -278,6 +285,7 @@
                     <option value="6" selected>EV 6h</option>
                     <option value="8">EV 8h</option>
                 </select>
+                <label class="chk" title="All-in price: spot + grid tariffs + electricity tax + 25% VAT"><input type="checkbox" id="feesToggle" checked> INCL. FEES+VAT</label>
                 <button id="loadBtn" class="btn-alt">LOAD PRICES</button>
                 <button id="runBtn" class="btn-primary">RUN TIMESTRAL</button>
             </div>
@@ -285,12 +293,13 @@
         </section>
 
         <section class="card">
-            <h2 id="hoursTitle">NEXT 24H — HOURLY FORECAST · KR/KWH</h2>
+            <h2 id="hoursTitle">FROM NOW — PUBLISHED + FORECAST · KR/KWH</h2>
             <div id="hours" class="hours-grid"></div>
         </section>
 
         <footer>
             Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK2)</a>, day-ahead, published daily ~13:00 CET.<br>
+            Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">Energi Data Service — DatahubPricelist</a> (Energinet transmission+system tariff, N1 Nettarif C, elafgift) + 25% VAT.<br>
             Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a> via the deployed <b>dk2-elspot-forecast</b> workflow (repo <b>elspot-dk2-workflows/</b>).
         </footer>
     </div>
@@ -306,6 +315,22 @@
         var DEPLOYMENT_NAME = "dk2-elspot-forecast";
         var HOURS_PER_DAY = 24;
         var HOUR_MS = 3600 * 1000;
+        var DATAHUB_URL = "https://api.energidataservice.dk/dataset/DatahubPricelist";
+        var ENERGINET_GLN = "5790000432752";
+        var N1_GLN = "5790001089030";
+        var FEE_NOTES = ["Elafgift", "Systemtarif", "Transmissions nettarif", "Nettarif C"];
+        var VAT_RATE = 0.25;
+        var DEFAULT_TARIFFS = {
+            "Elafgift": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.008 }],
+            "Systemtarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.072 }],
+            "Transmissions nettarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.043 }],
+            "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
+                Price1: 0.0879, Price2: 0.0879, Price3: 0.0879, Price4: 0.0879, Price5: 0.0879, Price6: 0.0879,
+                Price7: 0.2636, Price8: 0.2636, Price9: 0.2636, Price10: 0.2636, Price11: 0.2636, Price12: 0.2636,
+                Price13: 0.2636, Price14: 0.2636, Price15: 0.2636, Price16: 0.2636, Price17: 0.2636,
+                Price18: 0.7907, Price19: 0.7907, Price20: 0.7907, Price21: 0.7907,
+                Price22: 0.2636, Price23: 0.2636, Price24: 0.2636 }]
+        };
 
         // ---------- pure core (unit-tested by test.js) ----------
 
@@ -453,6 +478,84 @@
             }).sort(function (a, b) { return a.utc - b.utc; });
         }
 
+        function pickTariffRecord(records, dkDateTimeIso) {
+            var best = null;
+            for (var i = 0; i < records.length; i++) {
+                var r = records[i];
+                var vf = String(r.ValidFrom || ""), vt = String(r.ValidTo || "");
+                if (vf && dkDateTimeIso >= vf && (!vt || dkDateTimeIso < vt)) {
+                    if (!best || vf > String(best.ValidFrom || "")) best = r;
+                }
+            }
+            return best;
+        }
+
+        function tariffPriceOfHour(record, dkHour) {
+            if (!record) return null;
+            var v = record["Price" + (dkHour + 1)];
+            if (v == null) v = record.Price1;
+            return v == null ? null : Number(v);
+        }
+
+        function feeKwhAt(tariffs, utcMs) {
+            var lbl = dkLabel(new Date(utcMs));
+            var dt = lbl.slice(0, 10) + "T" + lbl.slice(11, 16) + ":00";
+            var hour = parseInt(lbl.slice(11, 13), 10);
+            var total = 0, found = false;
+            for (var n = 0; n < FEE_NOTES.length; n++) {
+                var rec = pickTariffRecord((tariffs && tariffs[FEE_NOTES[n]]) || [], dt);
+                var p = tariffPriceOfHour(rec, hour);
+                if (p != null) { total += p; found = true; }
+            }
+            return found ? total : null;
+        }
+
+        function allInDkkMwh(spotDkkMwh, feeKwh) {
+            return (spotDkkMwh / 1000 + feeKwh) * (1 + VAT_RATE) * 1000;
+        }
+
+        function dispDkkMwh(spotDkkMwh, utcMs, tariffs, showFees) {
+            if (!showFees) return spotDkkMwh;
+            var fee = feeKwhAt(tariffs, utcMs);
+            return fee == null ? spotDkkMwh : allInDkkMwh(spotDkkMwh, fee);
+        }
+
+        function combinedSeries(history, forecast, nowMs, tariffs, showFees) {
+            var out = [];
+            (history || []).forEach(function (p) {
+                var t = p.utc.getTime();
+                if (t < nowMs) return;
+                out.push({ t: t, dk: dkLabel(p.utc), v: dispDkkMwh(p.price, t, tariffs, showFees), kind: "pub", lo: null, hi: null });
+            });
+            (forecast || []).forEach(function (f) {
+                var t = parseHourUtc(f.hour_utc).getTime();
+                out.push({
+                    t: t, dk: f.hour_dk,
+                    v: dispDkkMwh(f.median, t, tariffs, showFees),
+                    lo: dispDkkMwh(f.q10, t, tariffs, showFees),
+                    hi: dispDkkMwh(f.q90, t, tariffs, showFees),
+                    kind: "fc"
+                });
+            });
+            return out.sort(function (a, b) { return a.t - b.t; });
+        }
+
+        function bestWindowEntries(entries, winHours) {
+            if (!entries || !entries.length) return null;
+            var w = Math.min(winHours, entries.length);
+            var best = 0, bestSum = Infinity;
+            for (var i = 0; i + w <= entries.length; i++) {
+                var s = 0;
+                for (var j = 0; j < w; j++) s += entries[i + j].v;
+                if (s < bestSum) { bestSum = s; best = i; }
+            }
+            return {
+                start: entries[best].dk, end: entries[best + w - 1].dk,
+                startT: entries[best].t, endT: entries[best + w - 1].t + HOUR_MS,
+                avg: bestSum / w, idx: best, len: w
+            };
+        }
+
         var Core = {
             parseHourUtc: parseHourUtc,
             aggregateHourlyUtc: aggregateHourlyUtc,
@@ -465,13 +568,20 @@
             summarizeWeather: summarizeWeather,
             fmtKwh: fmtKwh,
             bestWindow: bestWindow,
-            historyFromResult: historyFromResult
+            historyFromResult: historyFromResult,
+            pickTariffRecord: pickTariffRecord,
+            tariffPriceOfHour: tariffPriceOfHour,
+            feeKwhAt: feeKwhAt,
+            allInDkkMwh: allInDkkMwh,
+            dispDkkMwh: dispDkkMwh,
+            combinedSeries: combinedSeries,
+            bestWindowEntries: bestWindowEntries
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
         // ---------- app (browser only) ----------
 
-        var state = { history: [], forecast: null };
+        var state = { history: [], forecast: null, tariffs: DEFAULT_TARIFFS, showFees: true };
 
         function feedback(message, kind) {
             var el = document.getElementById("feedback");
@@ -511,21 +621,21 @@
         function renderStats() {
             var corr = corrLag1(state.history);
             var maeLag1 = backtestMae(state.history, lag1Forecast, 7, HOURS_PER_DAY);
-            var tomorrowAvg = "—", cheapest = "—", maeTimestral = "—";
-            if (state.forecast && state.forecast.length) {
-                var sum = 0, minF = state.forecast[0];
-                state.forecast.forEach(function (f) {
-                    sum += f.median;
-                    if (f.median < minF.median) minF = f;
-                });
-                tomorrowAvg = fmtKwh(sum / state.forecast.length);
-                cheapest = minF.hour_dk.slice(5, 16);
+            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+            var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
+            var avg = "—", cheapest = "—", maeTimestral = "—";
+            if (series.length) {
+                var sum = 0, minE = series[0];
+                series.forEach(function (e) { sum += e.v; if (e.v < minE.v) minE = e; });
+                avg = fmtKwh(sum / series.length);
+                cheapest = minE.dk.slice(5, 16);
             }
             var items = [
                 ["CORR LAG-1", corr.toFixed(3), "var(--m-yellow)"],
                 ["MAE LAG-1 KR/KWH", maeLag1 == null ? "—" : fmtKwh(maeLag1), "var(--m-amber)"],
                 ["MAE TIMESTRAL KR/KWH", maeTimestral, "var(--m-orange)"],
-                ["FC AVG KR/KWH", tomorrowAvg, "var(--cream)"],
+                [state.showFees ? "AVG ALL-IN KR/KWH" : "FC AVG KR/KWH", avg, "var(--cream)"],
                 ["CHEAPEST HR", cheapest, "#8CFF6B"]
             ];
             if (state.workflowStats && state.workflowStats.wind_avg_ms != null) {
@@ -535,9 +645,9 @@
                 var t = state.workflowStats.mae_timestral_dkk;
                 items[2][1] = t == null ? "—" : fmtKwh(t);
             }
-            if (state.forecast && state.forecast.length) {
+            if (series.length) {
                 var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
-                var bw = bestWindow(state.forecast, evH);
+                var bw = bestWindowEntries(series, evH);
                 if (bw) items.push(["EV " + evH + "H FROM " + bw.start.slice(11, 16), fmtKwh(bw.avg) + " KR/KWH", "#8CFF6B"]);
             }
             document.getElementById("stats").innerHTML = items.map(function (it) {
@@ -552,52 +662,71 @@
             var history = state.history;
             var fc = state.forecast;
             if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
+            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
             var fcLen = fc && fc.length ? fc.length : HOURS_PER_DAY;
             var lastUtc = history.length ? history[history.length - 1].utc.getTime()
                                          : parseHourUtc(fc[0].hour_utc).getTime() - HOUR_MS;
-            var hist = history.slice(-5 * HOURS_PER_DAY);
+            var x0 = history.length ? nowMs : lastUtc;
             var x1 = lastUtc + Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
-            var x0 = hist.length ? hist[0].utc.getTime() : lastUtc - Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
-            var allVals = hist.map(function (p) { return p.price; });
+            if (x1 <= x0) x1 = x0 + HOURS_PER_DAY * HOUR_MS;
+            var series = combinedSeries(history, fc, nowMs, tariffs, state.showFees);
+            var allVals = series.map(function (e) { return e.v; });
             var lag1 = history.length ? lag1Forecast(history, Math.max(HOURS_PER_DAY, fcLen)) : [];
-            allVals = allVals.concat(lag1);
+            lag1.forEach(function (val, i) {
+                allVals.push(dispDkkMwh(val, lastUtc + (i + 1) * HOUR_MS, tariffs, state.showFees));
+            });
             if (fc) {
-                fc.forEach(function (f) { allVals.push(f.median, f.q10, f.q90); });
+                fc.forEach(function (f) {
+                    var t = parseHourUtc(f.hour_utc).getTime();
+                    allVals.push(dispDkkMwh(f.median, t, tariffs, state.showFees),
+                                 dispDkkMwh(f.q10, t, tariffs, state.showFees),
+                                 dispDkkMwh(f.q90, t, tariffs, state.showFees));
+                });
             }
+            if (!allVals.length) { svg.innerHTML = ""; return; }
             var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
             var pad = (yMax - yMin) * 0.08 || 1;
             var y0 = yMin - pad, y1 = yMax + pad;
             function X(t) { return padL + (t - x0) / (x1 - x0) * (W - padL - padR); }
             function Y(v) { return H - padB - (v - y0) / (y1 - y0) * (H - padT - padB); }
+            var steps = [250, 500, 1000, 2000, 5000, 10000], step = steps[steps.length - 1];
+            for (var si = 0; si < steps.length; si++) { if ((y1 - y0) / steps[si] <= 6) { step = steps[si]; break; } }
             var s = "";
-            for (var v = Math.ceil(y0 / 1000) * 1000; v <= y1; v += 1000) {
+            for (var v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
                 s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
-                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + (v / 1000).toFixed(1) + "</text>";
+                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
             }
             for (var t = x0; t <= x1; t += HOURS_PER_DAY * HOUR_MS) {
                 s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
                      '<text class="axis" x="' + (X(t) + 4) + '" y="' + (H - padB + 18) + '">' + dkLabel(new Date(t)).slice(5, 10) + "</text>";
             }
-            s += '<line class="now" x1="' + X(lastUtc) + '" y1="' + padT + '" x2="' + X(lastUtc) + '" y2="' + (H - padB) + '"/>' +
-                 '<text class="axis" x="' + X(lastUtc) + '" y="' + (padT + 12) + '" text-anchor="middle">LAST</text>';
-            if (hist.length) {
-                s += '<polyline class="line-hist" points="' + hist.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
-            }
-            var today = hist.slice(-HOURS_PER_DAY);
-            if (today.length) {
-                s += '<polyline class="line-today" points="' + today.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
-            }
-            var ahead = history.filter(function (p) { return p.utc.getTime() > lastUtc; });
-            if (ahead.length) {
-                s += '<polyline class="line-actual" points="' + ahead.map(function (p) { return X(p.utc.getTime()) + "," + Y(p.price); }).join(" ") + '"/>';
+            s += '<line class="now" x1="' + X(nowMs) + '" y1="' + padT + '" x2="' + X(nowMs) + '" y2="' + (H - padB) + '"/>' +
+                 '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + 12) + '" text-anchor="middle">NOW</text>';
+            var pub = series.filter(function (e) { return e.kind === "pub"; });
+            if (pub.length) {
+                s += '<polyline class="line-actual" points="' + pub.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
             }
             if (lag1.length) {
-                var lagPts = lag1.map(function (val, i) { return { t: lastUtc + (i + 1) * HOUR_MS, v: val }; });
-                s += '<polyline class="line-lag1" points="' + lagPts.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
+                var lagPts = lag1.map(function (val, i) {
+                    var t = lastUtc + (i + 1) * HOUR_MS;
+                    return X(t) + "," + Y(dispDkkMwh(val, t, tariffs, state.showFees));
+                });
+                s += '<polyline class="line-lag1" points="' + lagPts.join(" ") + '"/>';
+            }
+            var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+            var bw = series.length ? bestWindowEntries(series, evH) : null;
+            if (bw) {
+                s += '<rect class="ev-window" x="' + X(bw.startT) + '" y="' + padT + '" width="' + Math.max(4, X(bw.endT) - X(bw.startT)) + '" height="' + (H - padT - padB) + '"/>' +
+                     '<text class="axis" x="' + ((X(bw.startT) + X(bw.endT)) / 2) + '" y="' + (padT + 12) + '" text-anchor="middle">EV</text>';
             }
             if (fc) {
-                var fPts = fc.map(function (f, i) {
-                    return { t: lastUtc + (i + 1) * HOUR_MS, m: f.median, lo: f.q10, hi: f.q90 };
+                var fPts = fc.map(function (f) {
+                    var t = parseHourUtc(f.hour_utc).getTime();
+                    return { t: t,
+                             m: dispDkkMwh(f.median, t, tariffs, state.showFees),
+                             lo: dispDkkMwh(f.q10, t, tariffs, state.showFees),
+                             hi: dispDkkMwh(f.q90, t, tariffs, state.showFees) };
                 });
                 var band = fPts.map(function (p) { return X(p.t) + "," + Y(p.hi); }).join(" ") + " " +
                     fPts.slice().reverse().map(function (p) { return X(p.t) + "," + Y(p.lo); }).join(" ");
@@ -609,26 +738,87 @@
 
         function renderHours() {
             var el = document.getElementById("hours");
-            if (!state.forecast || !state.forecast.length) {
-                el.innerHTML = '<p class="dim">No forecast yet — press RUN TIMESTRAL (needs your API key); LOAD PRICES shows the lag-1 baseline on the chart.</p>';
+            var tariffs = state.tariffs || DEFAULT_TARIFFS;
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+            var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
+            if (!series.length) {
+                el.innerHTML = '<p class="dim">Nothing to show yet — LOAD PRICES (or RUN TIMESTRAL with your API key) fills the chart from the current hour.</p>';
                 return;
             }
+            var nPub = series.filter(function (e) { return e.kind === "pub"; }).length;
+            var nFc = series.length - nPub;
             document.getElementById("hoursTitle").textContent =
-                "NEXT " + state.forecast.length + "H — HOURLY FORECAST · KR/KWH";
-            var minF = state.forecast[0];
-            state.forecast.forEach(function (f) { if (f.median < minF.median) minF = f; });
-            el.innerHTML = state.forecast.map(function (f) {
-                var cls = f === minF ? "hour-cell cheapest" : "hour-cell";
-                return '<div class="' + cls + '"><span class="h">' + f.hour_dk.slice(5) + '</span>' +
-                    '<span class="v">' + fmtKwh(f.median) + ' kr/kWh</span>' +
-                    '<span class="r">q10–q90: ' + fmtKwh(f.q10) + "–" + fmtKwh(f.q90) + "</span></div>";
+                "FROM NOW — " + nPub + "H PUBLISHED" + (nFc ? " + " + nFc + "H FORECAST" : "") +
+                " · KR/KWH" + (state.showFees ? " · INCL. FEES" : "");
+            var minE = series[0];
+            series.forEach(function (e) { if (e.v < minE.v) minE = e; });
+            var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+            var bw = bestWindowEntries(series, evH);
+            el.innerHTML = series.map(function (e, i) {
+                var cls = "hour-cell";
+                if (e === minE) cls += " cheapest";
+                if (bw && i >= bw.idx && i < bw.idx + bw.len) cls += " ev";
+                var range = e.kind === "fc"
+                    ? '<span class="r">q10–q90: ' + fmtKwh(e.lo) + "–" + fmtKwh(e.hi) + "</span>"
+                    : '<span class="r">published day-ahead</span>';
+                return '<div class="' + cls + '"><span class="h">' + e.dk.slice(5) + '</span>' +
+                    '<span class="v">' + fmtKwh(e.v) + ' kr/kWh</span>' + range + "</div>";
             }).join("");
         }
 
         function renderAll() {
+            document.getElementById("chartTitle").textContent =
+                "PRICE CHART · KR/KWH" + (state.showFees ? " · INCL. FEES+VAT" : " · SPOT ONLY");
             renderStats();
             renderChart();
             renderHours();
+        }
+
+        function fetchTariffRecords(gln, notes, attempt) {
+            attempt = attempt || 1;
+            var params = new URLSearchParams({
+                filter: JSON.stringify({ GLN_Number: [gln], Note: notes }),
+                sort: "ValidFrom DESC",
+                limit: 60
+            });
+            return fetch(DATAHUB_URL + "?" + params.toString()).then(function (resp) {
+                if (!resp.ok) {
+                    if ((resp.status === 429 || resp.status >= 500) && attempt < 4) {
+                        return sleep(1500 * attempt).then(function () { return fetchTariffRecords(gln, notes, attempt + 1); });
+                    }
+                    throw new Error("DatahubPricelist HTTP " + resp.status);
+                }
+                return resp.json();
+            }).then(function (data) { return data.records || []; });
+        }
+
+        function groupTariffs(records) {
+            var g = {};
+            (records || []).forEach(function (r) {
+                if (!r.Note || FEE_NOTES.indexOf(r.Note) < 0) return;
+                (g[r.Note] = g[r.Note] || []).push(r);
+            });
+            return g;
+        }
+
+        function loadTariffs() {
+            var el = document.getElementById("feesLine");
+            Promise.all([
+                fetchTariffRecords(ENERGINET_GLN, ["Elafgift", "Systemtarif", "Transmissions nettarif"]),
+                fetchTariffRecords(N1_GLN, ["Nettarif C"])
+            ]).then(function (results) {
+                state.tariffs = groupTariffs(results[0].concat(results[1]));
+                try { localStorage.setItem("elspot_dk2_tariffs", JSON.stringify({ at: Date.now(), tariffs: state.tariffs })); } catch (e) {}
+                el.textContent = "Fees (live, DatahubPricelist): Energinet transmission+system tariff, N1 Nettarif C (night 00–06 low, peak 17–21), elafgift, +25% VAT.";
+                renderAll();
+            }).catch(function (err) {
+                var cached = null;
+                try { cached = JSON.parse(localStorage.getItem("elspot_dk2_tariffs") || "null"); } catch (e) {}
+                state.tariffs = (cached && cached.tariffs) || DEFAULT_TARIFFS;
+                el.textContent = "Fees (" + (cached ? "cached" : "built-in 2026 defaults") + "; DatahubPricelist unreachable: " + err.message +
+                    "): transmission+system, N1 Nettarif C, elafgift, +25% VAT.";
+                renderAll();
+            });
         }
 
         function loadPricesViaWorkflow(key) {
@@ -803,7 +993,13 @@
         function init() {
             document.getElementById("loadBtn").addEventListener("click", loadPrices);
             document.getElementById("runBtn").addEventListener("click", runTimestral);
+            document.getElementById("feesToggle").addEventListener("change", function (ev) {
+                state.showFees = ev.target.checked;
+                renderAll();
+            });
+            document.getElementById("evHours").addEventListener("change", renderAll);
             loadWeatherLine();
+            loadTariffs();
             try {
                 var saved = localStorage.getItem("elspot_dk2_api_key");
                 if (saved) document.getElementById("apiKey").value = saved;

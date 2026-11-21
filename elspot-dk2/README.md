@@ -37,11 +37,18 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    `GET /v1/workflows/executions/{id}` every 3 s, showing progress in the banner), which runs
    Timestral (default 28M checkpoint; 5M/123M/209M selectable) on the last 30 days and returns the
    forecast with q10–q90 quantiles plus a rolling backtest of Timestral vs the lag-1 baseline.
-3. The chart then overlays the **Timestral median** (orange dashes) and its **q10–q90 band** (red)
-   over the full horizon, and the hourly grid below lists every forecast hour in kr/kWh with its
+3. The chart shows **from the current hour only**: published day-ahead prices ahead of now (green),
+   then the **Timestral median** (orange dashes) with its **q10–q90 band** (red) over the full
+   horizon. The hourly grid below lists every hour from now (published + forecast) in kr/kWh with its
    q10–q90 range, cheapest highlighted.
-4. **EV charging**: the HUD stat `EV {4/6/8}H FROM …` (window length selectable) shows the cheapest
-   contiguous charging window in the forecast and its average price in kr/kWh.
+4. **EV charging**: the green shaded **EV window** on the chart marks the cheapest contiguous
+   `EV 4/6/8h` run from now (over published + forecast), and the HUD stat `EV {n}H FROM …` gives its
+   start time and average price.
+5. **All-in price**: with **INCL. FEES+VAT** ticked (default), prices include the mandatory per-kWh
+   fees from Energinet's `DatahubPricelist` — transmission + system tariff (Energinet), distribution
+   `Nettarif C` (N1 A/S, Zealand — low at night 00–06, peak 17–21), electricity tax (elafgift) — plus
+   25% VAT: all-in = (spot + fees) × 1.25. Untick for spot only. Tariffs are fetched live with
+   retry, cached in `localStorage`, with built-in 2026 defaults as fallback.
 
 No retraining is involved: Timestral is zero-shot — the price history is the inference context
 (up to 32K steps), with hour-of-day/weekday passed as known-future covariates.
@@ -50,6 +57,11 @@ No retraining is involved: Timestral is zero-shot — the price history is the i
 
 - **Data**: `GET https://api.energidataservice.dk/dataset/DayAheadPrices?filter={"PriceArea":["DK2"]}&start=…&sort=TimeUTC asc`
   — keyless, CORS-enabled; bucketed to hourly UTC (DST-proof), labels shown in Europe/Copenhagen.
+- **Fees**: `GET https://api.energidataservice.dk/dataset/DatahubPricelist?filter={"GLN_Number":[…],"Note":[…]}…`
+  — keyless, CORS-enabled. Energinet GLN `5790000432752` provides `Transmissions nettarif`,
+  `Systemtarif`, `Elafgift`; N1 A/S GLN `5790001089030` (Zealand/Copenhagen, DK2) provides the
+  household distribution tariff `Nettarif C`. Records carry `ValidFrom`/`ValidTo` validity windows
+  and `Price1..Price24` = local Danish hours 00–01 … 23–24 (flat charges set `Price1` only).
 - **Model**: the managed workflow deployment `dk2-elspot-forecast` (source: `elspot-dk2-workflows/` in
   this repo) runs `TimestralForecaster.from_pretrained("mistralai/Timestral-<size>")` (open weights,
   Modified MIT, CPU-only) on the hourly DKK/MWh series and forecasts `horizon_hours` steps ahead
