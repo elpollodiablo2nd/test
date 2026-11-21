@@ -281,8 +281,8 @@
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
                     <option value="5M">5M</option>
                     <option value="28M" selected>28M</option>
-                    <option value="123M">123M</option>
-                    <option value="209M">209M</option>
+                    <option value="123M" disabled>123M (too big on-device)</option>
+                    <option value="209M" disabled>209M (too big on-device)</option>
                 </select>
                 <select id="horizon" class="pixel" title="Forecast horizon">
                     <option value="24" selected>24h ahead</option>
@@ -978,7 +978,13 @@
         function onnxAvailable() { return typeof ort !== "undefined"; }
 
         function getOnnxSession(modelSize) {
-            if (state.onnxSession && state.onnxSessionSize === modelSize) return Promise.resolve(state.onnxSession);
+            state.onnxSessions = state.onnxSessions || {};
+            if (state.onnxSessions[modelSize]) return state.onnxSessions[modelSize];
+            state.onnxSessions[modelSize] = _createOnnxSession(modelSize); // cache the promise too: no double downloads
+            return state.onnxSessions[modelSize];
+        }
+
+        function _createOnnxSession(modelSize) {
             var url = ONNX_MODEL_URLS[modelSize];
             var p;
             if (url) {
@@ -1006,10 +1012,6 @@
                     ort.env.wasm.numThreads = 1;
                 }
                 return ort.InferenceSession.create(buf, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
-            }).then(function (session) {
-                state.onnxSession = session;
-                state.onnxSessionSize = modelSize;
-                return session;
             });
         }
 
