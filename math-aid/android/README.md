@@ -41,7 +41,7 @@ Uden secrets genererer CI en midlertidig nøgle — så er release-APK'en stadig
 ## Filer
 
 - `app/src/main/assets/` — hele web-appen (index.html, manifest.webmanifest, sw.js, ikoner). Opdater ved at kopiere nye filer fra `../`.
-- `app/src/main/java/ai/mistral/mathaid/MainActivity.kt` — WebView der loader `file:///android_asset/index.html`.
+- `app/src/main/java/ai/mistral/mathaid/MainActivity.java` — WebView der loader `file:///android_asset/index.html`. **Bemærk:** skrevet i Java med vilje — projektet har ingen Kotlin-plugin, så en `.kt`-fil bliver ignoreret ved build og APK'en crasher ved launch (tom `classes.dex`, `ClassNotFoundException`). Manifestet skal også deklarere `INTERNET`-tilladelsen.
 - `app/src/main/res/drawable/icon.png` — app-ikon (512px pixel M).
 
 ## Alternativ uden APK: installer som PWA
