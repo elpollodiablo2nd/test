@@ -11,8 +11,21 @@ Dette er et minimalt Android Studio-projekt, der pakker `../index.html` (sammen 
 3. Tilslut en telefon med USB-debugging, eller vælg en emulator.
 4. Klik **▶ Run** — så installeres appen direkte.
 5. Eller byg en APK-fil: **Build → Build Bundle(s) / APK(s) → Build APK(s)**.
-   - Debug-APK (ingen signering nødvendig, kan installeres direkte): `app/build/outputs/apk/debug/app-debug.apk`
-   - Release-APK til Play Store: lav først en signing key (Build → Generate Signed Bundle / APK → vælg eller opret keystore), så får du `app/build/outputs/apk/release/app-release.apk`.
+   - Debug-APK (auto-signeret med debug-nøgle, kan installeres direkte på egen telefon): `app/build/outputs/apk/debug/app-debug.apk`
+   - **Release-APK** (signeret, klar til deling/Play): `app/build/outputs/apk/release/app-release.apk`. Lokalt: sæt miljøvariablerne `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` (eller læg en `keystore.jks` i `app/`), så kører `gradle assembleRelease`.
+
+## Debug vs. release
+- **Debug**: signeres automatisk med en engangsnøgle — fin til at teste på din egen telefon (`adb install app-debug.apk`), men kan ikke opdateres over en tidligere installeret version.
+- **Release**: signeret med din egen nøgle. Til Play Store skal du bruge **samme nøgle ved hver opdatering**, så gem keystore et sikkert sted.
+
+## Automatisk build i CI (ingen lokal toolchain nødvendig)
+Workflowet `.github/workflows/build-apk.yml` bygger både `app-debug.apk` og signeret `app-release.apk` ved hvert push til `math-aid/**` (eller via **Run workflow** på fanen Actions). Download dem under **Actions → seneste run → Artifacts**.
+
+For at CI skal bruge din egen nøgle til release, opret disse repo-secrets (Settings → Secrets and variables → Actions):
+- `APP_KEYSTORE_BASE64` — din `.jks`/`.keystore` base64-encoded (`base64 -i keystore.jks`)
+- `APP_KEYSTORE_PASSWORD`, `APP_KEY_ALIAS`, `APP_KEY_PASSWORD`
+
+Uden secrets genererer CI en midlertidig nøgle — så er release-APK'en stadig signeret og installerbar, men kun én gang pr. build.
 
 ## Filer
 
