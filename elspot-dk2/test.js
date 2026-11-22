@@ -48,6 +48,15 @@ check("per-zone snapshots differ", Core.ZONES.DK1.snapshot !== Core.ZONES.DK2.sn
 check("DK1 default TREFOR tariff (night 0.0429, peak 0.3863)", Core.DEFAULT_TARIFFS.DK1["Nettarif C"][0].Price1 === 0.0429 && Core.DEFAULT_TARIFFS.DK1["Nettarif C"][0].Price18 === 0.3863);
 check("national fees present in both zones", !!(Core.DEFAULT_TARIFFS.DK1["Systemtarif"] && Core.DEFAULT_TARIFFS.DK1["Elafgift"] && Core.DEFAULT_TARIFFS.DK2["Transmissions nettarif"]));
 
+// xAxisDateLine: weekday+date only when the DK-local date changes between ticks
+// (2026-11-20T23:00Z = 2026-11-21 00:00 DK = Saturday; 2026-11-21T23:00Z = Sunday 2026-11-22)
+const xa = Core.xAxisDateLine(Date.UTC(2026, 10, 20, 23), null);
+check("xAxisDateLine first tick of DK day", xa.line === "Sat 11-21" && xa.date === "2026-11-21");
+const xb = Core.xAxisDateLine(Date.UTC(2026, 10, 21, 6), xa.date); // 07:00 DK, same DK day
+check("xAxisDateLine same DK day -> empty line", xb.line === "" && xb.date === "2026-11-21");
+const xc = Core.xAxisDateLine(Date.UTC(2026, 10, 21, 23), xb.date); // 2026-11-22 00:00 DK
+check("xAxisDateLine next DK day", xc.line === "Sun 11-22" && xc.date === "2026-11-22");
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 
