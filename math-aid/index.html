@@ -564,7 +564,7 @@
                 <span class="today-detail" id="today-detail">Ingen svar endnu i dag</span>
             </div>
             <canvas id="chart" width="640" height="240"></canvas>
-            <div class="chart-caption">% rigtige svar pr. dag — seneste 14 dage (gemmes lokalt på enheden)</div>
+            <div class="chart-caption">% rigtige svar pr. dag — seneste 14 dage · gemmes lokalt på enheden · kun første svar på en opgave tæller</div>
         </div>
 
         <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
@@ -588,7 +588,8 @@
             answer: 0,
             answerText: '',
             figure: '',
-            steps: []
+            steps: [],
+            attemptRecorded: false
         };
 
         const problemTypes = [
@@ -694,6 +695,7 @@
             document.getElementById('show-solution').textContent = '💡 Vis løsning';
             currentProblem.figure = '';
             currentProblem.answerText = '';
+            currentProblem.attemptRecorded = false;
 
             const types = moduleTypes[activeModule];
             const totalWeight = types.reduce((sum, p) => sum + p.weight, 0);
@@ -1311,7 +1313,12 @@
             const ans = currentProblem.answer;
             const tol = currentProblem.type === 'cirkel' ? Math.max(0.05, Math.abs(ans) * 0.01) : 1e-9 * Math.max(1, Math.abs(ans));
             const ok = Math.abs(guess - ans) <= tol;
-            recordAttempt(ok);
+            // Kun første svar på en opgave tæller i statistikken (dagens %, graf og sessionsstatistik)
+            const firstTry = !currentProblem.attemptRecorded;
+            if (firstTry) {
+                recordAttempt(ok);
+                currentProblem.attemptRecorded = true;
+            }
             if (ok) {
                 let expr;
                 if (currentProblem.type === 'equation') {
@@ -1322,13 +1329,15 @@
                 } else {
                     expr = `${currentProblem.problem} = ${currentProblem.answerText || formatNumber(ans)}`;
                 }
-                showFeedback(true, `✅ KORREKT! ${expr}`);
+                showFeedback(true, `✅ KORREKT! ${expr}${firstTry ? '' : ' (statistikken tæller kun første svar)'}`);
                 input.disabled = true;
-                stats[activeModule].total++;
-                stats[activeModule][currentProblem.type]++;
-                renderStats();
+                if (firstTry) {
+                    stats[activeModule].total++;
+                    stats[activeModule][currentProblem.type]++;
+                    renderStats();
+                }
             } else {
-                showFeedback(false, '❌ Forkert — prøv igen!');
+                showFeedback(false, firstTry ? '❌ Forkert — prøv igen! (tæller i statistikken)' : '❌ Forkert — prøv igen! (tæller ikke — kun første svar tæller)');
             }
         }
 
