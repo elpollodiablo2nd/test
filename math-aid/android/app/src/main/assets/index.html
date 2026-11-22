@@ -1433,12 +1433,13 @@
             const ctx = canvas.getContext('2d');
             const W = canvas.width;
             const H = canvas.height;
-            const top = 18, bottom = 34, left = 36, right = 8;
+            const top = 16, bottom = 46, left = 48, right = 8;
             const baseY = H - bottom;
             const plotH = H - top - bottom;
             ctx.fillStyle = '#150C24';
             ctx.fillRect(0, 0, W, H);
-            ctx.font = '15px VT323, monospace';
+            // større tal på akserne
+            ctx.font = '19px VT323, monospace';
             for (let s = 0; s <= gridSteps; s++) {
                 const y = baseY - (s / gridSteps) * plotH;
                 ctx.strokeStyle = 'rgba(255,250,235,0.15)';
@@ -1446,8 +1447,8 @@
                 ctx.moveTo(left, y);
                 ctx.lineTo(W - right, y);
                 ctx.stroke();
-                ctx.fillStyle = 'rgba(255,250,235,0.65)';
-                ctx.fillText(fmtVal((yMax / gridSteps) * s), 2, y + 4);
+                ctx.fillStyle = 'rgba(255,250,235,0.75)';
+                ctx.fillText(fmtVal((yMax / gridSteps) * s), 2, y + 5);
             }
             const slot = (W - left - right) / days.length;
             const barW = Math.max(6, Math.floor(slot) - 8);
@@ -1458,13 +1459,15 @@
                 const bh = stub ? 4 : Math.max(val === 0 ? 0 : 2, (val / yMax) * plotH);
                 ctx.fillStyle = stub ? 'rgba(255,250,235,0.12)' : colorFor(val);
                 ctx.fillRect(x, baseY - bh, barW, bh);
-                // tallet UNDER hver søjle, datoen nederst
+                // stort ORANGE tal UNDER hver søjle, datoen nederst
                 if (!stub) {
-                    ctx.fillStyle = 'rgba(255,250,235,0.95)';
-                    ctx.fillText(fmtVal(val), x - 2, baseY + 16);
+                    ctx.font = '24px VT323, monospace';
+                    ctx.fillStyle = '#FF8205';
+                    ctx.fillText(fmtVal(val), x - 2, baseY + 27);
                 }
+                ctx.font = '15px VT323, monospace';
                 ctx.fillStyle = 'rgba(255,250,235,0.6)';
-                ctx.fillText(day.label, x - 2, baseY + 30);
+                ctx.fillText(day.label, x - 2, baseY + 42);
             });
         }
 
