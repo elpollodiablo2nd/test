@@ -67,6 +67,17 @@ const fpB = [{ utc: new Date(Date.UTC(2026, 10, 22, 10)), price: 3 }];
 check("fresherPoints picks later last point", Core.fresherPoints(fpA, fpB) === fpB && Core.fresherPoints(fpB, fpA) === fpB);
 check("fresherPoints null-safe", Core.fresherPoints(null, fpA) === fpA && Core.fresherPoints(fpA, null) === fpA && Core.fresherPoints(null, null) == null);
 
+// nearestSeriesEntry / tipLines (chart hover tooltip)
+const tsA = { t: Date.UTC(2026, 10, 22, 10), dk: "2026-11-22 11:00", v: 1.234, kind: "pub", lo: null, hi: null };
+const tsB = { t: Date.UTC(2026, 10, 22, 11), dk: "2026-11-22 12:00", v: 1.5, kind: "fc", lo: 1.1, hi: 1.9 };
+const tipS = [tsA, tsB];
+check("nearestSeriesEntry exact", Core.nearestSeriesEntry(tipS, Date.UTC(2026, 10, 22, 10)) === tsA);
+check("nearestSeriesEntry between rounds to nearest", Core.nearestSeriesEntry(tipS, Date.UTC(2026, 10, 22, 10) + 30 * 60e3) === tsA && Core.nearestSeriesEntry(tipS, Date.UTC(2026, 10, 22, 10) + 31 * 60e3) === tsB);
+check("nearestSeriesEntry empty -> null", Core.nearestSeriesEntry([], 0) == null);
+const tlF = Core.tipLines(tsB, 1.4);
+check("tipLines forecast = label + median + q10-q90 + lag-1", tlF[0][0] === "22/11 12:00" && tlF[1][0].indexOf("median") > 0 && tlF[2][0].indexOf("q10") === 0 && tlF[3][0].indexOf("lag-1") === 0);
+check("tipLines published", Core.tipLines(tsA, null)[1][0].indexOf("published") > 0 && Core.tipLines(tsA, null).length === 2);
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 

@@ -160,6 +160,7 @@
         .stat-label { font-size: 1.05rem; opacity: 0.95; }
 
         .screen {
+            position: relative;
             color: var(--cream);
             background:
                 repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
@@ -169,7 +170,13 @@
             padding: 0.7rem;
         }
 
-        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; }
+        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; touch-action: pan-y; cursor: crosshair; }
+        #chartTip {
+            position: absolute; top: 8px; transform: translateX(-50%);
+            background: #0B0714; border: 3px solid var(--ink); box-shadow: 3px 3px 0 #000;
+            padding: 0.35rem 0.6rem; font-family: 'VT323', monospace; font-size: 1.15rem;
+            color: var(--cream); white-space: nowrap; pointer-events: none; z-index: 5; line-height: 1.25;
+        }
         #chart .grid { stroke: rgba(255, 250, 235, 0.25); stroke-width: 2; }
         #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
         #chart .axis {
@@ -257,6 +264,7 @@
             <h2 id="chartTitle">PRICE CHART · KR/KWH</h2>
             <div class="screen">
                 <svg id="chart" viewBox="0 0 760 460" role="img" aria-label="Hourly day-ahead prices and forecast"></svg>
+                <div id="chartTip" hidden></div>
                 <div class="legend">
                     <span class="l-actual">published ahead (day-ahead)</span>
                     <span class="l-lag1">lag-1 baseline</span>
@@ -388,6 +396,28 @@
             if (!a || !a.length) return b;
             if (!b || !b.length) return a;
             return a[a.length - 1].utc >= b[b.length - 1].utc ? a : b;
+        }
+
+        function nearestSeriesEntry(series, tMs) {
+            var best = null, bd = Infinity;
+            for (var i = 0; i < series.length; i++) {
+                var d = Math.abs(series[i].t - tMs);
+                if (d < bd) { bd = d; best = series[i]; }
+            }
+            return best;
+        }
+
+        // tooltip lines for a traced chart point: [[text, color], ...]
+        function tipLines(e, lag1Val) {
+            var out = [[dkShort(e.dk), "var(--cream)"]];
+            if (e.kind === "fc") {
+                out.push([fmtKwh(e.v) + " kr/kWh · median", "var(--m-orange)"]);
+                if (e.lo != null && e.hi != null) out.push(["q10–q90 " + fmtKwh(e.lo) + "–" + fmtKwh(e.hi) + " kr/kWh", "#E10500"]);
+            } else {
+                out.push([fmtKwh(e.v) + " kr/kWh · published", "#8CFF6B"]);
+            }
+            if (lag1Val != null) out.push(["lag-1 " + fmtKwh(lag1Val) + " kr/kWh", "var(--cream)"]);
+            return out;
         }
 
         function dkDay(dkStr) { return dkStr.slice(8, 10) + "/" + dkStr.slice(5, 7); } // "26/11"
@@ -707,6 +737,8 @@
             zoneConfig: zoneConfig,
             xAxisDateLine: xAxisDateLine,
             fresherPoints: fresherPoints,
+            nearestSeriesEntry: nearestSeriesEntry,
+            tipLines: tipLines,
             dkDay: dkDay,
             dkShort: dkShort
         };
@@ -839,12 +871,12 @@
             if (pub.length) {
                 s += '<polyline class="line-actual" points="' + pub.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
             }
-            if (lag1.length) {
-                var lagPts = lag1.map(function (val, i) {
-                    var t = lastUtc + (i + 1) * HOUR_MS;
-                    return X(t) + "," + Y(dispDkkMwh(val, t, tariffs, state.showFees));
-                });
-                s += '<polyline class="line-lag1" points="' + lagPts.join(" ") + '"/>';
+            var lag1Tip = lag1.map(function (val, i) {
+                var t = lastUtc + (i + 1) * HOUR_MS;
+                return { t: t, v: dispDkkMwh(val, t, tariffs, state.showFees) };
+            });
+            if (lag1Tip.length) {
+                s += '<polyline class="line-lag1" points="' + lag1Tip.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
             }
             var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
             var bw = series.length ? bestWindowEntries(series, evH) : null;
@@ -865,7 +897,10 @@
                 s += '<polygon class="band" points="' + band + '"/>';
                 s += '<polyline class="line-fc" points="' + fPts.map(function (p) { return X(p.t) + "," + Y(p.m); }).join(" ") + '"/>';
             }
+            s += '<line id="tipLine" y1="' + padT + '" y2="' + (H - padB) + '" stroke="rgba(255,250,235,0.75)" stroke-width="2" stroke-dasharray="4 4" style="display:none"/>' +
+                 '<circle id="tipDot" r="6" fill="#FFFAEB" stroke="#000000" stroke-width="2" style="display:none"/>';
             svg.innerHTML = s;
+            state.chartGeom = { W: W, H: H, padL: padL, padR: padR, x0: x0, x1: x1, X: X, Y: Y, series: series, lag1: lag1Tip };
         }
 
         function renderHours() {
@@ -1203,6 +1238,41 @@
             loadPrices();
         }
 
+        function hideChartTip() {
+            var tip = document.getElementById("chartTip");
+            if (tip) tip.hidden = true;
+            var svg = document.getElementById("chart");
+            var line = svg.querySelector("#tipLine"), dot = svg.querySelector("#tipDot");
+            if (line) line.style.display = "none";
+            if (dot) dot.style.display = "none";
+        }
+
+        function onChartMove(ev) {
+            var g = state.chartGeom;
+            var svg = document.getElementById("chart");
+            var tip = document.getElementById("chartTip");
+            if (!g || !g.series.length) { hideChartTip(); return; }
+            var rect = svg.getBoundingClientRect();
+            if (!rect.width) return;
+            var px = (ev.clientX - rect.left) * (g.W / rect.width);
+            if (px < g.padL || px > g.W - g.padR) { hideChartTip(); return; }
+            var t = g.x0 + (px - g.padL) / (g.W - g.padL - g.padR) * (g.x1 - g.x0);
+            t = Math.max(g.x0, Math.min(g.x1, Math.round(t / HOUR_MS) * HOUR_MS));
+            var e = nearestSeriesEntry(g.series, t);
+            if (!e) { hideChartTip(); return; }
+            var lag1Val = null;
+            for (var i = 0; i < g.lag1.length; i++) if (g.lag1[i].t === e.t) lag1Val = g.lag1[i].v;
+            var x = g.X(e.t), y = g.Y(e.v);
+            var line = svg.querySelector("#tipLine"), dot = svg.querySelector("#tipDot");
+            if (line) { line.style.display = ""; line.setAttribute("x1", x); line.setAttribute("x2", x); }
+            if (dot) { dot.style.display = ""; dot.setAttribute("cx", x); dot.setAttribute("cy", y); }
+            tip.innerHTML = tipLines(e, lag1Val).map(function (l) {
+                return '<div style="color:' + l[1] + '">' + l[0] + "</div>";
+            }).join("");
+            tip.hidden = false;
+            tip.style.left = Math.max(14, Math.min(86, x / g.W * 100)) + "%";
+        }
+
         function init() {
             document.getElementById("aboutBtn").addEventListener("click", function () {
                 var panel = document.getElementById("aboutPanel");
@@ -1221,6 +1291,11 @@
                 renderAll();
             });
             document.getElementById("evHours").addEventListener("change", renderAll);
+            var chartSvg = document.getElementById("chart");
+            chartSvg.addEventListener("pointermove", onChartMove);
+            chartSvg.addEventListener("pointerdown", onChartMove);
+            chartSvg.addEventListener("pointerleave", hideChartTip);
+            chartSvg.addEventListener("pointercancel", hideChartTip);
             loadWeatherLine();
             loadTariffs();
             loadPrices();
