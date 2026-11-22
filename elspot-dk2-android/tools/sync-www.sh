@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 cp ../elspot-dk2/index.html www/index.html
 cp ../elspot-dk2/icon.svg www/icon.svg
+cp ../elspot-dk2/chonck.svg www/chonck.svg
 python3 - <<'PY'
 import io
 p = "www/index.html"
