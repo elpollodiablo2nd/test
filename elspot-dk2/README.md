@@ -56,20 +56,29 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
 No retraining is involved: Timestral is zero-shot — the price history is the inference context
 (up to 32K steps), with hour-of-day/weekday passed as known-future covariates.
 
-### Covariates & full-year backtest (DK2, Timestral-28M; 82 rolling origins every 5 days, 168h context, 72h horizon, 60/40 temporal split, calibrated q10–q90)
+### Covariates, full-year backtest & error localization (DK2, Timestral-28M)
 
-| known covariates | h24 MAE% | h48 MAE% | h72 MAE% | q10–q90 coverage raw → conformal |
+82 rolling origins every 5 days, 168h context, 72h horizon, 60/40 temporal split, test-set MAE% of mean actual.
+**App-faithful**: neighbour day-ahead prices are only published up to ~+36h past each origin, so they are masked
+(NaN) beyond that in these runs — the earlier h48/h72 numbers without masking were leakage-inflated.
+
+| known covariates | h24 | h48 | h72 | q10–q90 coverage raw → conformal (h24/h48/h72) |
 |---|---|---|---|---|
 | spot only | 16.5 | 22.6 | 23.5 | 54% → 93% |
-| + weather (Open-Meteo wind/temp/solar) | 16.4 | 22.5 | 23.5 | 55% → 93% |
-| + DE/SE3 day-ahead neighbour prices | **4.30** | **7.19** | **8.01** | 85% → 93% |
-| + neighbours + wind/solar generation forecast (Energinet `Forecasts_Hour`) | 4.31 | 7.21 | 8.02 | 86% → 93% |
+| + weather (Open-Meteo wind/temp/solar) | 14.1 | 19.9 | 20.5 | 72% → 93% |
+| + DE/SE3 day-ahead neighbours | 4.13 | 9.11 | 13.27 | 86% → 94% |
+| + weather + neighbours (shipped config) | **3.97** | **8.68** | **12.34** | 90/82/72% → 95/92/91% |
+| + neighbours + wind/solar generation forecast (`Forecasts_Hour`) | 4.32 | 9.40 | 13.53 | worse — generation forecast adds nothing |
 
-Wind/solar effects on price — including negative-price hours in high wind — are captured by the DE/SE3
-day-ahead covariates (Q4/windy quarter improves 22.2% → 7.0% h24); weather and generation-forecast covariates add
-nothing on top. The model's built-in non-negative clamp (active only when the recent context has no negative hour)
-measured better than an unclamped run on negative-price hours (MAE 41 vs 82 DKK/MWh on those hours), so it is kept.
-DK1 (west) with neighbours: h24 4.29% / h48 7.27% / h72 8.13%. 5M with neighbours: 5.2% / 8.2% / 9.0%.
+5M with weather+neighbours: 5.34 / 9.38 / 12.89%. DK1 (west) neighbours: 4.29 / 7.27 / 8.13% (unmasked h48/h72).
+
+**Error localization** (per-hour analysis of the shipped config): MAE grows with horizon — rel 1–24: 69, 25–48: 197,
+49–72: 335 DKK/MWh — and **every one of the top-20 errors is at rel ≥ 42 where DE/SE3 are NaN** (MAE 325 on
+neighbour-NaN hours vs 82 when present). Errors also peak in the 16–19 UTC price peak. Gust events (3h price drop
+>300 DKK/MWh with wind +8 m/s; 36 in the year) are forecast about as well as average when neighbours are published
+(the German day-ahead moves with the same wind), and 92% of the 109 negative-price hours had wind10m > 15 m/s.
+Negative-price hours: MAE 32 DKK/MWh with the non-negative clamp (kept — unclamped measured worse, 82).
+Skipped weather indicators: none — 0 of 864 app input hours missing (Open-Meteo 32d archive + 7d forecast covers the window).
 
 ## How it works
 
