@@ -78,6 +78,10 @@ const tlF = Core.tipLines(tsB, 1.4);
 check("tipLines forecast = label + median + q10-q90 + lag-1", tlF[0][0] === "22/11 12:00" && tlF[1][0].indexOf("median") > 0 && tlF[2][0].indexOf("q10") === 0 && tlF[3][0].indexOf("lag-1") === 0);
 check("tipLines published", Core.tipLines(tsA, null)[1][0].indexOf("published") > 0 && Core.tipLines(tsA, null).length === 2);
 
+// modelCacheKey: bundled models are not cached, downloadable ones are
+check("modelCacheKey 5M bundled -> null", Core.modelCacheKey("5M") === null);
+check("modelCacheKey 28M parts -> cache URL", /28M\.onnx$/.test(Core.modelCacheKey("28M")));
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 

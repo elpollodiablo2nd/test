@@ -246,7 +246,7 @@
             <h2>ABOUT · HOW IT WORKS · SOURCES</h2>
             <p class="dim"><b>elspot</b> forecasts day-ahead electricity prices in Denmark — pick <b>DK2 · EAST</b> (default) or <b>DK1 · WEST</b> in the RUN card (remembered). Timestral runs <b>on-device via ONNX</b>: no API key, no server.</p>
             <p><b>What to push:</b> 1) prices load automatically — live from Energinet with retries/Retry-After; if that fails on this network (common on shared mobile IPs, remembered for 1h), it falls back to the <b>remote Pages snapshot</b> (refreshed every 30 min by a GitHub Actions job, which itself falls back to Nord Pool), then the local cache (freshest wins), then the snapshot bundled in the APK. The banner always names the source; <b>LOAD PRICES</b> forces a live retry;
-            2) optionally pick the model (<b>5M</b> bundled in the APK; <b>28M</b> downloaded once from Pages and kept in memory — switching models never re-downloads; 123M/209M disabled, too big on-device), the <b>horizon</b> (24/48/72h) and the <b>EV window</b> (4/6/8h);
+            2) optionally pick the model (<b>5M</b> bundled in the APK; <b>28M</b> downloaded once from Pages, then stored in the app cache — it survives app restarts and switching models never re-downloads; 123M/209M disabled, too big on-device), the <b>horizon</b> (24/48/72h) and the <b>EV window</b> (4/6/8h);
             3) press <b>RUN TIMESTRAL</b> — the ONNX-exported Timestral runs on this device in ~1–5 s.</p>
             <p><b>What to expect:</b> the app fetches weather (Open-Meteo at the zone's location — Copenhagen for DK2, Esbjerg for DK1) and runs the model with wind/temp/solar covariates plus hour-of-day/weekday encodings. The chart shows <b>from the current hour</b>: published day-ahead prices ahead of now (green), the cream dashed <b>lag-1 baseline</b> (tomorrow ≈ today), the orange dashed <b>median</b> forecast with the red <b>q10–q90 band</b>, the NOW line, and the green shaded <b>EV charge window</b>. The x-axis shows time of day plus <b>weekday + date (DD/MM)</b> at each day boundary, with an adaptive step (1h…96h depending on the window). The HUD shows the cheapest hour and the EV window; the grid lists every hour from now. Prices are in <b>kr/kWh</b> (source data is DKK/MWh ÷ 1000); with <b>INCL. FEES+VAT</b> ticked they include the mandatory fees — Energinet transmission+system tariff + elafgift (national) and the DSO Nettarif C (N1 for DK2, TREFOR for DK1; low at night, peak 17–21) — fetched live from DatahubPricelist with all ValidFrom/ValidTo windows, so seasonal/quarterly tariff changes are automatic, plus 25% VAT: what you actually pay per kWh.</p>
             <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK1/DK2)</a>, day-ahead, published daily ~13:00 CET.
@@ -396,6 +396,10 @@
             if (!a || !a.length) return b;
             if (!b || !b.length) return a;
             return a[a.length - 1].utc >= b[b.length - 1].utc ? a : b;
+        }
+
+        function modelCacheKey(modelSize) {
+            return ONNX_MODEL_URLS[modelSize] ? null : "https://elspot.app/cache/models/" + modelSize + ".onnx";
         }
 
         function nearestSeriesEntry(series, tMs) {
@@ -738,6 +742,7 @@
             xAxisDateLine: xAxisDateLine,
             fresherPoints: fresherPoints,
             nearestSeriesEntry: nearestSeriesEntry,
+            modelCacheKey: modelCacheKey,
             tipLines: tipLines,
             dkDay: dkDay,
             dkShort: dkShort
@@ -1086,15 +1091,14 @@
             return state.onnxSessions[modelSize];
         }
 
-        function _createOnnxSession(modelSize) {
-            var url = ONNX_MODEL_URLS[modelSize];
-            var p;
+        function downloadModelBytes(modelSize, url) {
             if (url) {
                 url = new URL(url, window.location.href).href; // absolute: WebView import()/fetch need it
-                p = fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
-            } else if (ONNX_MODEL_PARTS[modelSize]) {
-                feedback("Downloading on-device model " + modelSize + " (~113 MB in 4 parts, one time)…", "correct");
-                p = Promise.all(ONNX_MODEL_PARTS[modelSize].map(function (u) {
+                return fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
+            }
+            if (ONNX_MODEL_PARTS[modelSize]) {
+                feedback("Downloading on-device model " + modelSize + " (~113 MB in 4 parts, one time; then cached in the app)…", "correct");
+                return Promise.all(ONNX_MODEL_PARTS[modelSize].map(function (u) {
                     return fetch(u).then(function (r) { if (!r.ok) throw new Error("model part HTTP " + r.status + " " + u); return r.arrayBuffer(); });
                 })).then(function (bufs) {
                     var total = bufs.reduce(function (a, b) { return a + b.byteLength; }, 0);
@@ -1102,9 +1106,31 @@
                     bufs.forEach(function (b) { out.set(new Uint8Array(b), off); off += b.byteLength; });
                     return out.buffer;
                 });
-            } else {
-                return Promise.reject(new Error("no on-device model for " + modelSize + " — use 5M/28M or SERVER mode"));
             }
+            return Promise.reject(new Error("no on-device model for " + modelSize + " — use 5M/28M"));
+        }
+
+        // downloaded models (28M parts) persist in the WebView CacheStorage across app restarts
+        function modelBytes(modelSize, url) {
+            var ck = modelCacheKey(modelSize);
+            if (!ck || typeof caches === "undefined") return downloadModelBytes(modelSize, url);
+            return caches.open("elspot-onnx-models").then(function (c) { return c.match(ck); }).then(function (resp) {
+                if (resp) return resp.arrayBuffer().then(function (buf) {
+                    feedback("Model " + modelSize + " restored from the app cache — no download needed.", "correct");
+                    return buf;
+                });
+                return null;
+            }).catch(function () { return null; }).then(function (buf) {
+                if (buf) return buf;
+                return downloadModelBytes(modelSize, url).then(function (b) {
+                    caches.open("elspot-onnx-models").then(function (c) { return c.put(ck, new Response(b)); }).catch(function () {});
+                    return b;
+                });
+            });
+        }
+
+        function _createOnnxSession(modelSize) {
+            var p = modelBytes(modelSize, ONNX_MODEL_URLS[modelSize]);
             return p.then(function (buf) {
                 if (typeof ort !== "undefined") {
                     // absolute URLs (bare "vendor/..." specifiers fail in a WebView dynamic import);
