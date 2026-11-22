@@ -457,7 +457,13 @@
             opacity: 0.75;
         }
 
-        #chart {
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .charts canvas {
             width: 100%;
             height: auto;
             background: var(--screen);
@@ -501,6 +507,7 @@
             .stats { grid-template-columns: repeat(2, 1fr); }
             .math-card { padding: 1.25rem; }
             .figure svg { width: 170px; }
+            .charts { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -563,8 +570,17 @@
                 <span class="today-pct" id="today-pct">–</span>
                 <span class="today-detail" id="today-detail">Ingen svar endnu i dag</span>
             </div>
-            <canvas id="chart" width="640" height="240"></canvas>
-            <div class="chart-caption">% rigtige svar pr. dag — seneste 14 dage · gemmes lokalt på enheden · kun første svar på en opgave tæller</div>
+            <div class="charts">
+                <div>
+                    <canvas id="chart" width="560" height="240"></canvas>
+                    <div class="chart-caption">% rigtige pr. dag — seneste 7 dage</div>
+                </div>
+                <div>
+                    <canvas id="chart-counts" width="560" height="240"></canvas>
+                    <div class="chart-caption">Besvarede opgaver pr. dag — seneste 7 dage</div>
+                </div>
+            </div>
+            <div class="chart-caption">Gemmes lokalt på enheden · kun første svar på en opgave tæller · tallet står under hver søjle</div>
         </div>
 
         <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
@@ -1386,51 +1402,69 @@
                 pctEl.style.color = pct >= 75 ? 'var(--m-orange-dark)' : pct >= 50 ? '#B36A00' : 'var(--m-red)';
                 detEl.textContent = `${t.correct} af ${t.total} svar rigtige i dag`;
             }
-            drawChart(h);
+            const days = lastNDays(h, 7);
+            const pctColors = ['#E10500', '#FA500F', '#FF8205', '#FFAF00', '#FFD800'];
+            drawBars('chart', days,
+                (d) => (d.entry && d.entry.total > 0 ? (d.entry.correct / d.entry.total) * 100 : null),
+                (v) => Math.round(v) + '%',
+                (v) => pctColors[Math.min(4, Math.floor(v / 25))],
+                100, 4);
+            const maxCount = Math.max(1, ...days.map((d) => (d.entry ? d.entry.total : 0)));
+            drawBars('chart-counts', days,
+                (d) => (d.entry ? d.entry.total : 0),
+                (v) => String(Math.round(v)),
+                () => '#FF8205',
+                maxCount, Math.min(maxCount, 8));
         }
 
-        function drawChart(h) {
-            const canvas = document.getElementById('chart');
+        function lastNDays(h, n) {
+            const days = [];
+            const now = new Date();
+            for (let i = n - 1; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+                days.push({ label: d.getDate() + '/' + (d.getMonth() + 1), entry: h[dateKey(d)] || null });
+            }
+            return days;
+        }
+
+        function drawBars(canvasId, days, getVal, fmtVal, colorFor, yMax, gridSteps) {
+            const canvas = document.getElementById(canvasId);
             if (!canvas || !canvas.getContext) return;
             const ctx = canvas.getContext('2d');
             const W = canvas.width;
             const H = canvas.height;
-            const top = 20, bottom = 30, left = 42, right = 10;
+            const top = 18, bottom = 34, left = 36, right = 8;
+            const baseY = H - bottom;
+            const plotH = H - top - bottom;
             ctx.fillStyle = '#150C24';
             ctx.fillRect(0, 0, W, H);
-            ctx.font = '14px VT323, monospace';
-            for (let p = 0; p <= 100; p += 25) {
-                const y = H - bottom - (p / 100) * (H - top - bottom);
+            ctx.font = '15px VT323, monospace';
+            for (let s = 0; s <= gridSteps; s++) {
+                const y = baseY - (s / gridSteps) * plotH;
                 ctx.strokeStyle = 'rgba(255,250,235,0.15)';
                 ctx.beginPath();
                 ctx.moveTo(left, y);
                 ctx.lineTo(W - right, y);
                 ctx.stroke();
                 ctx.fillStyle = 'rgba(255,250,235,0.65)';
-                ctx.fillText(p + '%', 4, y + 4);
-            }
-            const days = [];
-            const now = new Date();
-            for (let i = 13; i >= 0; i--) {
-                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-                days.push({ label: d.getDate() + '/' + (d.getMonth() + 1), entry: h[dateKey(d)] || null });
+                ctx.fillText(fmtVal((yMax / gridSteps) * s), 2, y + 4);
             }
             const slot = (W - left - right) / days.length;
-            const barW = Math.max(6, Math.floor(slot) - 6);
-            const colors = ['#E10500', '#FA500F', '#FF8205', '#FFAF00', '#FFD800'];
-            const baseY = H - bottom;
+            const barW = Math.max(6, Math.floor(slot) - 8);
             days.forEach((day, i) => {
                 const x = left + i * slot + (slot - barW) / 2;
-                let pct = null;
-                if (day.entry && day.entry.total > 0) pct = (day.entry.correct / day.entry.total) * 100;
-                const bh = pct === null ? 4 : Math.max(2, (pct / 100) * (H - top - bottom));
-                ctx.fillStyle = pct === null ? 'rgba(255,250,235,0.12)' : colors[Math.min(4, Math.floor(pct / 25))];
+                const val = getVal(day);
+                const stub = val === null;
+                const bh = stub ? 4 : Math.max(val === 0 ? 0 : 2, (val / yMax) * plotH);
+                ctx.fillStyle = stub ? 'rgba(255,250,235,0.12)' : colorFor(val);
                 ctx.fillRect(x, baseY - bh, barW, bh);
-                ctx.fillStyle = 'rgba(255,250,235,0.75)';
-                ctx.fillText(day.label, x - 4, H - 10);
-                if (pct !== null) {
-                    ctx.fillText(String(Math.round(pct)), x, baseY - bh - 6);
+                // tallet UNDER hver søjle, datoen nederst
+                if (!stub) {
+                    ctx.fillStyle = 'rgba(255,250,235,0.95)';
+                    ctx.fillText(fmtVal(val), x - 2, baseY + 16);
                 }
+                ctx.fillStyle = 'rgba(255,250,235,0.6)';
+                ctx.fillText(day.label, x - 2, baseY + 30);
             });
         }
 
