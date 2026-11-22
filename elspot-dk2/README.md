@@ -22,9 +22,12 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    (`DayAheadPrices`, `PriceArea=DK1|DK2`; quarter-hourly since 2025-10-01, aggregated to hourly).
    Energinet occasionally answers **429 (rate limited)** or is unreachable from the device — the page
    retries up to 6 times, honoring `Retry-After` (capped at 60 s) with jittered backoff, and then falls
-   back, in order, to the **cached copy** from the last successful load (`localStorage`, with timestamp)
-   and to a **bundled snapshot** (`assets/prices-dk1.json` / `prices-dk2.json`, refreshed at app
-   build time by `tools/fetch_prices_snapshot.py`). The banner always says which source was used.
+   back, in order, to the **remote Pages snapshot** (`elspot-dk2/assets/prices-dk1.json` /
+   `prices-dk2.json`, refreshed every 3h by the GitHub Actions job
+   `.github/workflows/refresh-elspot-snapshots.yml`, which itself falls back to the Nord Pool
+   data-portal API when Energinet rate-limits the runner), the **cached copy** from the last
+   successful load (`localStorage`, with timestamp; the freshest of the two is shown), and finally
+   the **snapshot bundled in the APK** (refreshed at app build time). The banner always says which source was used.
    Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
    **lag-1 baseline** (tomorrow ≈ today), and the HUD shows the day-to-day correlation and the

@@ -61,6 +61,12 @@ check("xAxisDateLine next DK day", xc.line === "Sun 22/11" && xc.date === "2026-
 check("dkDay DD/MM", Core.dkDay("2026-11-26 14:00") === "26/11");
 check("dkShort DD/MM HH:00", Core.dkShort("2026-11-26 14:00") === "26/11 14:00");
 
+// fresherPoints: pick the series ending later
+const fpA = [{ utc: new Date(Date.UTC(2026, 10, 20, 10)), price: 1 }, { utc: new Date(Date.UTC(2026, 10, 21, 10)), price: 2 }];
+const fpB = [{ utc: new Date(Date.UTC(2026, 10, 22, 10)), price: 3 }];
+check("fresherPoints picks later last point", Core.fresherPoints(fpA, fpB) === fpB && Core.fresherPoints(fpB, fpA) === fpB);
+check("fresherPoints null-safe", Core.fresherPoints(null, fpA) === fpA && Core.fresherPoints(fpA, null) === fpA && Core.fresherPoints(null, null) == null);
+
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
 

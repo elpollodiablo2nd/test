@@ -236,9 +236,11 @@
 
         <section class="card" id="aboutPanel" hidden>
             <h2>ABOUT · HOW IT WORKS · SOURCES</h2>
-            <p class="dim">Prices load automatically (live → cache → bundled snapshot) — then press <b>RUN TIMESTRAL</b>: Timestral runs on-device via ONNX, no API key.</p>
-            <p><b>What to push:</b> 1) prices load automatically from Energinet — with retries and Retry-After handling, then the
-            cached copy, then a bundled snapshot, so the chart fills even when Energinet rate-limits (<b>LOAD PRICES</b> just retries);
+            <p class="dim">Prices load automatically (live Energinet → remote Pages snapshot refreshed every 3h by CI → local cache → bundled snapshot) — then press <b>RUN TIMESTRAL</b>: Timestral runs on-device via ONNX, no API key.</p>
+            <p><b>What to push:</b> 1) prices load automatically from Energinet — with retries and Retry-After handling; if Energinet
+            still fails (common on shared mobile IPs), it falls back to the remote Pages snapshot (refreshed every 3h by a GitHub
+            Actions job, which itself falls back to Nord Pool), then the local cache, then the snapshot bundled in the APK
+            (<b>LOAD PRICES</b> just retries);
             2) optionally pick the Timestral checkpoint (5M bundled in the app, 28M downloaded once) and the <b>horizon</b>
             (24/48/72h — beyond 24h there is no published day-ahead price to check against and the confidence band widens);
             3) press <b>RUN TIMESTRAL</b> — the ONNX-exported Timestral runs on this device, no API key.</p>
@@ -390,6 +392,12 @@
 
         function dkWeekday(date) {
             return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(date);
+        }
+
+        function fresherPoints(a, b) { // pick the series whose last point is later
+            if (!a || !a.length) return b;
+            if (!b || !b.length) return a;
+            return a[a.length - 1].utc >= b[b.length - 1].utc ? a : b;
         }
 
         function dkDay(dkStr) { return dkStr.slice(8, 10) + "/" + dkStr.slice(5, 7); } // "26/11"
@@ -708,6 +716,7 @@
             DEFAULT_TARIFFS: DEFAULT_TARIFFS,
             zoneConfig: zoneConfig,
             xAxisDateLine: xAxisDateLine,
+            fresherPoints: fresherPoints,
             dkDay: dkDay,
             dkShort: dkShort
         };
@@ -977,7 +986,9 @@
                 localStorage.setItem("elspot_history_at_" + state.zone, new Date().toISOString());
             } catch (e) {}
             renderAll();
-            feedback(sourceMsg + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
+            var lastUtc = points[points.length - 1].utc.getTime();
+            var stale = lastUtc < Date.now() ? " — data ends " + dkShort(dkLabel(points[points.length - 1].utc)) + " DK, nothing published ahead" : "";
+            feedback(sourceMsg + stale + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
         }
 
         function loadPrices() {
@@ -987,31 +998,48 @@
                 applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet, last " +
                     dkLabel(points[points.length - 1].utc) + " (DK).");
             }).catch(function (err) {
+                var zone = state.zone;
                 var cached = null, cachedAt = null;
                 try {
-                    cached = JSON.parse(localStorage.getItem("elspot_history_" + state.zone) || "null");
-                    cachedAt = localStorage.getItem("elspot_history_at_" + state.zone);
+                    cached = JSON.parse(localStorage.getItem("elspot_history_" + zone) || "null");
+                    cachedAt = localStorage.getItem("elspot_history_at_" + zone);
                 } catch (e) {}
-                if (cached && cached.length) {
-                    state.history = cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; });
-                    state.forecast = null;
-                    state.workflowStats = null;
-                    renderAll();
-                    feedback("Energinet failed (" + err.message + ") — showing cached prices from " +
-                        (cachedAt || "the last successful load") + ".", "wrong");
-                    return;
-                }
-                feedback("Energinet failed (" + err.message + ") and no cache — trying the bundled snapshot…", "wrong");
-                return fetch(zoneConfig(state.zone).snapshot).then(function (r) {
-                    if (!r.ok) throw new Error("snapshot HTTP " + r.status);
+                var cachePts = (cached && cached.length)
+                    ? cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; }) : null;
+                // remote Pages snapshot: refreshed every few hours by a GitHub Actions job (Nord Pool fallback there)
+                var remoteUrl = new URL(zoneConfig(zone).snapshot, PAGES_BASE + "elspot-dk2/").href;
+                return fetch(remoteUrl).then(function (r) {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
                     return r.json();
                 }).then(function (snap) {
-                    var points = aggregateHourlyUtc(snap.records || []);
-                    if (points.length < 7 * HOURS_PER_DAY) throw new Error("bundled snapshot too small");
-                    applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices from the bundled snapshot (built " +
-                        String(snap.generated_at || "?").slice(0, 16) + "Z). Energinet error: " + err.message + ".");
-                }).catch(function (err2) {
-                    feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
+                    return { points: aggregateHourlyUtc(snap.records || []),
+                             msg: "remote Pages snapshot (built " + String(snap.generated_at || "?").slice(0, 16) + "Z" +
+                                  (snap.source ? ", source " + snap.source : "") + ")" };
+                }).catch(function () { return null; }).then(function (remote) {
+                    var cands = [];
+                    if (remote && remote.points.length) cands.push(remote);
+                    if (cachePts && cachePts.length) cands.push({ points: cachePts, msg: "cached prices from " + (cachedAt || "the last successful load") });
+                    var best = null, bestMsg = "";
+                    cands.forEach(function (c) {
+                        var nb = fresherPoints(best, c.points);
+                        if (nb !== best) { best = nb; bestMsg = c.msg; }
+                    });
+                    if (best && best.length >= 7 * HOURS_PER_DAY) {
+                        applyHistory(best, "Energinet failed (" + err.message + ") — showing " + bestMsg + ".");
+                        return;
+                    }
+                    feedback("Energinet failed (" + err.message + ") and no usable cache/remote snapshot — trying the bundled snapshot…", "wrong");
+                    return fetch(zoneConfig(zone).snapshot).then(function (r) {
+                        if (!r.ok) throw new Error("snapshot HTTP " + r.status);
+                        return r.json();
+                    }).then(function (snap) {
+                        var points = aggregateHourlyUtc(snap.records || []);
+                        if (points.length < 7 * HOURS_PER_DAY) throw new Error("bundled snapshot too small");
+                        applyHistory(points, "Loaded " + points.length + " hourly " + zone + " prices from the bundled snapshot (built " +
+                            String(snap.generated_at || "?").slice(0, 16) + "Z). Energinet error: " + err.message + ".");
+                    }).catch(function (err2) {
+                        feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
+                    });
                 });
             }).finally(function () { setBusy(false); });
         }
