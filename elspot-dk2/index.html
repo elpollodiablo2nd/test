@@ -216,7 +216,7 @@
         details.about p { font-size: 1.15rem; line-height: 1.5; margin: 0.7rem 0; }
 
         footer { text-align: center; font-size: 1.15rem; opacity: 0.9; margin-top: 0.5rem; line-height: 1.5; }
-        footer .chonck { width: 1.6rem; height: 1.6rem; vertical-align: -0.4rem; margin: 0 0.15rem; }
+        footer .chonck { width: 2.6rem; height: auto; vertical-align: -0.55rem; margin: 0 0.2rem; }
         footer a { color: var(--m-orange); }
 
         @media (max-width: 640px) {
@@ -313,7 +313,7 @@
             <div id="hours" class="hours-grid"></div>
         </section>
 
-        <footer>coded with <img class="chonck" src="chonck.svg" alt="LE chonck pixel sprite"> <b>LE chonck</b> from <a href="https://mistral.ai">Mistral AI</a></footer>
+        <footer>coded with <img class="chonck" src="chonck.svg" alt="Le chonck pixel sprite"> <b>Le chonck</b> from <a href="https://mistral.ai">Mistral AI</a></footer>
     </div>
 
     <script>
@@ -991,14 +991,12 @@
             feedback(sourceMsg + stale + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
         }
 
-        function loadPrices() {
-            setBusy(true);
-            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days)…", "correct");
-            return fetchPrices(35).then(function (points) {
-                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet, last " +
-                    dkLabel(points[points.length - 1].utc) + " (DK).");
-            }).catch(function (err) {
-                var zone = state.zone;
+        function markLive(ok) {
+            try { localStorage.setItem("elspot_live", JSON.stringify({ ok: ok, at: Date.now() })); } catch (e) {}
+        }
+
+        function loadFallback(err) {
+            var zone = state.zone;
                 var cached = null, cachedAt = null;
                 try {
                     cached = JSON.parse(localStorage.getItem("elspot_history_" + zone) || "null");
@@ -1041,6 +1039,25 @@
                         feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
                     });
                 });
+        }
+
+        function loadPrices(force) {
+            setBusy(true);
+            var liveState = null;
+            try { liveState = JSON.parse(localStorage.getItem("elspot_live") || "null"); } catch (e) {}
+            if (!force && liveState && liveState.ok === false && Date.now() - liveState.at < 3600e3) {
+                feedback("Energinet unreachable from this network — loading the remote Pages snapshot instead (LOAD PRICES forces a live retry).", "correct");
+                return loadFallback(new Error("live fetch skipped: failed " + Math.round((Date.now() - liveState.at) / 60000) + " min ago"))
+                    .finally(function () { setBusy(false); });
+            }
+            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days)…", "correct");
+            return fetchPrices(35).then(function (points) {
+                markLive(true);
+                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet, last " +
+                    dkLabel(points[points.length - 1].utc) + " (DK).");
+            }).catch(function (err) {
+                markLive(false);
+                return loadFallback(err);
             }).finally(function () { setBusy(false); });
         }
 
@@ -1218,7 +1235,7 @@
             if (!ZONES[state.zone]) state.zone = "DK2";
             zoneSel.value = state.zone;
             zoneSel.addEventListener("change", function () { setZone(this.value); });
-            document.getElementById("loadBtn").addEventListener("click", loadPrices);
+            document.getElementById("loadBtn").addEventListener("click", function () { loadPrices(true); });
             document.getElementById("runBtn").addEventListener("click", runTimestral);
             document.getElementById("feesToggle").addEventListener("change", function (ev) {
                 state.showFees = ev.target.checked;
