@@ -6,8 +6,10 @@ the 96-step output to the requested horizon (24/48/72).
 
 Inputs:
   context          float32 (1, 1, 768)  hourly prices DKK/MWh, NaN = missing (left padding)
-  known_covariates float32 (1, 5, 864)  rows [wind, temp, solar, enc_hour, enc_weekday]
+  known_covariates float32 (1, 7, 864)  rows [wind, temp, solar, DE, SE3, enc_hour, enc_weekday]
                                        over context+horizon (864 = 768 + 96); NaN = missing.
+                                       DE/SE3 = neighbour-zone day-ahead prices DKK/MWh (the big
+                                       zero-shot signal: full-year backtest 28M h24 MAE% 16.5 -> 4.3).
                                        enc_* are the target-encoded categorical codes, computed
                                        exactly like TimestralForecaster._encode_categorical —
                                        the app replicates that in JS (see index.html Core).
@@ -63,15 +65,44 @@ def fetch_reference_points(days=34):
         "filter": json.dumps({"PriceArea": ["DK2"]}),
         "start": start, "sort": "TimeUTC asc", "limit": 4000,
     })
-    data = http_json(ENERGINET + "?" + params)
+    try:
+        data = http_json(ENERGINET + "?" + params)
+        records = data.get("records", [])
+    except Exception as e:
+        print(f"Energinet reference fetch failed ({e}); using local snapshot")
+        records = json.load(open(REPO / "elspot-dk2" / "assets" / "prices-dk2.json"))["records"]
     buckets = {}
-    for rec in data.get("records", []):
+    for rec in records:
         if not rec.get("TimeUTC") or rec.get("DayAheadPriceDKK") is None:
             continue
-        d = datetime.fromisoformat(str(rec["TimeUTC"])).replace(tzinfo=timezone.utc)
+        d = datetime.fromisoformat(str(rec["TimeUTC"]).replace("Z", "+00:00")).astimezone(timezone.utc)
         hour = d.replace(minute=0, second=0, microsecond=0)
         buckets.setdefault(hour, []).append(float(rec["DayAheadPriceDKK"]))
     return sorted((h, sum(v) / len(v)) for h, v in buckets.items())
+
+
+def fetch_neighbor_maps(days=34):
+    """DE + SE3 day-ahead hourly prices (DKK/MWh) from Energinet, keyed by UTC hour."""
+    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M")
+    params = urllib.parse.urlencode({
+        "filter": json.dumps({"PriceArea": ["DE", "SE3"]}),
+        "start": start, "sort": "TimeUTC asc", "limit": 9000,
+    })
+    try:
+        data = http_json(ENERGINET + "?" + params)
+        records = data.get("records", [])
+    except Exception as e:
+        print(f"Energinet neighbour fetch failed ({e}); using local snapshot")
+        records = json.load(open(REPO / "elspot-dk2" / "assets" / "prices-neighbors.json"))["records"]
+    out = {"DE": {}, "SE3": {}}
+    for rec in records:
+        if not rec.get("TimeUTC") or rec.get("DayAheadPriceDKK") is None:
+            continue
+        d = datetime.fromisoformat(str(rec["TimeUTC"]).replace("Z", "+00:00")).astimezone(timezone.utc)
+        hour = d.replace(minute=0, second=0, microsecond=0)
+        key = hour.strftime("%Y-%m-%dT%H:00")
+        out.setdefault(rec["PriceArea"], {}).setdefault(key, []).append(float(rec["DayAheadPriceDKK"]))
+    return {a: {k: sum(v) / len(v) for k, v in m.items()} for a, m in out.items()}
 
 
 def fetch_weather_map(points):
@@ -93,8 +124,8 @@ def fetch_weather_map(points):
     return weather
 
 
-def build_inputs(points, weather):
-    """Reference inputs mirroring the worker: last T_CTX hours (NaN-padded), covariates over T_CTX+H."""
+def build_inputs(points, weather, neighbors):
+    """Reference inputs mirroring the app: last T_CTX hours (NaN-padded), covariates over T_CTX+H."""
     hours = [h for h, _ in points][-T_CTX:]
     prices = [p for _, p in points][-T_CTX:]
     pad = T_CTX - len(hours)
@@ -106,8 +137,14 @@ def build_inputs(points, weather):
     context = np.asarray(prices, dtype=np.float32)[None, None, :]
     cat = np.asarray([[h.hour if h else float("nan") for h in all_hours],
                       [h.weekday() if h else float("nan") for h in all_hours]], dtype=np.float64)[None, :, :]
-    known_w = np.asarray([[[weather.get(h.strftime("%Y-%m-%dT%H:00"), [float("nan")] * 3)[i] if h else float("nan")
-                            for h in all_hours] for i in range(3)]], dtype=np.float64)
+    rows = []
+    for i in range(3):  # wind, temp, solar
+        rows.append([weather.get(h.strftime("%Y-%m-%dT%H:00"), [float("nan")] * 3)[i] if h else float("nan")
+                     for h in all_hours])
+    for area in ("DE", "SE3"):  # neighbour day-ahead prices
+        nmap = neighbors.get(area, {})
+        rows.append([nmap.get(h.strftime("%Y-%m-%dT%H:00"), float("nan")) if h else float("nan") for h in all_hours])
+    known_w = np.asarray([rows], dtype=np.float64)
     return context, cat, known_w, all_hours
 
 
@@ -152,7 +189,8 @@ def main():
     print("fetching reference data (Energinet + Open-Meteo) ...")
     points = fetch_reference_points()
     weather = fetch_weather_map(points)
-    context, cat, known_w, all_hours = build_inputs(points, weather)
+    neighbors = fetch_neighbor_maps()
+    context, cat, known_w, all_hours = build_inputs(points, weather, neighbors)
 
     # torch reference via the public API (with categorical codes, target-encoded internally)
     with torch.inference_mode():
@@ -166,16 +204,16 @@ def main():
     levels = ref.quantile_levels
     print("reference quantiles:", q_ref.shape, "levels:", levels[:3], "...", levels[-1])
 
-    # pre-encode categoricals exactly like the forecaster does, then build the (1,5,T+H) known tensor
+    # pre-encode categoricals exactly like the forecaster does, then build the (1,7,T+H) known tensor
     inputs, mask = forecaster._as_context(torch.as_tensor(context, dtype=torch.float32), None)
     target = forecaster._encoding_target(inputs, mask)
     enc = forecaster._encode_categorical(torch.as_tensor(cat), target)
-    known5 = torch.cat([torch.as_tensor(known_w, dtype=torch.float32), enc], dim=1).contiguous()
-    assert known5.shape == (1, 5, T_CTX + H), known5.shape
+    known_all = torch.cat([torch.as_tensor(known_w, dtype=torch.float32), enc], dim=1).contiguous()
+    assert known_all.shape == (1, 7, T_CTX + H), known_all.shape
 
     wrapper = OnnxWrapper(forecaster, H)
     with torch.inference_mode():
-        q_wrap = wrapper(torch.as_tensor(context, dtype=torch.float32), known5)
+        q_wrap = wrapper(torch.as_tensor(context, dtype=torch.float32), known_all)
     d = float((q_wrap - ref.quantiles).abs().max())
     print(f"wrapper vs public API max abs diff: {d:.3e}")
     assert d < 5e-3, "wrapper does not match the public forecast()"
@@ -310,7 +348,7 @@ def main():
         with torch.no_grad():
             torch.onnx.export(
                 wrapper,
-                (torch.as_tensor(context, dtype=torch.float32), known5),
+                (torch.as_tensor(context, dtype=torch.float32), known_all),
                 str(raw),
                 input_names=["context", "known_covariates"],
                 output_names=["quantiles"],
@@ -330,7 +368,7 @@ def main():
     sess = ort.InferenceSession(str(raw), providers=["CPUExecutionProvider"])
     q_onnx = sess.run(["quantiles"], {
         "context": context,
-        "known_covariates": known5.numpy(),
+        "known_covariates": known_all.numpy(),
     })[0][0, 0]
     d2 = float(np.abs(q_onnx - q_ref).max())
     print(f"onnx vs torch max abs diff: {d2:.3e}")
@@ -349,7 +387,7 @@ def main():
     if final != raw:
         print("quantized", final, final.stat().st_size / 1e6, "MB")
         sess2 = ort.InferenceSession(str(final), providers=["CPUExecutionProvider"])
-        q_q = sess2.run(["quantiles"], {"context": context, "known_covariates": known5.numpy()})[0][0, 0]
+        q_q = sess2.run(["quantiles"], {"context": context, "known_covariates": known_all.numpy()})[0][0, 0]
         d3 = float(np.abs(q_q - q_ref).max())
         rel = float(np.abs(q_q - q_ref).max() / (np.abs(q_ref).max() + 1e-9))
         print(f"quantized vs torch max abs diff: {d3:.3e} (rel {rel:.2e})")
@@ -359,12 +397,20 @@ def main():
 
     ref_path = HERE / "test" / f"reference-{args.size.lower()}.json"
     ref_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _no_nan(o):
+        if isinstance(o, float) and (math.isnan(o) or math.isinf(o)):
+            return None
+        if isinstance(o, list):
+            return [_no_nan(v) for v in o]
+        return o
+
     ref_path.write_text(json.dumps({
         "size": args.size, "T": T_CTX, "H": H,
         "levels": list(levels),
-        "context": context[0, 0].tolist(),
-        "known_covariates": known5[0].tolist(),
-        "quantiles": q_ref.tolist(),
+        "context": _no_nan(context[0, 0].tolist()),
+        "known_covariates": _no_nan(known_all[0].tolist()),
+        "quantiles": _no_nan(q_ref.tolist()),
     }))
     print("reference saved to", ref_path)
     print("DONE", final)

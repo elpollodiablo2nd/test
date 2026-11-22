@@ -227,19 +227,37 @@ const h0 = Date.UTC(2026, 10, 20, 0, 0, 0);
 const hist = [];
 for (let i = 0; i < 800; i++) hist.push({ utc: new Date(h0 + i * 3600e3), price: 400 + (i % 24) * 10 });
 const wmap = {};
-for (let i = 0; i < 900; i++) { const d = new Date(h0 + i * 3600e3); wmap[Core.utcHourKey(d)] = [5, 2, 100]; }
-const inp = Core.buildOnnxInputs(hist, wmap);
+const nmap = {};
+for (let i = 0; i < 900; i++) { const d = new Date(h0 + i * 3600e3); wmap[Core.utcHourKey(d)] = [5, 2, 100]; nmap[Core.utcHourKey(d)] = [300, 350]; }
+const inp = Core.buildOnnxInputs(hist, wmap, nmap);
 check("buildOnnxInputs context len", inp.context.length === 768);
-check("buildOnnxInputs known len", inp.known.length === 5 * 864);
+check("buildOnnxInputs known len", inp.known.length === 7 * 864);
 check("buildOnnxInputs hours len", inp.hours.length === 864);
 check("buildOnnxInputs no pad when 800h", isFinite(inp.context[0]));
 check("buildOnnxInputs last ctx price", close(inp.context[767], hist[799].price, 1e-3));
 check("buildOnnxInputs weather row", inp.known[0] === 5 && inp.known[864] === 2 && inp.known[2 * 864] === 100);
-check("buildOnnxInputs enc rows finite", isFinite(inp.known[3 * 864 + 700]) && isFinite(inp.known[4 * 864 + 700]));
+check("buildOnnxInputs neighbor rows DE/SE3", inp.known[3 * 864 + 700] === 300 && inp.known[4 * 864 + 700] === 350);
+check("buildOnnxInputs enc rows finite", isFinite(inp.known[5 * 864 + 700]) && isFinite(inp.known[6 * 864 + 700]));
 const inp2 = Core.buildOnnxInputs(hist.slice(0, 100), {});
 check("buildOnnxInputs left-pads NaN", isNaN(inp2.context[0]) && isFinite(inp2.context[668]));
 check("buildOnnxInputs weather NaN when missing", isNaN(inp2.known[0]) && isNaN(inp2.known[864]));
-check("buildOnnxInputs enc NaN in padding", isNaN(inp2.known[3 * 864 + 10]) && isFinite(inp2.known[3 * 864 + 700]));
+check("buildOnnxInputs neighbor NaN when missing", isNaN(inp2.known[3 * 864 + 700]) && isNaN(inp2.known[4 * 864 + 700]));
+check("buildOnnxInputs enc NaN in padding", isNaN(inp2.known[5 * 864 + 10]) && isFinite(inp2.known[5 * 864 + 700]));
+
+// conformal band calibration (q10-q90 recalibration)
+check("quantileOf median", Core.quantileOf([1, 2, 3, 4], 0.5) === 2.5 && Core.quantileOf([], 0.5) === null);
+const pairs = [];
+for (let i = 0; i < 100; i++) pairs.push({ med: 100, q10: 80, q90: 120, act: 100 + (i % 10) * 2 }); // act within band
+check("bandRatios all finite >= 0", Core.bandRatios(pairs).length === 100 && Core.bandRatios(pairs).every(r => r >= 0 && r <= 1));
+check("bandRatios skips bad rows", Core.bandRatios([{ med: NaN, q10: 1, q90: 2, act: 1 }, { med: 1, q10: 2, q90: 3, act: 1 }]).length === 0);
+const k = Core.conformalK(pairs, 0.85);
+check("conformalK ~1 when actuals inside band", k !== null && k >= 1 && k < 1.2);
+check("conformalK null when few samples", Core.conformalK(pairs.slice(0, 5), 0.85) === null);
+const wide = pairs.map(p => ({ ...p, act: p.med + 40 })); // all 40 above median (half-width 20) -> r = 2
+check("conformalK = 2 when all overshoot 2x", Math.abs(Core.conformalK(wide, 0.85) - 2) < 1e-9);
+check("scaleBand widens by k", JSON.stringify(Core.scaleBand(100, 80, 120, 2)) === JSON.stringify([60, 140]));
+check("scaleBand no k -> unchanged", JSON.stringify(Core.scaleBand(100, 80, 120, NaN)) === JSON.stringify([80, 120]));
+check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

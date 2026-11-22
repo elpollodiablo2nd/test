@@ -16,10 +16,11 @@ const ort = require("onnxruntime-web");
 ort.env.wasm.wasmPaths = path.join(__dirname, "..", "node_modules", "onnxruntime-web", "dist") + path.sep;
 
 async function main() {
-    const ref = JSON.parse(fs.readFileSync(refPath, "utf8"));
+    const ref = JSON.parse(fs.readFileSync(refPath, "utf8").replace(/NaN/g, "null"));
     const T = ref.T, H = ref.H;
-    const context = new ort.Tensor("float32", Float32Array.from(ref.context), [1, 1, T]);
-    const known = new ort.Tensor("float32", Float32Array.from(ref.known_covariates.flat()), [1, ref.known_covariates.length, T + H]);
+    const nanMap = v => (v === null ? NaN : v);
+    const context = new ort.Tensor("float32", Float32Array.from(ref.context.map(nanMap)), [1, 1, T]);
+    const known = new ort.Tensor("float32", Float32Array.from(ref.known_covariates.flat().map(nanMap)), [1, ref.known_covariates.length, T + H]);
     const t0 = Date.now();
     const session = await ort.InferenceSession.create(modelPath, {
         executionProviders: ["wasm"],
