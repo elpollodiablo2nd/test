@@ -1,0 +1,40 @@
+name: refresh-elspot-snapshots-live
+
+# Live shim for PR #7 (branch vibe/dk2-elspot-forecast-07bb3a, which GitHub Pages serves):
+# cron only fires on the default branch, so this workflow checks out the Pages branch,
+# refreshes elspot-dk2/assets/prices-dk{1,2}.json (+ the APK build copies) every 3h and
+# pushes back to that branch. The refresh script falls back to the Nord Pool data-portal
+# API if Energinet rate-limits the runner. Remove this file once PR #7 is merged
+# (the repo then has .github/workflows/refresh-elspot-snapshots.yml on the default branch).
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: vibe/dk2-elspot-forecast-07bb3a
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refresh price snapshots (Energinet, Nord Pool fallback)
+        run: python3 elspot-dk2-android/tools/fetch_prices_snapshot.py
+      - name: Commit and push to the Pages branch if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add elspot-dk2/assets elspot-dk2-android/www/assets
+          if git diff --cached --quiet; then
+            echo "snapshots unchanged, nothing to commit"
+          else
+            git commit -m "chore: refresh elspot price snapshots (DK1/DK2)"
+            git push
+          fi
