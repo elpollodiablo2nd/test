@@ -25,14 +25,15 @@ jobs:
 
       # Manuel SDK-installation: android-actions/setup-android@v3 fejler, fordi den
       # kalder `sdkmanager tools`, og pakken findes ikke længere i nye cmdline-tools.
-      - name: Set up Android SDK (cmdline-tools, manuelt)
+      # Brug det præinstallerede SDK på runneren (/usr/local/lib/android/sdk) —
+      # rør IKKE ved ANDROID_HOME/ANDROID_SDK_ROOT, ellers fejler AGP med to forskellige SDK-stier.
+      - name: Set up Android SDK (cmdline-tools i præinstalleret SDK)
         run: |
-          SDK="$RUNNER_TEMP/android-sdk"
+          SDK="/usr/local/lib/android/sdk"
           mkdir -p "$SDK/cmdline-tools"
           curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip -q /tmp/cmdtools.zip -d "$SDK/cmdline-tools"
           mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
