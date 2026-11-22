@@ -51,11 +51,15 @@ check("national fees present in both zones", !!(Core.DEFAULT_TARIFFS.DK1["System
 // xAxisDateLine: weekday+date only when the DK-local date changes between ticks
 // (2026-11-20T23:00Z = 2026-11-21 00:00 DK = Saturday; 2026-11-21T23:00Z = Sunday 2026-11-22)
 const xa = Core.xAxisDateLine(Date.UTC(2026, 10, 20, 23), null);
-check("xAxisDateLine first tick of DK day", xa.line === "Sat 11-21" && xa.date === "2026-11-21");
+check("xAxisDateLine first tick of DK day", xa.line === "Sat 21/11" && xa.date === "2026-11-21");
 const xb = Core.xAxisDateLine(Date.UTC(2026, 10, 21, 6), xa.date); // 07:00 DK, same DK day
 check("xAxisDateLine same DK day -> empty line", xb.line === "" && xb.date === "2026-11-21");
 const xc = Core.xAxisDateLine(Date.UTC(2026, 10, 21, 23), xb.date); // 2026-11-22 00:00 DK
-check("xAxisDateLine next DK day", xc.line === "Sun 11-22" && xc.date === "2026-11-22");
+check("xAxisDateLine next DK day", xc.line === "Sun 22/11" && xc.date === "2026-11-22");
+
+// dkDay / dkShort: DD/MM display format
+check("dkDay DD/MM", Core.dkDay("2026-11-26 14:00") === "26/11");
+check("dkShort DD/MM HH:00", Core.dkShort("2026-11-26 14:00") === "26/11 14:00");
 
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");

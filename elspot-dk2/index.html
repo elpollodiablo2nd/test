@@ -391,12 +391,15 @@
             return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(date);
         }
 
+        function dkDay(dkStr) { return dkStr.slice(8, 10) + "/" + dkStr.slice(5, 7); } // "26/11"
+        function dkShort(dkStr) { return dkDay(dkStr) + " " + dkStr.slice(11, 16); } // "26/11 14:00"
+
         // x-axis date line: weekday+date on the first tick of each DK day, empty otherwise
         function xAxisDateLine(tMs, prevDate) {
             var d = new Date(tMs);
             var dl = dkLabel(d);
             var d10 = dl.slice(0, 10);
-            return { date: d10, line: d10 !== prevDate ? dkWeekday(d) + " " + dl.slice(5, 10) : "" };
+            return { date: d10, line: d10 !== prevDate ? dkWeekday(d) + " " + dkDay(dl) : "" };
         }
 
         function pearson(xs, ys) {
@@ -703,7 +706,9 @@
             ZONES: ZONES,
             DEFAULT_TARIFFS: DEFAULT_TARIFFS,
             zoneConfig: zoneConfig,
-            xAxisDateLine: xAxisDateLine
+            xAxisDateLine: xAxisDateLine,
+            dkDay: dkDay,
+            dkShort: dkShort
         };
         if (typeof module !== "undefined" && module.exports) module.exports = Core;
 
@@ -762,7 +767,7 @@
                 var sum = 0, minE = series[0];
                 series.forEach(function (e) { sum += e.v; if (e.v < minE.v) minE = e; });
                 avg = fmtKwh(sum / series.length);
-                cheapest = minE.dk.slice(5, 16);
+                cheapest = dkShort(minE.dk);
             }
             var items = [
                 ["CORR LAG-1", corr.toFixed(3), "var(--m-yellow)"],
@@ -899,7 +904,7 @@
                 var range = e.kind === "fc"
                     ? '<span class="r">q10–q90: ' + fmtKwh(e.lo) + "–" + fmtKwh(e.hi) + "</span>"
                     : '<span class="r">published day-ahead</span>';
-                return '<div class="' + cls + '"><span class="h">' + e.dk.slice(5) + '</span>' +
+                return '<div class="' + cls + '"><span class="h">' + dkShort(e.dk) + '</span>' +
                     '<span class="v">' + fmtKwh(e.v) + ' kr/kWh</span>' + range + "</div>";
             }).join("");
         }
