@@ -18,6 +18,17 @@ Dette er et minimalt Android Studio-projekt, der pakker `../index.html` (sammen 
 - **Debug**: signeres automatisk med en engangsnøgle — fin til at teste på din egen telefon (`adb install app-debug.apk`), men kan ikke opdateres over en tidligere installeret version.
 - **Release**: signeret med din egen nøgle. Til Play Store skal du bruge **samme nøgle ved hver opdatering**, så gem keystore et sikkert sted.
 
+## Automatisk release ved tag (GitHub Releases med APK)
+
+Workflowet `.github/workflows/release.yml` kører ved hvert tag på formen `v*`:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Så bygger CI en signeret `app-release.apk` og opretter automatisk en **GitHub Release** med APK'en vedhæftet (Releases-fanen). Brug dine egne secrets (se nedenfor) for at alle releases signeres med samme nøgle — ellers genereres en ny nøgle pr. tag.
+
 ## Automatisk build i CI (ingen lokal toolchain nødvendig)
 Workflowet `.github/workflows/build-apk.yml` bygger både `app-debug.apk` og signeret `app-release.apk` ved hvert push til `math-aid/**` (eller via **Run workflow** på fanen Actions). Download dem under **Actions → seneste run → Artifacts**.
 
