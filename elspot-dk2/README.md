@@ -30,8 +30,7 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    the **snapshot bundled in the APK** (refreshed at app build time). The banner always says which source was used.
    Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
-   **lag-1 baseline** (tomorrow ≈ today), and the HUD shows the day-to-day correlation and the
-   lag-1 backtest MAE.
+   **lag-1 baseline** (tomorrow ≈ today). The HUD shows the cheapest hour and the EV window.
 2. Press **RUN TIMESTRAL** — in the Android app (`elspot-dk2-android/app-debug.apk`) the
    ONNX-exported Timestral runs **on-device** (no API key): pick the checkpoint (5M bundled, 28M
    downloaded once in 4 parts) and the **horizon** (24/48/72h — beyond 24h there is no published
@@ -41,7 +40,8 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
 3. The chart shows **from the current hour only**: published day-ahead prices ahead of now (green),
    then the **Timestral median** (orange dashes) with its **q10–q90 band** (red) over the full
    horizon. The x-axis is adaptive — two-line labels with date **and** time of day (DK), with the
-   finest tick step that fits the window (2h for a 24h view, up to 24h for multi-day views). The
+   finest tick step that fits the window (2h for a 24h view, up to 24h for multi-day views), with
+   weekday + DD/MM date at each day boundary. The
    hourly grid below lists every hour from now (published + forecast) in kr/kWh with its q10–q90
    range, cheapest highlighted.
 4. **EV charging**: the green shaded **EV window** on the chart marks the cheapest contiguous
