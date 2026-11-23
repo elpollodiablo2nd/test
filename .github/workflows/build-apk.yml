@@ -1,0 +1,89 @@
+name: Build Math Aid APK
+
+on:
+  push:
+    paths:
+      - 'math-aid/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Manuel SDK-installation: android-actions/setup-android@v3 fejler, fordi den
+      # kalder `sdkmanager tools`, og pakken findes ikke længere i nye cmdline-tools.
+      # Brug det præinstallerede SDK på runneren (/usr/local/lib/android/sdk) —
+      # rør IKKE ved ANDROID_HOME/ANDROID_SDK_ROOT, ellers fejler AGP med to forskellige SDK-stier.
+      - name: Set up Android SDK (cmdline-tools i præinstalleret SDK)
+        run: |
+          SDK="/usr/local/lib/android/sdk"
+          mkdir -p "$SDK/cmdline-tools"
+          curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q /tmp/cmdtools.zip -d "$SDK/cmdline-tools"
+          mv "$SDK/cmdline-tools/cmdline-tools" "$SDK/cmdline-tools/latest"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      # Keystore: brug repo-secrets hvis de findes, ellers generer en midlertidig nøgle.
+      # Til Play Store: opret én keystore og gem den i secrets (se README), så alle
+      # opdateringer signeres med samme nøgle.
+      - name: Prepare signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          SECRET_STORE_PASSWORD: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+          SECRET_KEY_ALIAS: ${{ secrets.APP_KEY_ALIAS }}
+          SECRET_KEY_PASSWORD: ${{ secrets.APP_KEY_PASSWORD }}
+        run: |
+          KS="$PWD/math-aid/android/app/keystore.jks"
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$KS"
+            export KEYSTORE_PASSWORD="$SECRET_STORE_PASSWORD" KEY_ALIAS="$SECRET_KEY_ALIAS" KEY_PASSWORD="$SECRET_KEY_PASSWORD"
+          else
+            keytool -genkeypair -v -keystore "$KS" -alias mathaid -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass changeit -keypass changeit -dname "CN=Math Aid, OU=Dev, O=Mistral, C=DK"
+            export KEYSTORE_PASSWORD=changeit KEY_ALIAS=mathaid KEY_PASSWORD=changeit
+          fi
+          echo "KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build debug APK (auto-signeret, til test)
+        working-directory: math-aid/android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Build signed release APK
+        working-directory: math-aid/android
+        run: gradle assembleRelease --no-daemon
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-aid-app-debug-apk
+          path: math-aid/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-aid-app-release-apk
+          path: math-aid/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30

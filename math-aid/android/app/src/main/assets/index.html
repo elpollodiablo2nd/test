@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Aid — Pixel Edition</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#FF8205">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --m-yellow: #FFD800;
+            --m-amber: #FFAF00;
+            --m-orange: #FF8205;
+            --m-orange-dark: #FA500F;
+            --m-red: #E10500;
+            --ink: #000000;
+            --cream: #FFFAEB;
+            --night: #0B0714;
+            --screen: #150C24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+        }
+
+        body {
+            font-family: 'VT323', 'Courier New', monospace;
+            background-color: var(--night);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
+                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+            background-size: auto, 32px 32px, 32px 32px;
+            color: var(--cream);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem 3rem;
+            overflow-x: hidden;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px);
+            z-index: 50;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .logo-m {
+            width: 96px;
+            height: 96px;
+            shape-rendering: crispEdges;
+            filter: drop-shadow(5px 5px 0 rgba(0, 0, 0, 0.8));
+            animation: bob 1.6s steps(2, jump-none) infinite;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 2rem;
+            margin-top: 1.25rem;
+            letter-spacing: 2px;
+            background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(4px 4px 0 #000);
+        }
+
+        @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+            h1 { color: var(--m-orange); background: none; }
+        }
+
+        .subtitle {
+            font-size: 1.4rem;
+            color: var(--m-amber);
+            margin-top: 0.75rem;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: currentColor;
+            box-shadow: 0 -8px 0 currentColor, 0 8px 0 currentColor, -8px 0 0 currentColor, 8px 0 0 currentColor;
+            animation: twinkle 1.2s steps(2, jump-none) infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.15; transform: translateY(-6px); }
+        }
+
+        .math-card {
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            padding: 1.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .type-badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            padding: 0.55rem 0.8rem;
+            margin-bottom: 1.25rem;
+            background: var(--m-yellow);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        #type-badge[data-type="subtraction"] { background: var(--m-amber); }
+        #type-badge[data-type="multiplication"] { background: var(--m-orange); }
+        #type-badge[data-type="division"] { background: var(--m-orange-dark); color: var(--cream); }
+        #type-badge[data-type="equation"] { background: var(--m-red); color: var(--cream); }
+        #type-badge[data-type="cirkel"] { background: var(--m-yellow); }
+        #type-badge[data-type="trekant"] { background: var(--m-amber); }
+        #type-badge[data-type="firkant"] { background: var(--m-orange); }
+        #type-badge[data-type="rumfang"] { background: var(--m-red); color: var(--cream); }
+        #type-badge[data-type="procent"] { background: var(--cream); }
+        #type-badge[data-type="plus"] { background: var(--m-yellow); }
+        #type-badge[data-type="minus"] { background: var(--m-amber); }
+        #type-badge[data-type="gange"] { background: var(--m-orange); }
+        #type-badge[data-type="dividere"] { background: var(--m-orange-dark); color: var(--cream); }
+        #type-badge[data-type="forenkl"] { background: var(--m-red); color: var(--cream); }
+        #type-badge[data-type="udvid"] { background: var(--cream); }
+        #type-badge[data-type="vaegt"] { background: var(--m-yellow); }
+        #type-badge[data-type="laengde"] { background: var(--m-amber); }
+        #type-badge[data-type="volumen"] { background: var(--m-orange); }
+
+        .problem-display {
+            padding: 1.5rem;
+            min-height: 96px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background:
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
+                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.7), inset -4px -4px 0 rgba(255, 255, 255, 0.07);
+            margin-bottom: 1.5rem;
+        }
+
+        .figure {
+            display: none;
+        }
+
+        .figure.visible {
+            display: block;
+        }
+
+        .figure svg {
+            width: 210px;
+            height: auto;
+        }
+
+        .fig-label {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 17px;
+            fill: var(--cream);
+        }
+
+        .module-switch {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .module-btn {
+            background: var(--screen);
+            color: var(--cream);
+        }
+
+        .module-btn.active {
+            background: var(--m-yellow);
+            color: var(--ink);
+        }
+
+        .math-expression {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 2.8rem;
+            color: var(--m-yellow);
+            text-shadow: 0 0 14px rgba(255, 216, 0, 0.55), 4px 4px 0 var(--m-red);
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 0.55em;
+            height: 0.9em;
+            margin-left: 10px;
+            background: var(--m-yellow);
+            box-shadow: 0 0 10px rgba(255, 216, 0, 0.8);
+            animation: blink 0.9s steps(1) infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: 4px solid var(--ink);
+            box-shadow: 0 6px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+        }
+
+        button:hover {
+            filter: brightness(1.08);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 var(--ink);
+        }
+
+        button:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--ink);
+        }
+
+        .btn-primary {
+            background: var(--m-orange);
+            color: var(--ink);
+        }
+
+        .btn-refresh {
+            background: var(--cream);
+            color: var(--ink);
+        }
+
+        .answer-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        #answer-input {
+            flex: 1;
+            min-width: 0;
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.8rem;
+            padding: 0.5rem 1rem;
+            background: #ffffff;
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
+            outline: none;
+        }
+
+        #answer-input:focus {
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange);
+        }
+
+        #answer-input:disabled {
+            background: #EAE2D0;
+        }
+
+        .btn-check {
+            background: var(--m-amber);
+            color: var(--ink);
+            white-space: nowrap;
+        }
+
+        .feedback {
+            display: none;
+            margin-bottom: 1.25rem;
+            padding: 0.9rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            line-height: 1.7;
+        }
+
+        .feedback.visible {
+            display: block;
+        }
+
+        .feedback.correct {
+            background: var(--m-yellow);
+            color: var(--ink);
+        }
+
+        .feedback.wrong {
+            background: var(--m-red);
+            color: var(--cream);
+            animation: shake 0.25s steps(2);
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(-6px); }
+        }
+
+        .solution {
+            display: none;
+            margin-top: 1.25rem;
+            padding: 1.25rem 1.5rem;
+            background: #FFF3D0;
+            border: 4px solid var(--ink);
+            border-left: 12px solid var(--m-orange-dark);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.08);
+        }
+
+        .solution.visible {
+            display: block;
+            animation: pop 0.15s steps(2);
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.96); }
+            to { transform: scale(1); }
+        }
+
+        .solution-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            color: var(--m-orange-dark);
+            margin-bottom: 1rem;
+        }
+
+        .solution-steps {
+            font-size: 1.45rem;
+            line-height: 1.6;
+        }
+
+        .solution-steps kbd {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.3rem;
+            background: var(--ink);
+            color: var(--m-yellow);
+            padding: 0.1rem 0.45rem;
+            border: 3px solid var(--ink);
+            box-shadow: inset -3px -3px 0 rgba(255, 255, 255, 0.18), inset 3px 3px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .step {
+            position: relative;
+            margin-bottom: 0.6rem;
+            padding-left: 1.25rem;
+        }
+
+        .step::before {
+            content: "►";
+            position: absolute;
+            left: 0;
+            color: var(--m-orange-dark);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+            gap: 0.75rem;
+            padding: 1rem;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.6rem 0.25rem;
+            background: rgba(0, 0, 0, 0.35);
+            border: 3px solid rgba(255, 250, 235, 0.25);
+        }
+
+        .stat-value {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1rem;
+            color: var(--m-yellow);
+            text-shadow: 3px 3px 0 #000;
+        }
+
+        .stat-label {
+            font-size: 1.05rem;
+            margin-top: 0.35rem;
+            color: var(--cream);
+            opacity: 0.85;
+        }
+
+        .progress-card {
+            padding: 1.5rem;
+        }
+
+        .progress-head {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .progress-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            color: var(--ink);
+        }
+
+        .today-pct {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.4rem;
+            color: var(--m-orange-dark);
+        }
+
+        .today-detail {
+            font-size: 1.3rem;
+            color: var(--ink);
+            opacity: 0.75;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .charts canvas {
+            width: 100%;
+            height: auto;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .chart-caption {
+            margin-top: 0.6rem;
+            font-size: 1.05rem;
+            color: var(--ink);
+            opacity: 0.7;
+            text-align: center;
+        }
+
+        .hint {
+            margin-top: 1.25rem;
+            text-align: center;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.55rem;
+            color: rgba(255, 250, 235, 0.6);
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .hint kbd {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.55rem;
+            background: var(--ink);
+            color: var(--m-yellow);
+            border: 3px solid rgba(255, 250, 235, 0.4);
+            padding: 0.3rem 0.45rem;
+        }
+
+        @media (max-width: 640px) {
+            h1 { font-size: 1.25rem; }
+            .logo-m { width: 72px; height: 72px; }
+            .math-expression { font-size: 2rem; }
+            .buttons { flex-direction: column; }
+            .answer-row { flex-direction: column; }
+            button { width: 100%; justify-content: center; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .math-card { padding: 1.25rem; }
+            .figure svg { width: 170px; }
+            .charts { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <span class="sparkle" style="top: 6px; left: 14%; color: var(--m-yellow);"></span>
+            <span class="sparkle" style="top: 40px; right: 16%; color: var(--m-orange); animation-delay: 0.3s;"></span>
+            <span class="sparkle" style="top: 90px; left: 8%; color: var(--m-red); animation-delay: 0.6s;"></span>
+            <span class="sparkle" style="top: 110px; right: 9%; color: var(--m-amber); animation-delay: 0.9s;"></span>
+            <svg class="logo-m" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="Mistral M logo">
+                <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
+                <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
+                <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
+                <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
+                <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
+                <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
+            </svg>
+            <h1>MATH AID</h1>
+            <p class="subtitle">Øvelse på 8. klasse-niveau · Pixel-udgave</p>
+        </header>
+
+        <div class="module-switch">
+            <button id="mod-tal" class="module-btn active" onclick="setModule('tal')">🔢 TAL &amp; LIGNINGER</button>
+            <button id="mod-geometri" class="module-btn" onclick="setModule('geometri')">📐 GEOMETRI</button>
+            <button id="mod-brok" class="module-btn" onclick="setModule('brok')">➗ BRØKER</button>
+            <button id="mod-enheder" class="module-btn" onclick="setModule('enheder')">📏 ENHEDER</button>
+        </div>
+
+        <div class="math-card">
+            <div id="type-badge" class="type-badge" data-type="addition"></div>
+            <div class="problem-display">
+                <div id="figure" class="figure"></div>
+                <div class="expr-line"><span id="problem" class="math-expression"></span><span class="cursor"></span></div>
+            </div>
+
+            <div class="answer-row">
+                <input id="answer-input" type="text" inputmode="decimal" placeholder="Dit svar (fx 12 eller 3/4)..." autocomplete="off">
+                <button id="check-answer" class="btn-check" onclick="checkAnswer()">✅ Tjek svar</button>
+            </div>
+
+            <div id="answer-feedback" class="feedback"></div>
+
+            <div class="buttons">
+                <button id="show-solution" class="btn-primary" onclick="showSolution()">💡 Vis løsning</button>
+                <button class="btn-refresh" onclick="generateProblem()">🔄 Ny opgave</button>
+            </div>
+
+            <div id="solution" class="solution">
+                <div class="solution-title">TRIN-FOR-TRIN-LØSNING</div>
+                <div id="solution-steps" class="solution-steps"></div>
+            </div>
+        </div>
+
+        <div class="stats" id="stats"></div>
+
+        <div class="math-card progress-card">
+            <div class="progress-head">
+                <span class="progress-title">📊 I DAG</span>
+                <span class="today-pct" id="today-pct">–</span>
+                <span class="today-detail" id="today-detail">Ingen svar endnu i dag</span>
+            </div>
+            <div class="charts">
+                <div>
+                    <canvas id="chart" width="560" height="240"></canvas>
+                    <div class="chart-caption">% rigtige pr. dag — seneste 7 dage</div>
+                </div>
+                <div>
+                    <canvas id="chart-counts" width="560" height="240"></canvas>
+                    <div class="chart-caption">Besvarede opgaver pr. dag — seneste 7 dage</div>
+                </div>
+            </div>
+            <div class="chart-caption">Gemmes lokalt på enheden (localStorage + cookie) · kun første svar på en opgave tæller · tallet står under hver søjle</div>
+        </div>
+
+        <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
+    </div>
+
+    <script>
+        const PI = 3.14;
+
+        let activeModule = 'tal';
+
+        let stats = {
+            tal: { total: 0, addition: 0, subtraction: 0, multiplication: 0, division: 0, equation: 0, procent: 0 },
+            geometri: { total: 0, cirkel: 0, trekant: 0, firkant: 0, rumfang: 0 },
+            brok: { total: 0, plus: 0, minus: 0, gange: 0, dividere: 0, forenkl: 0, udvid: 0 },
+            enheder: { total: 0, vaegt: 0, laengde: 0, volumen: 0 }
+        };
+
+        let currentProblem = {
+            type: '',
+            problem: '',
+            answer: 0,
+            answerText: '',
+            figure: '',
+            steps: [],
+            attemptRecorded: false
+        };
+
+        const problemTypes = [
+            { type: 'addition', weight: 20 },
+            { type: 'subtraction', weight: 20 },
+            { type: 'multiplication', weight: 15 },
+            { type: 'division', weight: 15 },
+            { type: 'equation', weight: 15 },
+            { type: 'procent', weight: 15 }
+        ];
+
+        const brokTypes = [
+            { type: 'plus', weight: 20 },
+            { type: 'minus', weight: 15 },
+            { type: 'gange', weight: 20 },
+            { type: 'dividere', weight: 15 },
+            { type: 'forenkl', weight: 15 },
+            { type: 'udvid', weight: 15 }
+        ];
+
+        const enhederTypes = [
+            { type: 'vaegt', weight: 35 },
+            { type: 'laengde', weight: 35 },
+            { type: 'volumen', weight: 30 }
+        ];
+
+        const typeNames = {
+            addition: 'Addition',
+            subtraction: 'Subtraktion',
+            multiplication: 'Multiplikation',
+            division: 'Division',
+            equation: 'Ligninger',
+            cirkel: 'Cirkel',
+            trekant: 'Trekant',
+            firkant: 'Firkant',
+            rumfang: 'Rumfang',
+            procent: 'Procent',
+            plus: 'Plus',
+            minus: 'Minus',
+            gange: 'Gange',
+            dividere: 'Division',
+            forenkl: 'Forkort',
+            udvid: 'Udvid',
+            vaegt: 'Vægt',
+            laengde: 'Længde',
+            volumen: 'Volumen'
+        };
+
+        const geometryTypes = [
+            { type: 'cirkel', weight: 30 },
+            { type: 'trekant', weight: 25 },
+            { type: 'firkant', weight: 25 },
+            { type: 'rumfang', weight: 20 }
+        ];
+
+        const moduleTypes = {
+            tal: problemTypes,
+            geometri: geometryTypes,
+            brok: brokTypes,
+            enheder: enhederTypes
+        };
+
+        const statConfig = {
+            tal: {
+                keys: ['total', 'addition', 'subtraction', 'multiplication', 'division', 'equation', 'procent'],
+                labels: ['Opgaver løst', 'Addition', 'Subtraktion', 'Multiplikation', 'Division', 'Ligninger', 'Procent'],
+                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FA500F', '#FF6A5E', '#FFFAEB']
+            },
+            geometri: {
+                keys: ['total', 'cirkel', 'trekant', 'firkant', 'rumfang'],
+                labels: ['Opgaver løst', 'Cirkler', 'Trekanter', 'Firkanter', 'Rumfang'],
+                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FF6A5E']
+            },
+            brok: {
+                keys: ['total', 'plus', 'minus', 'gange', 'dividere', 'forenkl', 'udvid'],
+                labels: ['Opgaver løst', 'Plus', 'Minus', 'Gange', 'Division', 'Forkort', 'Udvid'],
+                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FA500F', '#FF6A5E', '#FFFAEB']
+            },
+            enheder: {
+                keys: ['total', 'vaegt', 'laengde', 'volumen'],
+                labels: ['Opgaver løst', 'Vægt', 'Længde', 'Volumen'],
+                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205']
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderStats();
+            updateProgress();
+            generateProblem();
+        });
+
+        function setModule(m) {
+            activeModule = m;
+            for (const mod of ['tal', 'geometri', 'brok', 'enheder']) {
+                document.getElementById('mod-' + mod).classList.toggle('active', mod === m);
+            }
+            renderStats();
+            generateProblem();
+        }
+
+        function generateProblem() {
+            document.getElementById('solution').classList.remove('visible');
+            document.getElementById('show-solution').textContent = '💡 Vis løsning';
+            currentProblem.figure = '';
+            currentProblem.answerText = '';
+            currentProblem.attemptRecorded = false;
+
+            const types = moduleTypes[activeModule];
+            const totalWeight = types.reduce((sum, p) => sum + p.weight, 0);
+            let random = Math.random() * totalWeight;
+            let selectedType = types[0].type;
+
+            for (const pt of types) {
+                if (random < pt.weight) {
+                    selectedType = pt.type;
+                    break;
+                }
+                random -= pt.weight;
+            }
+
+            switch (selectedType) {
+                case 'addition': generateAddition(); break;
+                case 'subtraction': generateSubtraction(); break;
+                case 'multiplication': generateMultiplication(); break;
+                case 'division': generateDivision(); break;
+                case 'equation': generateEquation(); break;
+                case 'cirkel': generateCirkel(); break;
+                case 'trekant': generateTrekant(); break;
+                case 'firkant': generateFirkant(); break;
+                case 'rumfang': generateRumfang(); break;
+                case 'procent': generateProcent(); break;
+                case 'plus': generateBrok('plus'); break;
+                case 'minus': generateBrok('minus'); break;
+                case 'gange': generateBrok('gange'); break;
+                case 'dividere': generateBrok('dividere'); break;
+                case 'forenkl': generateBrok('forenkl'); break;
+                case 'udvid': generateBrok('udvid'); break;
+                case 'vaegt': generateEnhed('vaegt'); break;
+                case 'laengde': generateEnhed('laengde'); break;
+                case 'volumen': generateEnhed('volumen'); break;
+            }
+
+            document.getElementById('problem').textContent = currentProblem.problem;
+            const badge = document.getElementById('type-badge');
+            badge.textContent = typeNames[selectedType];
+            badge.dataset.type = selectedType;
+
+            const figure = document.getElementById('figure');
+            if (currentProblem.figure) {
+                figure.innerHTML = currentProblem.figure;
+                figure.classList.add('visible');
+            } else {
+                figure.innerHTML = '';
+                figure.classList.remove('visible');
+            }
+
+            const input = document.getElementById('answer-input');
+            input.value = '';
+            input.disabled = false;
+            input.focus();
+            document.getElementById('answer-feedback').className = 'feedback';
+        }
+
+        function generateAddition() {
+            const a = Math.floor(Math.random() * 500) + 100;
+            const b = Math.floor(Math.random() * 500) + 100;
+            const result = a + b;
+
+            currentProblem.type = 'addition';
+            currentProblem.problem = `${a} + ${b}`;
+            currentProblem.answer = result;
+
+            const aStr = a.toString();
+            const bStr = b.toString();
+
+            currentProblem.steps = [
+                `Lad os lægge <kbd>${aStr}</kbd> og <kbd>${bStr}</kbd> sammen kolonne for kolonne fra højre mod venstre:`,
+                `Enerplads: <kbd>${aStr.charAt(aStr.length - 1)}</kbd> + <kbd>${bStr.charAt(bStr.length - 1)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 1)) + parseInt(bStr.charAt(bStr.length - 1)))}</kbd>`,
+                aStr.length > 1 && bStr.length > 1 ? `Tierplads: <kbd>${aStr.charAt(aStr.length - 2)}</kbd> + <kbd>${bStr.charAt(bStr.length - 2)}</kbd> = <kbd>${(parseInt(aStr.charAt(aStr.length - 2)) + parseInt(bStr.charAt(bStr.length - 2)))}</kbd>` : '',
+                aStr.length > 2 && bStr.length > 2 ? `Hundrederplads: <kbd>${aStr.charAt(0)}</kbd> + <kbd>${bStr.charAt(0)}</kbd> = <kbd>${(parseInt(aStr.charAt(0)) + parseInt(bStr.charAt(0)))}</kbd>` : '',
+                `Slutresultat: <kbd>${a} + ${b} = ${result}</kbd>`
+            ].filter(s => s !== '');
+        }
+
+        function generateSubtraction() {
+            let a, b;
+            do {
+                a = Math.floor(Math.random() * 500) + 200;
+                b = Math.floor(Math.random() * 400) + 100;
+            } while (a <= b);
+
+            const result = a - b;
+
+            currentProblem.type = 'subtraction';
+            currentProblem.problem = `${a} - ${b}`;
+            currentProblem.answer = result;
+
+            currentProblem.steps = [
+                `Lad os trække <kbd>${b}</kbd> fra <kbd>${a}</kbd>:`,
+                `Vi kan dele det op: <kbd>${a}</kbd> - <kbd>${b}</kbd> = <kbd>${a - b}</kbd>`,
+                `Kontrol: <kbd>${result} + ${b} = ${a}</kbd>`,
+                `Slutresultat: <kbd>${a} - ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateMultiplication() {
+            const a = Math.floor(Math.random() * 20) + 2;
+            const b = Math.floor(Math.random() * 20) + 2;
+            const result = a * b;
+
+            currentProblem.type = 'multiplication';
+            currentProblem.problem = `${a} × ${b}`;
+            currentProblem.answer = result;
+
+            currentProblem.steps = [
+                `Vi kan bruge den distributive lov for multiplikation:`,
+                `Del det ene tal op: <kbd>${b} = ${Math.floor(b / 10) * 10} + ${b % 10}</kbd>`,
+                `Først gange: <kbd>${a} × ${Math.floor(b / 10) * 10} = ${a * (Math.floor(b / 10) * 10)}</kbd>`,
+                `Så gange: <kbd>${a} × ${b % 10} = ${a * (b % 10)}</kbd>`,
+                `Læg delresultaterne sammen: <kbd>${a * (Math.floor(b / 10) * 10)} + ${a * (b % 10)} = ${result}</kbd>`,
+                `Slutresultat: <kbd>${a} × ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateDivision() {
+            let a, b;
+            do {
+                b = Math.floor(Math.random() * 12) + 2;
+                const quotient = Math.floor(Math.random() * 20) + 2;
+                a = b * quotient;
+            } while (a > 300);
+
+            const result = a / b;
+
+            currentProblem.type = 'division';
+            currentProblem.problem = `${a} ÷ ${b}`;
+            currentProblem.answer = result;
+
+            currentProblem.steps = [
+                `Lad os dividere <kbd>${a}</kbd> med <kbd>${b}</kbd>:`,
+                `Spørg: Hvor mange gange går <kbd>${b}</kbd> op i <kbd>${a}</kbd>?`,
+                `Vi ved, at: <kbd>${b} × ${result} = ${a}</kbd>`,
+                `Kontrol: <kbd>${result} × ${b} = ${a}</kbd>`,
+                `Slutresultat: <kbd>${a} ÷ ${b} = ${result}</kbd>`
+            ];
+        }
+
+        function generateEquation() {
+            const equationTypes = ['ax+b=c', 'a(x+b)=c', 'ax-b=c', 'a(x-b)=c'];
+            const type = equationTypes[Math.floor(Math.random() * equationTypes.length)];
+
+            let a, b, c, x;
+
+            switch (type) {
+                case 'ax+b=c':
+                    a = Math.floor(Math.random() * 8) + 2;
+                    b = Math.floor(Math.random() * 20) + 1;
+                    x = Math.floor(Math.random() * 10) + 1;
+                    c = a * x + b;
+                    currentProblem.problem = `${a}x + ${b} = ${c}`;
+                    currentProblem.steps = [
+                        `Givet: <kbd>${a}x + ${b} = ${c}</kbd>`,
+                        `Trin 1: Træk <kbd>${b}</kbd> fra på begge sider: <kbd>${a}x = ${c - b}</kbd>`,
+                        `Trin 2: Divider begge sider med <kbd>${a}</kbd>: <kbd>x = ${(c - b) / a}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'a(x+b)=c':
+                    a = Math.floor(Math.random() * 6) + 2;
+                    b = Math.floor(Math.random() * 10) + 1;
+                    x = Math.floor(Math.random() * 8) + 1;
+                    c = a * (x + b);
+                    currentProblem.problem = `${a}(x + ${b}) = ${c}`;
+                    currentProblem.steps = [
+                        `Givet: <kbd>${a}(x + ${b}) = ${c}</kbd>`,
+                        `Trin 1: Divider begge sider med <kbd>${a}</kbd>: <kbd>x + ${b} = ${c / a}</kbd>`,
+                        `Trin 2: Træk <kbd>${b}</kbd> fra på begge sider: <kbd>x = ${c / a - b}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'ax-b=c':
+                    a = Math.floor(Math.random() * 8) + 2;
+                    b = Math.floor(Math.random() * 20) + 1;
+                    x = Math.floor(Math.random() * 10) + 1;
+                    c = a * x - b;
+                    currentProblem.problem = `${a}x - ${b} = ${c}`;
+                    currentProblem.steps = [
+                        `Givet: <kbd>${a}x - ${b} = ${c}</kbd>`,
+                        `Trin 1: Læg <kbd>${b}</kbd> til på begge sider: <kbd>${a}x = ${c + b}</kbd>`,
+                        `Trin 2: Divider begge sider med <kbd>${a}</kbd>: <kbd>x = ${(c + b) / a}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+                case 'a(x-b)=c':
+                    a = Math.floor(Math.random() * 6) + 2;
+                    b = Math.floor(Math.random() * 10) + 1;
+                    x = Math.floor(Math.random() * 8) + 1 + b;
+                    c = a * (x - b);
+                    currentProblem.problem = `${a}(x - ${b}) = ${c}`;
+                    currentProblem.steps = [
+                        `Givet: <kbd>${a}(x - ${b}) = ${c}</kbd>`,
+                        `Trin 1: Divider begge sider med <kbd>${a}</kbd>: <kbd>x - ${b} = ${c / a}</kbd>`,
+                        `Trin 2: Læg <kbd>${b}</kbd> til på begge sider: <kbd>x = ${c / a + b}</kbd>`,
+                        `Slutløsning: <kbd>x = ${x}</kbd>`
+                    ];
+                    break;
+            }
+            currentProblem.type = 'equation';
+            currentProblem.answer = x;
+        }
+
+        function svgCirkel(val, label) {
+            const line = label === 'r'
+                ? `<line x1="80" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="115" y="56" class="fig-label">r = ${val}</text>`
+                : `<line x1="50" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="72" y="43" class="fig-label">d = ${val}</text>`;
+            return `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><circle cx="80" cy="50" r="30" fill="rgba(255,216,0,0.12)" stroke="#FFD800" stroke-width="4"/>${line}</svg>`;
+        }
+
+        function generateCirkel() {
+            const r = Math.floor(Math.random() * 11) + 2;
+            const givenD = Math.random() < 0.5;
+            const d = r * 2;
+            currentProblem.type = 'cirkel';
+            if (Math.random() < 0.5) {
+                currentProblem.problem = 'O = ?';
+                currentProblem.answer = round2(givenD ? PI * d : 2 * PI * r);
+                currentProblem.figure = svgCirkel(givenD ? d : r, givenD ? 'd' : 'r');
+                const given = givenD ? `diameteren <kbd>d = ${d}</kbd>` : `radius <kbd>r = ${r}</kbd>`;
+                currentProblem.steps = [
+                    `Vi skal finde omkredsen af cirklen med ${given}:`,
+                    givenD ? `Formel: <kbd>O = π · d</kbd>` : `Formel: <kbd>O = 2 · π · r</kbd>`,
+                    givenD
+                        ? `Indsæt: <kbd>O = 3,14 · ${d} = ${formatNumber(round2(PI * d))}</kbd>`
+                        : `Indsæt: <kbd>O = 2 · 3,14 · ${r} = ${formatNumber(round2(2 * PI * r))}</kbd>`,
+                    `Slutresultat: <kbd>O = ${formatNumber(currentProblem.answer)}</kbd>`
+                ];
+            } else {
+                currentProblem.problem = 'A = ?';
+                currentProblem.answer = round2(PI * r * r);
+                currentProblem.figure = svgCirkel(r, 'r');
+                currentProblem.steps = [
+                    `Vi skal finde arealet af cirklen med radius <kbd>r = ${r}</kbd>:`,
+                    `Formel: <kbd>A = π · r²</kbd>`,
+                    `Indsæt: <kbd>A = 3,14 · ${r}² = 3,14 · ${r * r} = ${formatNumber(round2(PI * r * r))}</kbd>`,
+                    `Slutresultat: <kbd>A = ${formatNumber(currentProblem.answer)}</kbd>`
+                ];
+            }
+        }
+
+        function generateTrekant() {
+            currentProblem.type = 'trekant';
+            const roll = Math.random();
+            if (roll < 0.4) {
+                const g = Math.floor(Math.random() * 12) + 4;
+                const h = Math.floor(Math.random() * 10) + 3;
+                currentProblem.problem = 'A = ?';
+                currentProblem.answer = (g * h) / 2;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="40,75 120,75 120,30" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="72" y="93" class="fig-label">g = ${g}</text><text x="126" y="56" class="fig-label">h = ${h}</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde arealet af trekanten med grundlinje <kbd>g = ${g}</kbd> og højde <kbd>h = ${h}</kbd>:`,
+                    `Formel: <kbd>A = ½ · g · h = (g · h) / 2</kbd>`,
+                    `Indsæt: <kbd>A = (${g} · ${h}) / 2 = ${g * h} / 2 = ${formatNumber((g * h) / 2)}</kbd>`,
+                    `Slutresultat: <kbd>A = ${formatNumber(currentProblem.answer)}</kbd>`
+                ];
+            } else if (roll < 0.7) {
+                const a = Math.floor(Math.random() * 8) + 3;
+                const b = Math.floor(Math.random() * 8) + 3;
+                const c = Math.floor(Math.random() * 8) + 3;
+                currentProblem.problem = 'O = ?';
+                currentProblem.answer = a + b + c;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="80" y="93" class="fig-label">c = ${c}</text><text x="6" y="48" class="fig-label">a = ${a}</text><text x="132" y="52" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde omkredsen af trekanten med siderne <kbd>a = ${a}</kbd>, <kbd>b = ${b}</kbd> og <kbd>c = ${c}</kbd>:`,
+                    `Formel: <kbd>O = a + b + c</kbd>`,
+                    `Indsæt: <kbd>O = ${a} + ${b} + ${c} = ${a + b + c}</kbd>`,
+                    `Slutresultat: <kbd>O = ${a + b + c}</kbd>`
+                ];
+            } else {
+                const a = Math.floor(Math.random() * 41) + 30;
+                const b = Math.floor(Math.random() * 41) + 30;
+                currentProblem.problem = 'x = ?';
+                currentProblem.answer = 180 - a - b;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="56" y="66" class="fig-label">${a}°</text><text x="100" y="66" class="fig-label">${b}°</text><text x="78" y="40" class="fig-label">x°</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde den ukendte vinkel <kbd>x</kbd> i trekanten:`,
+                    `Vinkelsummen i en trekant er altid <kbd>180°</kbd>:`,
+                    `Indsæt: <kbd>x = 180° - ${a}° - ${b}° = ${180 - a - b}°</kbd>`,
+                    `Slutresultat: <kbd>x = ${180 - a - b}°</kbd>`
+                ];
+            }
+        }
+
+        function generateFirkant() {
+            currentProblem.type = 'firkant';
+            const wantAreal = Math.random() < 0.5;
+            const square = Math.random() < 0.4;
+            currentProblem.problem = wantAreal ? 'A = ?' : 'O = ?';
+            if (square) {
+                const s = Math.floor(Math.random() * 9) + 3;
+                currentProblem.answer = wantAreal ? s * s : 4 * s;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="55" y="28" width="55" height="55" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="76" y="20" class="fig-label">s = ${s}</text><text x="115" y="60" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.steps = wantAreal ? [
+                    `Vi skal finde arealet af kvadratet med sidelængden <kbd>s = ${s}</kbd>:`,
+                    `Formel: <kbd>A = s²</kbd>`,
+                    `Indsæt: <kbd>A = ${s}² = ${s * s}</kbd>`,
+                    `Slutresultat: <kbd>A = ${s * s}</kbd>`
+                ] : [
+                    `Vi skal finde omkredsen af kvadratet med sidelængden <kbd>s = ${s}</kbd>:`,
+                    `Formel: <kbd>O = 4 · s</kbd>`,
+                    `Indsæt: <kbd>O = 4 · ${s} = ${4 * s}</kbd>`,
+                    `Slutresultat: <kbd>O = ${4 * s}</kbd>`
+                ];
+            } else {
+                const l = Math.floor(Math.random() * 11) + 4;
+                const b = Math.floor(Math.random() * 8) + 3;
+                currentProblem.answer = wantAreal ? l * b : 2 * (l + b);
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="40" y="25" width="85" height="50" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="75" y="17" class="fig-label">l = ${l}</text><text x="131" y="55" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.steps = wantAreal ? [
+                    `Vi skal finde arealet af rektanglet med længde <kbd>l = ${l}</kbd> og bredde <kbd>b = ${b}</kbd>:`,
+                    `Formel: <kbd>A = l · b</kbd>`,
+                    `Indsæt: <kbd>A = ${l} · ${b} = ${l * b}</kbd>`,
+                    `Slutresultat: <kbd>A = ${l * b}</kbd>`
+                ] : [
+                    `Vi skal finde omkredsen af rektanglet med længde <kbd>l = ${l}</kbd> og bredde <kbd>b = ${b}</kbd>:`,
+                    `Formel: <kbd>O = 2 · (l + b)</kbd>`,
+                    `Indsæt: <kbd>O = 2 · (${l} + ${b}) = 2 · ${l + b} = ${2 * (l + b)}</kbd>`,
+                    `Slutresultat: <kbd>O = ${2 * (l + b)}</kbd>`
+                ];
+            }
+        }
+
+        function generateRumfang() {
+            currentProblem.type = 'rumfang';
+            currentProblem.problem = 'V = ?';
+            if (Math.random() < 0.4) {
+                const s = Math.floor(Math.random() * 7) + 2;
+                currentProblem.answer = s * s * s;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="50,45 65,30 115,30 100,45" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,45 115,30 115,80 100,95" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="50" y="45" width="50" height="50" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="68" y="107" class="fig-label">s = ${s}</text><text x="120" y="75" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde rumfanget af terningen med kantlængden <kbd>s = ${s}</kbd>:`,
+                    `Formel: <kbd>V = s³</kbd>`,
+                    `Indsæt: <kbd>V = ${s}³ = ${s} · ${s} · ${s} = ${s * s * s}</kbd>`,
+                    `Slutresultat: <kbd>V = ${s * s * s}</kbd>`
+                ];
+            } else {
+                const l = Math.floor(Math.random() * 8) + 3;
+                const b = Math.floor(Math.random() * 7) + 2;
+                const h = Math.floor(Math.random() * 7) + 2;
+                currentProblem.answer = l * b * h;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="40,42 55,27 115,27 100,42" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,42 115,27 115,75 100,90" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="40" y="42" width="60" height="48" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="63" y="105" class="fig-label">l = ${l}</text><text x="120" y="70" class="fig-label">h = ${h}</text><text x="72" y="20" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.steps = [
+                    `Vi skal finde rumfanget af kassen med længde <kbd>l = ${l}</kbd>, bredde <kbd>b = ${b}</kbd> og højde <kbd>h = ${h}</kbd>:`,
+                    `Formel: <kbd>V = l · b · h</kbd>`,
+                    `Indsæt: <kbd>V = ${l} · ${b} · ${h} = ${l * b * h}</kbd>`,
+                    `Slutresultat: <kbd>V = ${l * b * h}</kbd>`
+                ];
+            }
+        }
+
+        function gcd(a, b) {
+            a = Math.abs(a);
+            b = Math.abs(b);
+            while (b) {
+                const t = b;
+                b = a % b;
+                a = t;
+            }
+            return a;
+        }
+
+        function reduceFrac(n, d) {
+            const g = gcd(n, d) || 1;
+            return [n / g, d / g];
+        }
+
+        function brokText(n, d) {
+            return d === 1 ? String(n) : `${n}/${d}`;
+        }
+
+        function generateProcent() {
+            currentProblem.type = 'procent';
+            const variant = Math.floor(Math.random() * 3);
+            if (variant === 0) {
+                const p = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 90][Math.floor(Math.random() * 12)];
+                const tal = (Math.floor(Math.random() * 39) + 2) * 10;
+                currentProblem.problem = `${p} % af ${tal} = ?`;
+                currentProblem.answer = (p / 100) * tal;
+                currentProblem.steps = [
+                    `Vi skal finde <kbd>${p} %</kbd> af <kbd>${tal}</kbd>:`,
+                    `${p} % betyder hundrededele: <kbd>${p} % = ${p}/100 = ${formatNumber(p / 100)}</kbd>`,
+                    `Indsæt: <kbd>${formatNumber(p / 100)} · ${tal} = ${formatNumber((p / 100) * tal)}</kbd>`,
+                    `Slutresultat: <kbd>${p} % af ${tal} = ${formatNumber(currentProblem.answer)}</kbd>`
+                ];
+            } else if (variant === 1) {
+                const p = Math.floor(Math.random() * 99) + 1;
+                currentProblem.problem = `${p} % = ? (decimaltal)`;
+                currentProblem.answer = p / 100;
+                currentProblem.steps = [
+                    `Vi skal skrive <kbd>${p} %</kbd> som decimaltal:`,
+                    `Procent betyder hundrededele — del med 100: <kbd>${p} % = ${p} : 100</kbd>`,
+                    `Indsæt: <kbd>${p} % = ${formatNumber(p / 100)}</kbd>`,
+                    `Slutresultat: <kbd>${p} % = ${formatNumber(currentProblem.answer)}</kbd>`
+                ];
+            } else {
+                const p = Math.floor(Math.random() * 99) + 1;
+                const d = p / 100;
+                currentProblem.problem = `${formatNumber(d)} = ? %`;
+                currentProblem.answer = p;
+                currentProblem.steps = [
+                    `Vi skal skrive <kbd>${formatNumber(d)}</kbd> som procent:`,
+                    `Gang decimaltallet med 100 og sæt %-tegn på: <kbd>${formatNumber(d)} · 100</kbd>`,
+                    `Indsæt: <kbd>${formatNumber(d)} · 100 = ${p} %</kbd>`,
+                    `Slutresultat: <kbd>${formatNumber(d)} = ${p} %</kbd>`
+                ];
+            }
+        }
+
+        function generateBrok(type) {
+            currentProblem.type = type;
+            if (type === 'plus' || type === 'minus') {
+                const c = type === 'minus' ? Math.floor(Math.random() * 10) + 3 : Math.floor(Math.random() * 11) + 2;
+                let a, b;
+                if (type === 'minus') {
+                    b = Math.floor(Math.random() * (c - 2)) + 1;
+                    a = b + 1 + Math.floor(Math.random() * (c - 1 - b));
+                } else {
+                    a = Math.floor(Math.random() * (c - 1)) + 1;
+                    b = Math.floor(Math.random() * (c - 1)) + 1;
+                }
+                const sum = type === 'plus' ? a + b : a - b;
+                const [rn, rd] = reduceFrac(sum, c);
+                const tegn = type === 'plus' ? '+' : '-';
+                currentProblem.problem = `${a}/${c} ${tegn} ${b}/${c} = ?`;
+                currentProblem.answer = sum / c;
+                currentProblem.answerText = brokText(rn, rd);
+                const intro = type === 'plus'
+                    ? `Vi skal lægge brøkerne <kbd>${a}/${c}</kbd> og <kbd>${b}/${c}</kbd> sammen:`
+                    : `Vi skal trække <kbd>${b}/${c}</kbd> fra <kbd>${a}/${c}</kbd>:`;
+                const rule = type === 'plus'
+                    ? `Brøkerne har samme nævner <kbd>${c}</kbd> — behold nævneren og læg tællerne sammen:`
+                    : `Brøkerne har samme nævner <kbd>${c}</kbd> — behold nævneren og træk tællerne fra hinanden:`;
+                const tæller = type === 'plus' ? `${a} + ${b} = ${sum}` : `${a} - ${b} = ${sum}`;
+                currentProblem.steps = [
+                    intro,
+                    rule,
+                    `Indsæt: <kbd>${tæller}</kbd>`,
+                    `Indsæt: <kbd>${a}/${c} ${tegn} ${b}/${c} = ${sum}/${c}</kbd>`,
+                    ...(rn !== sum ? [`Forkort: <kbd>${sum}/${c} = ${brokText(rn, rd)}</kbd>`] : []),
+                    `Slutresultat: <kbd>${a}/${c} ${tegn} ${b}/${c} = ${currentProblem.answerText}</kbd>`
+                ];
+            } else if (type === 'gange' || type === 'dividere') {
+                const a = Math.floor(Math.random() * 9) + 1;
+                const b = Math.floor(Math.random() * 8) + 2;
+                const c = Math.floor(Math.random() * 9) + 1;
+                const d = Math.floor(Math.random() * 8) + 2;
+                const pn = type === 'gange' ? a * c : a * d;
+                const pd = type === 'gange' ? b * d : b * c;
+                const [rn, rd] = reduceFrac(pn, pd);
+                currentProblem.problem = type === 'gange' ? `${a}/${b} · ${c}/${d} = ?` : `${a}/${b} ÷ ${c}/${d} = ?`;
+                currentProblem.answer = pn / pd;
+                currentProblem.answerText = brokText(rn, rd);
+                currentProblem.steps = type === 'gange' ? [
+                    `Vi skal gange brøkerne <kbd>${a}/${b}</kbd> og <kbd>${c}/${d}</kbd>:`,
+                    `Gang tæller med tæller og nævner med nævner: <kbd>(${a} · ${c}) / (${b} · ${d})</kbd>`,
+                    `Indsæt: <kbd>${a}/${b} · ${c}/${d} = ${pn}/${pd}</kbd>`,
+                    ...(rn !== pn ? [`Forkort: <kbd>${pn}/${pd} = ${brokText(rn, rd)}</kbd>`] : []),
+                    `Slutresultat: <kbd>${a}/${b} · ${c}/${d} = ${currentProblem.answerText}</kbd>`
+                ] : [
+                    `Vi skal dividere <kbd>${a}/${b}</kbd> med <kbd>${c}/${d}</kbd>:`,
+                    `Division med en brøk = gang med den omvendte brøk: <kbd>${a}/${b} · ${d}/${c}</kbd>`,
+                    `Indsæt: <kbd>(${a} · ${d}) / (${b} · ${c}) = ${pn}/${pd}</kbd>`,
+                    ...(rn !== pn ? [`Forkort: <kbd>${pn}/${pd} = ${brokText(rn, rd)}</kbd>`] : []),
+                    `Slutresultat: <kbd>${a}/${b} ÷ ${c}/${d} = ${currentProblem.answerText}</kbd>`
+                ];
+            } else if (type === 'forenkl') {
+                const k = Math.floor(Math.random() * 3) + 2;
+                let rp, rq;
+                do {
+                    rp = Math.floor(Math.random() * 8) + 1;
+                    rq = Math.floor(Math.random() * 8) + 2;
+                } while (gcd(rp, rq) !== 1);
+                const a = k * rp;
+                const b = k * rq;
+                currentProblem.problem = `Forkort brøken ${a}/${b}`;
+                currentProblem.answer = rp / rq;
+                currentProblem.answerText = brokText(rp, rq);
+                currentProblem.steps = [
+                    `Vi skal forkorte brøken <kbd>${a}/${b}</kbd>:`,
+                    `Find største fælles divisor af ${a} og ${b} — det er <kbd>${k}</kbd>:`,
+                    `Del både tæller og nævner med ${k}: <kbd>${a} : ${k} = ${rp}</kbd> og <kbd>${b} : ${k} = ${rq}</kbd>`,
+                    `Slutresultat: <kbd>${a}/${b} = ${brokText(rp, rq)}</kbd>`
+                ];
+            } else {
+                let b, d;
+                do {
+                    b = Math.floor(Math.random() * 5) + 2;
+                    d = Math.floor(Math.random() * 5) + 2;
+                } while (b === d);
+                const a = Math.floor(Math.random() * (b - 1)) + 1;
+                const c = Math.floor(Math.random() * (d - 1)) + 1;
+                const pd = b * d;
+                const pn = a * d + c * b;
+                const [rn, rd] = reduceFrac(pn, pd);
+                currentProblem.problem = `${a}/${b} + ${c}/${d} = ?`;
+                currentProblem.answer = pn / pd;
+                currentProblem.answerText = brokText(rn, rd);
+                currentProblem.steps = [
+                    `Vi skal lægge <kbd>${a}/${b}</kbd> og <kbd>${c}/${d}</kbd> sammen — nævnerne er forskellige:`,
+                    `Find fælles nævner: <kbd>${b} · ${d} = ${pd}</kbd>`,
+                    `Udvid brøkerne: <kbd>${a}/${b} = ${a * d}/${pd}</kbd> og <kbd>${c}/${d} = ${c * b}/${pd}</kbd>`,
+                    `Læg sammen: <kbd>${a * d}/${pd} + ${c * b}/${pd} = ${pn}/${pd}</kbd>`,
+                    ...(rn !== pn ? [`Forkort: <kbd>${pn}/${pd} = ${brokText(rn, rd)}</kbd>`] : []),
+                    `Slutresultat: <kbd>${a}/${b} + ${c}/${d} = ${currentProblem.answerText}</kbd>`
+                ];
+            }
+        }
+
+        const enhedTables = {
+            vaegt: [
+                { fra: 'kg', til: 'g', faktor: 1000 },
+                { fra: 'g', til: 'kg', faktor: 0.001 },
+                { fra: 't', til: 'kg', faktor: 1000 },
+                { fra: 'kg', til: 't', faktor: 0.001 }
+            ],
+            laengde: [
+                { fra: 'km', til: 'm', faktor: 1000 },
+                { fra: 'm', til: 'km', faktor: 0.001 },
+                { fra: 'm', til: 'cm', faktor: 100 },
+                { fra: 'cm', til: 'm', faktor: 0.01 },
+                { fra: 'm', til: 'mm', faktor: 1000 },
+                { fra: 'mm', til: 'm', faktor: 0.001 }
+            ],
+            volumen: [
+                { fra: 'L', til: 'mL', faktor: 1000 },
+                { fra: 'mL', til: 'L', faktor: 0.001 },
+                { fra: 'L', til: 'dL', faktor: 10 },
+                { fra: 'dL', til: 'L', faktor: 0.1 },
+                { fra: 'dL', til: 'mL', faktor: 100 },
+                { fra: 'mL', til: 'dL', faktor: 0.01 }
+            ]
+        };
+
+        function generateEnhed(type) {
+            currentProblem.type = type;
+            const table = enhedTables[type];
+            const conv = table[Math.floor(Math.random() * table.length)];
+            const v = Math.floor(Math.random() * 999) + 1;
+            const del = 1 / conv.faktor;
+            currentProblem.answer = conv.faktor >= 1 ? v * conv.faktor : v / del;
+            currentProblem.answerText = `${formatNumber(currentProblem.answer)} ${conv.til}`;
+            currentProblem.problem = `Omregn ${formatNumber(v)} ${conv.fra} til ${conv.til} = ?`;
+            const note = conv.faktor >= 1
+                ? `1 ${conv.fra} = ${formatNumber(conv.faktor)} ${conv.til}`
+                : `1 ${conv.til} = ${formatNumber(del)} ${conv.fra}`;
+            const op = conv.faktor >= 1 ? `· ${formatNumber(conv.faktor)}` : `: ${formatNumber(del)}`;
+            currentProblem.steps = [
+                `Vi skal omregne <kbd>${formatNumber(v)} ${conv.fra}</kbd> til <kbd>${conv.til}</kbd>:`,
+                `Husk: <kbd>${note}</kbd>`,
+                `Indsæt: <kbd>${formatNumber(v)} ${conv.fra} ${op} = ${formatNumber(currentProblem.answer)} ${conv.til}</kbd>`,
+                `Slutresultat: <kbd>${formatNumber(v)} ${conv.fra} = ${currentProblem.answerText}</kbd>`
+            ];
+        }
+
+        function showSolution() {
+            const solutionDiv = document.getElementById('solution');
+            const solutionSteps = document.getElementById('solution-steps');
+            const showBtn = document.getElementById('show-solution');
+
+            if (solutionDiv.classList.contains('visible')) {
+                solutionDiv.classList.remove('visible');
+                showBtn.textContent = '💡 Vis løsning';
+            } else {
+                let stepsHtml = '';
+                currentProblem.steps.forEach((step) => {
+                    stepsHtml += `<div class="step">${step}</div>`;
+                });
+                solutionSteps.innerHTML = stepsHtml;
+                solutionDiv.classList.add('visible');
+                showBtn.textContent = '📖 Skjul løsning';
+            }
+        }
+
+        function formatNumber(n) {
+            return String(n).replace('.', ',');
+        }
+
+        function round2(n) {
+            return Math.round(n * 100) / 100;
+        }
+
+        function showFeedback(ok, msg) {
+            const fb = document.getElementById('answer-feedback');
+            fb.classList.remove('visible', 'correct', 'wrong');
+            void fb.offsetWidth;
+            fb.textContent = msg;
+            fb.classList.add('visible', ok ? 'correct' : 'wrong');
+        }
+
+        function parseAnswer(raw) {
+            raw = raw.trim().replace(',', '.');
+            if (raw === '') return NaN;
+            if (raw.includes('/')) {
+                const parts = raw.split('/');
+                if (parts.length !== 2) return NaN;
+                const num = Number(parts[0]);
+                const den = Number(parts[1]);
+                if (isNaN(num) || isNaN(den) || den === 0) return NaN;
+                return num / den;
+            }
+            return Number(raw);
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('answer-input');
+            if (input.disabled) return;
+            const guess = parseAnswer(input.value);
+            if (isNaN(guess)) {
+                showFeedback(false, input.value.trim() === '' ? '❌ Skriv dit svar først!' : '❌ Det skal være et tal (eller en brøk som 3/4)!');
+                return;
+            }
+            const ans = currentProblem.answer;
+            const tol = currentProblem.type === 'cirkel' ? Math.max(0.05, Math.abs(ans) * 0.01) : 1e-9 * Math.max(1, Math.abs(ans));
+            const ok = Math.abs(guess - ans) <= tol;
+            // Kun første svar på en opgave tæller i statistikken (dagens %, graf og sessionsstatistik)
+            const firstTry = !currentProblem.attemptRecorded;
+            if (firstTry) {
+                recordAttempt(ok);
+                currentProblem.attemptRecorded = true;
+            }
+            if (ok) {
+                let expr;
+                if (currentProblem.type === 'equation') {
+                    expr = `x = ${formatNumber(ans)}`;
+                } else if (currentProblem.problem.includes('= ?')) {
+                    const shown = currentProblem.answerText || formatNumber(ans) + (currentProblem.problem === 'x = ?' ? '°' : '');
+                    expr = currentProblem.problem.replace('= ?', '= ' + shown);
+                } else {
+                    expr = `${currentProblem.problem} = ${currentProblem.answerText || formatNumber(ans)}`;
+                }
+                showFeedback(true, `✅ KORREKT! ${expr}${firstTry ? '' : ' (statistikken tæller kun første svar)'}`);
+                input.disabled = true;
+                if (firstTry) {
+                    stats[activeModule].total++;
+                    stats[activeModule][currentProblem.type]++;
+                    renderStats();
+                }
+            } else {
+                showFeedback(false, firstTry ? '❌ Forkert — prøv igen! (tæller i statistikken)' : '❌ Forkert — prøv igen! (tæller ikke — kun første svar tæller)');
+            }
+        }
+
+        const HISTORY_KEY = 'mathaid_history_v1';
+
+        const COOKIE_KEY = 'mathaid_history';
+
+        function readCookieHistory() {
+            try {
+                const m = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_KEY + '=([^;]*)'));
+                return m ? (JSON.parse(decodeURIComponent(m[1])) || {}) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function writeCookieHistory(h) {
+            try {
+                // Cookies er maks ~4 KB — behold kun de seneste 50 dage (~3 KB URL-kodet)
+                const keys = Object.keys(h).sort().slice(-50);
+                const trimmed = {};
+                keys.forEach((k) => { trimmed[k] = h[k]; });
+                const expires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
+                document.cookie = COOKIE_KEY + '=' + encodeURIComponent(JSON.stringify(trimmed)) + '; expires=' + expires + '; path=/; SameSite=Lax';
+            } catch (e) { /* cookie blokeret — localStorage bærer stadig */ }
+        }
+
+        function loadHistory() {
+            let ls = {};
+            try {
+                ls = JSON.parse(localStorage.getItem(HISTORY_KEY)) || {};
+            } catch (e) { /* ignorer */ }
+            // cookie og localStorage smeltes sammen; localStorage vinder pr. nøgle
+            return Object.assign({}, readCookieHistory(), ls);
+        }
+
+        function saveHistory(h) {
+            try {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+            } catch (e) { /* lokalt lager utilgængeligt — cookie bærer stadig */ }
+            writeCookieHistory(h);
+        }
+
+        function dateKey(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function recordAttempt(correct) {
+            const h = loadHistory();
+            const k = dateKey(new Date());
+            if (!h[k]) h[k] = { correct: 0, total: 0 };
+            h[k].total++;
+            if (correct) h[k].correct++;
+            saveHistory(h);
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const h = loadHistory();
+            const t = h[dateKey(new Date())] || { correct: 0, total: 0 };
+            const pctEl = document.getElementById('today-pct');
+            const detEl = document.getElementById('today-detail');
+            if (t.total === 0) {
+                pctEl.textContent = '–';
+                pctEl.style.color = '';
+                detEl.textContent = 'Ingen svar endnu i dag';
+            } else {
+                const pct = Math.round((t.correct / t.total) * 100);
+                pctEl.textContent = pct + ' %';
+                pctEl.style.color = pct >= 75 ? 'var(--m-orange-dark)' : pct >= 50 ? '#B36A00' : 'var(--m-red)';
+                detEl.textContent = `${t.correct} af ${t.total} svar rigtige i dag`;
+            }
+            const days = lastNDays(h, 7);
+            const pctColors = ['#E10500', '#FA500F', '#FF8205', '#FFAF00', '#FFD800'];
+            drawBars('chart', days,
+                (d) => (d.entry && d.entry.total > 0 ? (d.entry.correct / d.entry.total) * 100 : null),
+                (v) => Math.round(v) + '%',
+                (v) => pctColors[Math.min(4, Math.floor(v / 25))],
+                100, 4);
+            const maxCount = Math.max(1, ...days.map((d) => (d.entry ? d.entry.total : 0)));
+            drawBars('chart-counts', days,
+                (d) => (d.entry ? d.entry.total : 0),
+                (v) => String(Math.round(v)),
+                () => '#FF8205',
+                maxCount, Math.min(maxCount, 8));
+        }
+
+        function lastNDays(h, n) {
+            const days = [];
+            const now = new Date();
+            for (let i = n - 1; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+                days.push({ label: d.getDate() + '/' + (d.getMonth() + 1), entry: h[dateKey(d)] || null });
+            }
+            return days;
+        }
+
+        function drawBars(canvasId, days, getVal, fmtVal, colorFor, yMax, gridSteps) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !canvas.getContext) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const top = 16, bottom = 46, left = 48, right = 8;
+            const baseY = H - bottom;
+            const plotH = H - top - bottom;
+            ctx.fillStyle = '#150C24';
+            ctx.fillRect(0, 0, W, H);
+            // større tal på akserne
+            ctx.font = '19px VT323, monospace';
+            for (let s = 0; s <= gridSteps; s++) {
+                const y = baseY - (s / gridSteps) * plotH;
+                ctx.strokeStyle = 'rgba(255,250,235,0.15)';
+                ctx.beginPath();
+                ctx.moveTo(left, y);
+                ctx.lineTo(W - right, y);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255,250,235,0.75)';
+                ctx.fillText(fmtVal((yMax / gridSteps) * s), 2, y + 5);
+            }
+            const slot = (W - left - right) / days.length;
+            const barW = Math.max(6, Math.floor(slot) - 8);
+            days.forEach((day, i) => {
+                const x = left + i * slot + (slot - barW) / 2;
+                const val = getVal(day);
+                const stub = val === null;
+                const bh = stub ? 4 : Math.max(val === 0 ? 0 : 2, (val / yMax) * plotH);
+                ctx.fillStyle = stub ? 'rgba(255,250,235,0.12)' : colorFor(val);
+                ctx.fillRect(x, baseY - bh, barW, bh);
+                // stort ORANGE tal UNDER hver søjle, datoen nederst
+                if (!stub) {
+                    ctx.font = '24px VT323, monospace';
+                    ctx.fillStyle = '#FF8205';
+                    ctx.fillText(fmtVal(val), x - 2, baseY + 27);
+                }
+                ctx.font = '15px VT323, monospace';
+                ctx.fillStyle = 'rgba(255,250,235,0.6)';
+                ctx.fillText(day.label, x - 2, baseY + 42);
+            });
+        }
+
+        function renderStats() {
+            const cfg = statConfig[activeModule];
+            const bar = document.getElementById('stats');
+            bar.innerHTML = '';
+            cfg.keys.forEach((key, i) => {
+                const item = document.createElement('div');
+                item.className = 'stat-item';
+                const val = document.createElement('div');
+                val.className = 'stat-value';
+                val.textContent = stats[activeModule][key];
+                val.style.color = cfg.colors[i];
+                const lab = document.createElement('div');
+                lab.className = 'stat-label';
+                lab.textContent = cfg.labels[i];
+                item.appendChild(val);
+                item.appendChild(lab);
+                bar.appendChild(item);
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target && e.target.id === 'answer-input') {
+                if (e.key === 'Enter') {
+                    checkAnswer();
+                    e.preventDefault();
+                }
+                return;
+            }
+            if (e.target && e.target.tagName === 'BUTTON') return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                showSolution();
+                e.preventDefault();
+            } else if (e.key === 'r' || e.key === 'R') {
+                generateProblem();
+                e.preventDefault();
+            }
+        });
+
+        if (typeof navigator !== 'undefined' && typeof location !== 'undefined' && 'serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>

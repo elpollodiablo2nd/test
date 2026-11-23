@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Math Aid — Pixel Edition</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#FF8205">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -424,6 +427,58 @@
             opacity: 0.85;
         }
 
+        .progress-card {
+            padding: 1.5rem;
+        }
+
+        .progress-head {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .progress-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.7rem;
+            color: var(--ink);
+        }
+
+        .today-pct {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.4rem;
+            color: var(--m-orange-dark);
+        }
+
+        .today-detail {
+            font-size: 1.3rem;
+            color: var(--ink);
+            opacity: 0.75;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .charts canvas {
+            width: 100%;
+            height: auto;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .chart-caption {
+            margin-top: 0.6rem;
+            font-size: 1.05rem;
+            color: var(--ink);
+            opacity: 0.7;
+            text-align: center;
+        }
+
         .hint {
             margin-top: 1.25rem;
             text-align: center;
@@ -452,6 +507,7 @@
             .stats { grid-template-columns: repeat(2, 1fr); }
             .math-card { padding: 1.25rem; }
             .figure svg { width: 170px; }
+            .charts { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -508,6 +564,25 @@
 
         <div class="stats" id="stats"></div>
 
+        <div class="math-card progress-card">
+            <div class="progress-head">
+                <span class="progress-title">📊 I DAG</span>
+                <span class="today-pct" id="today-pct">–</span>
+                <span class="today-detail" id="today-detail">Ingen svar endnu i dag</span>
+            </div>
+            <div class="charts">
+                <div>
+                    <canvas id="chart" width="560" height="240"></canvas>
+                    <div class="chart-caption">% rigtige pr. dag — seneste 7 dage</div>
+                </div>
+                <div>
+                    <canvas id="chart-counts" width="560" height="240"></canvas>
+                    <div class="chart-caption">Besvarede opgaver pr. dag — seneste 7 dage</div>
+                </div>
+            </div>
+            <div class="chart-caption">Gemmes lokalt på enheden (localStorage + cookie) · kun første svar på en opgave tæller · tallet står under hver søjle</div>
+        </div>
+
         <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
     </div>
 
@@ -529,7 +604,8 @@
             answer: 0,
             answerText: '',
             figure: '',
-            steps: []
+            steps: [],
+            attemptRecorded: false
         };
 
         const problemTypes = [
@@ -617,6 +693,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             renderStats();
+            updateProgress();
             generateProblem();
         });
 
@@ -634,6 +711,7 @@
             document.getElementById('show-solution').textContent = '💡 Vis løsning';
             currentProblem.figure = '';
             currentProblem.answerText = '';
+            currentProblem.attemptRecorded = false;
 
             const types = moduleTypes[activeModule];
             const totalWeight = types.reduce((sum, p) => sum + p.weight, 0);
@@ -1250,7 +1328,14 @@
             }
             const ans = currentProblem.answer;
             const tol = currentProblem.type === 'cirkel' ? Math.max(0.05, Math.abs(ans) * 0.01) : 1e-9 * Math.max(1, Math.abs(ans));
-            if (Math.abs(guess - ans) <= tol) {
+            const ok = Math.abs(guess - ans) <= tol;
+            // Kun første svar på en opgave tæller i statistikken (dagens %, graf og sessionsstatistik)
+            const firstTry = !currentProblem.attemptRecorded;
+            if (firstTry) {
+                recordAttempt(ok);
+                currentProblem.attemptRecorded = true;
+            }
+            if (ok) {
                 let expr;
                 if (currentProblem.type === 'equation') {
                     expr = `x = ${formatNumber(ans)}`;
@@ -1260,14 +1345,154 @@
                 } else {
                     expr = `${currentProblem.problem} = ${currentProblem.answerText || formatNumber(ans)}`;
                 }
-                showFeedback(true, `✅ KORREKT! ${expr}`);
+                showFeedback(true, `✅ KORREKT! ${expr}${firstTry ? '' : ' (statistikken tæller kun første svar)'}`);
                 input.disabled = true;
-                stats[activeModule].total++;
-                stats[activeModule][currentProblem.type]++;
-                renderStats();
+                if (firstTry) {
+                    stats[activeModule].total++;
+                    stats[activeModule][currentProblem.type]++;
+                    renderStats();
+                }
             } else {
-                showFeedback(false, '❌ Forkert — prøv igen!');
+                showFeedback(false, firstTry ? '❌ Forkert — prøv igen! (tæller i statistikken)' : '❌ Forkert — prøv igen! (tæller ikke — kun første svar tæller)');
             }
+        }
+
+        const HISTORY_KEY = 'mathaid_history_v1';
+
+        const COOKIE_KEY = 'mathaid_history';
+
+        function readCookieHistory() {
+            try {
+                const m = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_KEY + '=([^;]*)'));
+                return m ? (JSON.parse(decodeURIComponent(m[1])) || {}) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function writeCookieHistory(h) {
+            try {
+                // Cookies er maks ~4 KB — behold kun de seneste 50 dage (~3 KB URL-kodet)
+                const keys = Object.keys(h).sort().slice(-50);
+                const trimmed = {};
+                keys.forEach((k) => { trimmed[k] = h[k]; });
+                const expires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
+                document.cookie = COOKIE_KEY + '=' + encodeURIComponent(JSON.stringify(trimmed)) + '; expires=' + expires + '; path=/; SameSite=Lax';
+            } catch (e) { /* cookie blokeret — localStorage bærer stadig */ }
+        }
+
+        function loadHistory() {
+            let ls = {};
+            try {
+                ls = JSON.parse(localStorage.getItem(HISTORY_KEY)) || {};
+            } catch (e) { /* ignorer */ }
+            // cookie og localStorage smeltes sammen; localStorage vinder pr. nøgle
+            return Object.assign({}, readCookieHistory(), ls);
+        }
+
+        function saveHistory(h) {
+            try {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
+            } catch (e) { /* lokalt lager utilgængeligt — cookie bærer stadig */ }
+            writeCookieHistory(h);
+        }
+
+        function dateKey(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function recordAttempt(correct) {
+            const h = loadHistory();
+            const k = dateKey(new Date());
+            if (!h[k]) h[k] = { correct: 0, total: 0 };
+            h[k].total++;
+            if (correct) h[k].correct++;
+            saveHistory(h);
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const h = loadHistory();
+            const t = h[dateKey(new Date())] || { correct: 0, total: 0 };
+            const pctEl = document.getElementById('today-pct');
+            const detEl = document.getElementById('today-detail');
+            if (t.total === 0) {
+                pctEl.textContent = '–';
+                pctEl.style.color = '';
+                detEl.textContent = 'Ingen svar endnu i dag';
+            } else {
+                const pct = Math.round((t.correct / t.total) * 100);
+                pctEl.textContent = pct + ' %';
+                pctEl.style.color = pct >= 75 ? 'var(--m-orange-dark)' : pct >= 50 ? '#B36A00' : 'var(--m-red)';
+                detEl.textContent = `${t.correct} af ${t.total} svar rigtige i dag`;
+            }
+            const days = lastNDays(h, 7);
+            const pctColors = ['#E10500', '#FA500F', '#FF8205', '#FFAF00', '#FFD800'];
+            drawBars('chart', days,
+                (d) => (d.entry && d.entry.total > 0 ? (d.entry.correct / d.entry.total) * 100 : null),
+                (v) => Math.round(v) + '%',
+                (v) => pctColors[Math.min(4, Math.floor(v / 25))],
+                100, 4);
+            const maxCount = Math.max(1, ...days.map((d) => (d.entry ? d.entry.total : 0)));
+            drawBars('chart-counts', days,
+                (d) => (d.entry ? d.entry.total : 0),
+                (v) => String(Math.round(v)),
+                () => '#FF8205',
+                maxCount, Math.min(maxCount, 8));
+        }
+
+        function lastNDays(h, n) {
+            const days = [];
+            const now = new Date();
+            for (let i = n - 1; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+                days.push({ label: d.getDate() + '/' + (d.getMonth() + 1), entry: h[dateKey(d)] || null });
+            }
+            return days;
+        }
+
+        function drawBars(canvasId, days, getVal, fmtVal, colorFor, yMax, gridSteps) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas || !canvas.getContext) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const top = 16, bottom = 46, left = 48, right = 8;
+            const baseY = H - bottom;
+            const plotH = H - top - bottom;
+            ctx.fillStyle = '#150C24';
+            ctx.fillRect(0, 0, W, H);
+            // større tal på akserne
+            ctx.font = '19px VT323, monospace';
+            for (let s = 0; s <= gridSteps; s++) {
+                const y = baseY - (s / gridSteps) * plotH;
+                ctx.strokeStyle = 'rgba(255,250,235,0.15)';
+                ctx.beginPath();
+                ctx.moveTo(left, y);
+                ctx.lineTo(W - right, y);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255,250,235,0.75)';
+                ctx.fillText(fmtVal((yMax / gridSteps) * s), 2, y + 5);
+            }
+            const slot = (W - left - right) / days.length;
+            const barW = Math.max(6, Math.floor(slot) - 8);
+            days.forEach((day, i) => {
+                const x = left + i * slot + (slot - barW) / 2;
+                const val = getVal(day);
+                const stub = val === null;
+                const bh = stub ? 4 : Math.max(val === 0 ? 0 : 2, (val / yMax) * plotH);
+                ctx.fillStyle = stub ? 'rgba(255,250,235,0.12)' : colorFor(val);
+                ctx.fillRect(x, baseY - bh, barW, bh);
+                // stort ORANGE tal UNDER hver søjle, datoen nederst
+                if (!stub) {
+                    ctx.font = '24px VT323, monospace';
+                    ctx.fillStyle = '#FF8205';
+                    ctx.fillText(fmtVal(val), x - 2, baseY + 27);
+                }
+                ctx.font = '15px VT323, monospace';
+                ctx.fillStyle = 'rgba(255,250,235,0.6)';
+                ctx.fillText(day.label, x - 2, baseY + 42);
+            });
         }
 
         function renderStats() {
@@ -1307,6 +1532,10 @@
                 e.preventDefault();
             }
         });
+
+        if (typeof navigator !== 'undefined' && typeof location !== 'undefined' && 'serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
     </script>
 </body>
 </html>
