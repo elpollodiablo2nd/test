@@ -1,0 +1,6 @@
+dist/
+www/vendor/
+android/
+node_modules/
+__pycache__/
+www/assets/timestral-28m.onnx
