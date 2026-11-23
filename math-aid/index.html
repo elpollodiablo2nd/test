@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Math Aid — Hav-udgaven</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
+    <link rel="icon" href="icon-192.png">
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#FF8205">
+    <meta name="theme-color" content="#0EA5E9">
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -320,7 +320,7 @@
             height: 0.9em;
             margin-left: 10px;
             background: var(--m-yellow);
-            box-shadow: 0 0 10px rgba(255, 216, 0, 0.8);
+            box-shadow: 0 0 10px rgba(165, 243, 252, 0.9);
             animation: blink 0.9s steps(1) infinite;
         }
 
@@ -381,7 +381,7 @@
             font-family: 'VT323', 'Courier New', monospace;
             font-size: 1.8rem;
             padding: 0.5rem 1rem;
-            background: #ffffff;
+            background: #ECFEFF;
             color: var(--ink);
             border: 4px solid var(--ink);
             box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
@@ -393,7 +393,7 @@
         }
 
         #answer-input:disabled {
-            background: #EAE2D0;
+            background: #BAE6FD;
         }
 
         .btn-check {
@@ -437,7 +437,7 @@
             display: none;
             margin-top: 1.25rem;
             padding: 1.25rem 1.5rem;
-            background: #FFF3D0;
+            background: #CFFAFE;
             border: 4px solid var(--ink);
             border-left: 12px solid var(--m-orange-dark);
             box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.08);
@@ -1022,9 +1022,9 @@
 
         function svgCirkel(val, label) {
             const line = label === 'r'
-                ? `<line x1="80" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="115" y="56" class="fig-label">r = ${val}</text>`
-                : `<line x1="50" y1="50" x2="110" y2="50" stroke="#FFFAEB" stroke-width="3"/><text x="72" y="43" class="fig-label">d = ${val}</text>`;
-            return `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><circle cx="80" cy="50" r="30" fill="rgba(255,216,0,0.12)" stroke="#FFD800" stroke-width="4"/>${line}</svg>`;
+                ? `<line x1="80" y1="50" x2="110" y2="50" stroke="#ECFEFF" stroke-width="3"/><text x="115" y="56" class="fig-label">r = ${val}</text>`
+                : `<line x1="50" y1="50" x2="110" y2="50" stroke="#ECFEFF" stroke-width="3"/><text x="72" y="43" class="fig-label">d = ${val}</text>`;
+            return `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><circle cx="80" cy="50" r="30" fill="rgba(165,243,252,0.10)" stroke="#A5F3FC" stroke-width="4"/>${line}</svg>`;
         }
 
         function generateCirkel() {
@@ -1066,7 +1066,7 @@
                 const h = Math.floor(Math.random() * 10) + 3;
                 currentProblem.problem = 'A = ?';
                 currentProblem.answer = (g * h) / 2;
-                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="40,75 120,75 120,30" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="72" y="93" class="fig-label">g = ${g}</text><text x="126" y="56" class="fig-label">h = ${h}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="40,75 120,75 120,30" fill="rgba(34,211,238,0.12)" stroke="#22D3EE" stroke-width="4"/><text x="72" y="93" class="fig-label">g = ${g}</text><text x="126" y="56" class="fig-label">h = ${h}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde arealet af trekanten med grundlinje <kbd>g = ${g}</kbd> og højde <kbd>h = ${h}</kbd>:`,
                     `Formel: <kbd>A = ½ · g · h = (g · h) / 2</kbd>`,
@@ -1079,7 +1079,7 @@
                 const c = Math.floor(Math.random() * 8) + 3;
                 currentProblem.problem = 'O = ?';
                 currentProblem.answer = a + b + c;
-                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="80" y="93" class="fig-label">c = ${c}</text><text x="6" y="48" class="fig-label">a = ${a}</text><text x="132" y="52" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(34,211,238,0.12)" stroke="#22D3EE" stroke-width="4"/><text x="80" y="93" class="fig-label">c = ${c}</text><text x="6" y="48" class="fig-label">a = ${a}</text><text x="132" y="52" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde omkredsen af trekanten med siderne <kbd>a = ${a}</kbd>, <kbd>b = ${b}</kbd> og <kbd>c = ${c}</kbd>:`,
                     `Formel: <kbd>O = a + b + c</kbd>`,
@@ -1091,7 +1091,7 @@
                 const b = Math.floor(Math.random() * 41) + 30;
                 currentProblem.problem = 'x = ?';
                 currentProblem.answer = 180 - a - b;
-                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(255,175,0,0.12)" stroke="#FFAF00" stroke-width="4"/><text x="56" y="66" class="fig-label">${a}°</text><text x="100" y="66" class="fig-label">${b}°</text><text x="78" y="40" class="fig-label">x°</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><polygon points="45,72 130,72 87,22" fill="rgba(34,211,238,0.12)" stroke="#22D3EE" stroke-width="4"/><text x="56" y="66" class="fig-label">${a}°</text><text x="100" y="66" class="fig-label">${b}°</text><text x="78" y="40" class="fig-label">x°</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde den ukendte vinkel <kbd>x</kbd> i trekanten:`,
                     `Vinkelsummen i en trekant er altid <kbd>180°</kbd>:`,
@@ -1109,7 +1109,7 @@
             if (square) {
                 const s = Math.floor(Math.random() * 9) + 3;
                 currentProblem.answer = wantAreal ? s * s : 4 * s;
-                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="55" y="28" width="55" height="55" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="76" y="20" class="fig-label">s = ${s}</text><text x="115" y="60" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="55" y="28" width="55" height="55" fill="rgba(14,165,233,0.14)" stroke="#0EA5E9" stroke-width="4"/><text x="76" y="20" class="fig-label">s = ${s}</text><text x="115" y="60" class="fig-label">s = ${s}</text></svg>`;
                 currentProblem.steps = wantAreal ? [
                     `Vi skal finde arealet af kvadratet med sidelængden <kbd>s = ${s}</kbd>:`,
                     `Formel: <kbd>A = s²</kbd>`,
@@ -1125,7 +1125,7 @@
                 const l = Math.floor(Math.random() * 11) + 4;
                 const b = Math.floor(Math.random() * 8) + 3;
                 currentProblem.answer = wantAreal ? l * b : 2 * (l + b);
-                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="40" y="25" width="85" height="50" fill="rgba(255,130,5,0.12)" stroke="#FF8205" stroke-width="4"/><text x="75" y="17" class="fig-label">l = ${l}</text><text x="131" y="55" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 100" shape-rendering="crispEdges"><rect x="40" y="25" width="85" height="50" fill="rgba(14,165,233,0.14)" stroke="#0EA5E9" stroke-width="4"/><text x="75" y="17" class="fig-label">l = ${l}</text><text x="131" y="55" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = wantAreal ? [
                     `Vi skal finde arealet af rektanglet med længde <kbd>l = ${l}</kbd> og bredde <kbd>b = ${b}</kbd>:`,
                     `Formel: <kbd>A = l · b</kbd>`,
@@ -1146,7 +1146,7 @@
             if (Math.random() < 0.4) {
                 const s = Math.floor(Math.random() * 7) + 2;
                 currentProblem.answer = s * s * s;
-                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="50,45 65,30 115,30 100,45" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,45 115,30 115,80 100,95" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="50" y="45" width="50" height="50" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="68" y="107" class="fig-label">s = ${s}</text><text x="120" y="75" class="fig-label">s = ${s}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="50,45 65,30 115,30 100,45" fill="rgba(103,232,249,0.14)" stroke="#67E8F9" stroke-width="4"/><polygon points="100,45 115,30 115,80 100,95" fill="rgba(103,232,249,0.24)" stroke="#67E8F9" stroke-width="4"/><rect x="50" y="45" width="50" height="50" fill="rgba(103,232,249,0.07)" stroke="#67E8F9" stroke-width="4"/><text x="68" y="107" class="fig-label">s = ${s}</text><text x="120" y="75" class="fig-label">s = ${s}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde rumfanget af terningen med kantlængden <kbd>s = ${s}</kbd>:`,
                     `Formel: <kbd>V = s³</kbd>`,
@@ -1158,7 +1158,7 @@
                 const b = Math.floor(Math.random() * 7) + 2;
                 const h = Math.floor(Math.random() * 7) + 2;
                 currentProblem.answer = l * b * h;
-                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="40,42 55,27 115,27 100,42" fill="rgba(255,106,94,0.15)" stroke="#FF6A5E" stroke-width="4"/><polygon points="100,42 115,27 115,75 100,90" fill="rgba(255,106,94,0.25)" stroke="#FF6A5E" stroke-width="4"/><rect x="40" y="42" width="60" height="48" fill="rgba(255,106,94,0.08)" stroke="#FF6A5E" stroke-width="4"/><text x="63" y="105" class="fig-label">l = ${l}</text><text x="120" y="70" class="fig-label">h = ${h}</text><text x="72" y="20" class="fig-label">b = ${b}</text></svg>`;
+                currentProblem.figure = `<svg viewBox="0 0 190 110" shape-rendering="crispEdges"><polygon points="40,42 55,27 115,27 100,42" fill="rgba(103,232,249,0.14)" stroke="#67E8F9" stroke-width="4"/><polygon points="100,42 115,27 115,75 100,90" fill="rgba(103,232,249,0.24)" stroke="#67E8F9" stroke-width="4"/><rect x="40" y="42" width="60" height="48" fill="rgba(103,232,249,0.07)" stroke="#67E8F9" stroke-width="4"/><text x="63" y="105" class="fig-label">l = ${l}</text><text x="120" y="70" class="fig-label">h = ${h}</text><text x="72" y="20" class="fig-label">b = ${b}</text></svg>`;
                 currentProblem.steps = [
                     `Vi skal finde rumfanget af kassen med længde <kbd>l = ${l}</kbd>, bredde <kbd>b = ${b}</kbd> og højde <kbd>h = ${h}</kbd>:`,
                     `Formel: <kbd>V = l · b · h</kbd>`,
@@ -1531,7 +1531,7 @@
                 detEl.textContent = `${t.correct} af ${t.total} svar rigtige i dag`;
             }
             const days = lastNDays(h, 7);
-            const pctColors = ['#E10500', '#FA500F', '#FF8205', '#FFAF00', '#FFD800'];
+            const pctColors = ['#075985', '#0284C7', '#0EA5E9', '#22D3EE', '#A5F3FC'];
             drawBars('chart', days,
                 (d) => (d.entry && d.entry.total > 0 ? (d.entry.correct / d.entry.total) * 100 : null),
                 (v) => Math.round(v) + '%',
@@ -1541,7 +1541,7 @@
             drawBars('chart-counts', days,
                 (d) => (d.entry ? d.entry.total : 0),
                 (v) => String(Math.round(v)),
-                () => '#FF8205',
+                () => '#22D3EE',
                 maxCount, Math.min(maxCount, 8));
         }
 
@@ -1590,7 +1590,7 @@
                 // stort ORANGE tal UNDER hver søjle, datoen nederst
                 if (!stub) {
                     ctx.font = '24px VT323, monospace';
-                    ctx.fillStyle = '#FF8205';
+                    ctx.fillStyle = '#A5F3FC';
                     ctx.fillText(fmtVal(val), x - 2, baseY + 27);
                 }
                 ctx.font = '15px VT323, monospace';
@@ -1654,10 +1654,37 @@
 
         const SOUND_KEY = 'mathaid_sound';
         const SOUND_SOURCES = {
-            waves: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1f/Waves.ogg/Waves.ogg.mp3',
-            lofi: 'https://ice5.somafm.com/groovesalad-128-mp3'
+            waves: [
+                'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1f/Waves.ogg/Waves.ogg.mp3',
+                'https://upload.wikimedia.org/wikipedia/commons/1/1f/Waves.ogg'
+            ],
+            lofi: [
+                'https://ice5.somafm.com/groovesalad-128-mp3',
+                'https://ice6.somafm.com/groovesalad-128-mp3',
+                'https://ice1.somafm.com/groovesalad-128-mp3'
+            ]
         };
         let bgAudio = null;
+        let srcIdx = 0;
+
+        function playCurrent() {
+            const p = getSoundPref();
+            const list = SOUND_SOURCES[p.source] || SOUND_SOURCES.waves;
+            if (srcIdx >= list.length) {
+                const btn = document.getElementById('sound-toggle');
+                if (btn) btn.textContent = '⚠️ LYD?';
+                return;
+            }
+            bgAudio.src = list[srcIdx];
+            const pr = bgAudio.play();
+            if (pr && pr.catch) pr.catch(() => tryNextSource());
+        }
+
+        function tryNextSource() {
+            if (!getSoundPref().on) return;
+            srcIdx++;
+            playCurrent();
+        }
 
         function getSoundPref() {
             try {
@@ -1680,13 +1707,13 @@
         }
 
         function startSound() {
-            const p = getSoundPref();
             if (!bgAudio) {
                 bgAudio = new Audio();
                 bgAudio.loop = true;
+                bgAudio.addEventListener('error', () => tryNextSource());
             }
-            bgAudio.src = SOUND_SOURCES[p.source] || SOUND_SOURCES.waves;
-            bgAudio.play().catch(() => {});
+            srcIdx = 0;
+            playCurrent();
         }
 
         function toggleSound() {
