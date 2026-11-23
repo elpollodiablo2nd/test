@@ -1,14 +1,14 @@
 {
-  "name": "Math Aid — Pixel Edition",
+  "name": "Math Aid — Hav-udgaven",
   "short_name": "Math Aid",
-  "description": "8. klasse matematiktræning i pixel-art Mistral-stil — med daglig statistik og historik-graf, gemt lokalt.",
+  "description": "8. klasse matematiktræning i pixel-art hav-tema (hvalhaj, bølger, fisk og lyd) — med daglig statistik og historik-graf, gemt lokalt.",
   "lang": "da",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0B0714",
-  "theme_color": "#FF8205",
+  "background_color": "#04121F",
+  "theme_color": "#0EA5E9",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }

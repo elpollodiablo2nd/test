@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Aid — Pixel Edition</title>
+    <title>Math Aid — Hav-udgaven</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M0 0h24v3.428H0z' fill='%23FFD800'/%3E%3Cpath d='M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z' fill='%23FFD800'/%3E%3Cpath d='M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z' fill='%23FFAF00'/%3E%3Cpath d='M3.428 10.258h17.144v3.428H3.428z' fill='%23FF8205'/%3E%3Cpath d='M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z' fill='%23FA500F'/%3E%3Cpath d='M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z' fill='%23E10500'/%3E%3C/svg%3E">
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#FF8205">
@@ -13,15 +13,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
     <style>
         :root {
-            --m-yellow: #FFD800;
-            --m-amber: #FFAF00;
-            --m-orange: #FF8205;
-            --m-orange-dark: #FA500F;
-            --m-red: #E10500;
-            --ink: #000000;
-            --cream: #FFFAEB;
-            --night: #0B0714;
-            --screen: #150C24;
+            --m-yellow: #A5F3FC;
+            --m-amber: #22D3EE;
+            --m-orange: #0EA5E9;
+            --m-orange-dark: #0284C7;
+            --m-red: #E11D48;
+            --ink: #082F49;
+            --cream: #ECFEFF;
+            --night: #04121F;
+            --screen: #0A2540;
+            --sea: #0E7490;
         }
 
         * {
@@ -35,9 +36,9 @@
             font-family: 'VT323', 'Courier New', monospace;
             background-color: var(--night);
             background-image:
-                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
-                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+                radial-gradient(ellipse at 50% -10%, rgba(14, 165, 233, 0.22), transparent 60%),
+                linear-gradient(rgba(103, 232, 249, 0.06) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(103, 232, 249, 0.06) 2px, transparent 2px);
             background-size: auto, 32px 32px, 32px 32px;
             color: var(--cream);
             min-height: 100vh;
@@ -92,7 +93,11 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            filter: drop-shadow(4px 4px 0 #000);
+            filter: drop-shadow(4px 4px 0 #02101C);
+        }
+
+        h1 {
+            background: linear-gradient(180deg, #A5F3FC 0%, #22D3EE 30%, #0EA5E9 55%, #0284C7 78%, #075985 100%);
         }
 
         @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
@@ -110,21 +115,108 @@
             position: absolute;
             width: 8px;
             height: 8px;
-            background: currentColor;
-            box-shadow: 0 -8px 0 currentColor, 0 8px 0 currentColor, -8px 0 0 currentColor, 8px 0 0 currentColor;
-            animation: twinkle 1.2s steps(2, jump-none) infinite;
+            background: transparent;
+            border: 2px solid currentColor;
+            animation: rise 3.5s steps(7) infinite;
         }
 
-        @keyframes twinkle {
-            0%, 100% { opacity: 1; transform: translateY(0); }
-            50% { opacity: 0.15; transform: translateY(-6px); }
+        @keyframes rise {
+            0% { transform: translateY(0); opacity: 0; }
+            15% { opacity: 0.9; }
+            100% { transform: translateY(-90px); opacity: 0; }
+        }
+
+        #logo-whale {
+            width: 152px;
+            height: 72px;
+        }
+
+        .waves {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 56px;
+            pointer-events: none;
+            z-index: 40;
+        }
+
+        .waves::before, .waves::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 28px;
+            background-repeat: repeat-x;
+            background-size: 56px 28px;
+        }
+
+        .waves::before {
+            bottom: 26px;
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%2056%2028%22%20shape-rendering%3D%22crispEdges%22%3E%3Cpath%20d%3D%22M0%2028%20L0%2024%20L8%2024%20L8%2016%20L16%2016%20L16%208%20L24%208%20L24%200%20L32%200%20L32%208%20L40%208%20L40%2016%20L48%2016%20L48%2024%20L56%2024%20L56%2028%20Z%22%20fill%3D%22%230E7490%22/%3E%3C/svg%3E");
+            opacity: 0.45;
+            animation: waveSlide 9s steps(9) infinite;
+        }
+
+        .waves::after {
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%2056%2028%22%20shape-rendering%3D%22crispEdges%22%3E%3Cpath%20d%3D%22M0%2028%20L0%2024%20L8%2024%20L8%2016%20L16%2016%20L16%208%20L24%208%20L24%200%20L32%200%20L32%208%20L40%208%20L40%2016%20L48%2016%20L48%2024%20L56%2024%20L56%2028%20Z%22%20fill%3D%22%230891B2%22/%3E%3Crect%20x%3D%2220%22%20y%3D%2212%22%20width%3D%225%22%20height%3D%223%22%20fill%3D%22%23082F49%22/%3E%3Crect%20x%3D%2218%22%20y%3D%2211%22%20width%3D%222%22%20height%3D%225%22%20fill%3D%22%23082F49%22/%3E%3Crect%20x%3D%2224%22%20y%3D%2213%22%20width%3D%221%22%20height%3D%221%22%20fill%3D%22%23A5F3FC%22/%3E%3C/svg%3E");
+            opacity: 0.85;
+            animation: waveSlide 5s steps(5) infinite reverse;
+        }
+
+        @keyframes waveSlide {
+            from { background-position-x: 0; }
+            to { background-position-x: 56px; }
+        }
+
+        .swimmer {
+            position: fixed;
+            left: -180px;
+            z-index: 60;
+            pointer-events: none;
+            animation: swim 3.5s steps(60) forwards;
+        }
+
+        .swimmer svg {
+            width: 84px;
+            height: auto;
+            display: block;
+        }
+
+        .swimmer.shark svg {
+            width: 190px;
+        }
+
+        @keyframes swim {
+            from { transform: translateX(0); }
+            to { transform: translateX(115vw); }
+        }
+
+        .sound-bar {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .pixel-select {
+            font-family: 'VT323', monospace;
+            font-size: 1.3rem;
+            padding: 0.4rem 0.6rem;
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 0 4px 0 var(--ink);
         }
 
         .math-card {
             background: var(--cream);
             color: var(--ink);
             border: 4px solid var(--ink);
-            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            box-shadow: 8px 8px 0 var(--sea), 8px 8px 0 4px var(--ink);
             padding: 1.75rem;
             margin-bottom: 1.5rem;
         }
@@ -171,7 +263,7 @@
             gap: 0.75rem;
             background:
                 repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
-                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+                radial-gradient(ellipse at center, #0A2540 0%, var(--screen) 70%);
             border: 4px solid var(--ink);
             box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.7), inset -4px -4px 0 rgba(255, 255, 255, 0.07);
             margin-bottom: 1.5rem;
@@ -219,7 +311,7 @@
             font-weight: bold;
             font-size: 2.8rem;
             color: var(--m-yellow);
-            text-shadow: 0 0 14px rgba(255, 216, 0, 0.55), 4px 4px 0 var(--m-red);
+            text-shadow: 0 0 14px rgba(103, 232, 249, 0.55), 4px 4px 0 #075985;
         }
 
         .cursor {
@@ -518,16 +610,9 @@
             <span class="sparkle" style="top: 40px; right: 16%; color: var(--m-orange); animation-delay: 0.3s;"></span>
             <span class="sparkle" style="top: 90px; left: 8%; color: var(--m-red); animation-delay: 0.6s;"></span>
             <span class="sparkle" style="top: 110px; right: 9%; color: var(--m-amber); animation-delay: 0.9s;"></span>
-            <svg class="logo-m" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-label="Mistral M logo">
-                <path d="M0 0h24v3.428H0z" fill="#FFD800"/>
-                <path d="M0 3.428h3.428v3.428H0zM10.286 3.428h3.428v3.428h-3.428zM20.572 3.428H24v3.428h-3.428z" fill="#FFD800"/>
-                <path d="M0 6.856h3.428v3.428H0zM10.286 6.856h3.428v3.428h-3.428zM20.572 6.856H24v3.428h-3.428z" fill="#FFAF00"/>
-                <path d="M3.428 10.258h17.144v3.428H3.428z" fill="#FF8205"/>
-                <path d="M3.428 13.686h3.429v3.428H3.428zM10.286 13.686h3.429v3.428h-3.429zM17.142 13.686h3.43v3.428h-3.43z" fill="#FA500F"/>
-                <path d="M0 17.114h10.286v3.428H0zM13.714 17.114H24v3.428h-10.286z" fill="#E10500"/>
-            </svg>
+            <div id="logo-whale" class="logo-m" role="img" aria-label="Hvalhaj"></div>
             <h1>MATH AID</h1>
-            <p class="subtitle">Øvelse på 8. klasse-niveau · Pixel-udgave</p>
+            <p class="subtitle">Øvelse på 8. klasse-niveau · Hav-udgaven 🦈</p>
         </header>
 
         <div class="module-switch">
@@ -535,6 +620,14 @@
             <button id="mod-geometri" class="module-btn" onclick="setModule('geometri')">📐 GEOMETRI</button>
             <button id="mod-brok" class="module-btn" onclick="setModule('brok')">➗ BRØKER</button>
             <button id="mod-enheder" class="module-btn" onclick="setModule('enheder')">📏 ENHEDER</button>
+        </div>
+
+        <div class="sound-bar">
+            <button id="sound-toggle" class="module-btn" onclick="toggleSound()">🔇 LYD FRA</button>
+            <select id="sound-source" class="pixel-select" onchange="setSoundSource(this.value)">
+                <option value="waves">🌊 Havbølger (loop)</option>
+                <option value="lofi">📻 Lofi-radio (SomaFM)</option>
+            </select>
         </div>
 
         <div class="math-card">
@@ -585,6 +678,8 @@
 
         <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
     </div>
+
+    <div class="waves"></div>
 
     <script>
         const PI = 3.14;
@@ -672,26 +767,34 @@
             tal: {
                 keys: ['total', 'addition', 'subtraction', 'multiplication', 'division', 'equation', 'procent'],
                 labels: ['Opgaver løst', 'Addition', 'Subtraktion', 'Multiplikation', 'Division', 'Ligninger', 'Procent'],
-                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FA500F', '#FF6A5E', '#FFFAEB']
+                colors: ['#A5F3FC', '#A5F3FC', '#22D3EE', '#0EA5E9', '#0284C7', '#E11D48', '#ECFEFF']
             },
             geometri: {
                 keys: ['total', 'cirkel', 'trekant', 'firkant', 'rumfang'],
                 labels: ['Opgaver løst', 'Cirkler', 'Trekanter', 'Firkanter', 'Rumfang'],
-                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FF6A5E']
+                colors: ['#A5F3FC', '#A5F3FC', '#22D3EE', '#0EA5E9', '#E11D48']
             },
             brok: {
                 keys: ['total', 'plus', 'minus', 'gange', 'dividere', 'forenkl', 'udvid'],
                 labels: ['Opgaver løst', 'Plus', 'Minus', 'Gange', 'Division', 'Forkort', 'Udvid'],
-                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205', '#FA500F', '#FF6A5E', '#FFFAEB']
+                colors: ['#A5F3FC', '#A5F3FC', '#22D3EE', '#0EA5E9', '#0284C7', '#E11D48', '#ECFEFF']
             },
             enheder: {
                 keys: ['total', 'vaegt', 'laengde', 'volumen'],
                 labels: ['Opgaver løst', 'Vægt', 'Længde', 'Volumen'],
-                colors: ['#FFD800', '#FFD800', '#FFAF00', '#FF8205']
+                colors: ['#A5F3FC', '#A5F3FC', '#22D3EE', '#0EA5E9']
             }
         };
 
         document.addEventListener('DOMContentLoaded', () => {
+            const logo = document.getElementById('logo-whale');
+            if (logo) logo.innerHTML = pixelSvg('whale');
+            const fav = document.querySelector('link[rel="icon"]');
+            if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(pixelSvg('whale'));
+            updateSoundBtn();
+            if (getSoundPref().on) {
+                document.addEventListener('pointerdown', () => { if (getSoundPref().on) startSound(); }, { once: true });
+            }
             renderStats();
             updateProgress();
             generateProblem();
@@ -1346,6 +1449,7 @@
                     expr = `${currentProblem.problem} = ${currentProblem.answerText || formatNumber(ans)}`;
                 }
                 showFeedback(true, `✅ KORREKT! ${expr}${firstTry ? '' : ' (statistikken tæller kun første svar)'}`);
+                spawnFish();
                 input.disabled = true;
                 if (firstTry) {
                     stats[activeModule].total++;
@@ -1460,7 +1564,7 @@
             const top = 16, bottom = 46, left = 48, right = 8;
             const baseY = H - bottom;
             const plotH = H - top - bottom;
-            ctx.fillStyle = '#150C24';
+            ctx.fillStyle = '#0A2540';
             ctx.fillRect(0, 0, W, H);
             // større tal på akserne
             ctx.font = '19px VT323, monospace';
@@ -1493,6 +1597,128 @@
                 ctx.fillStyle = 'rgba(255,250,235,0.6)';
                 ctx.fillText(day.label, x - 2, baseY + 42);
             });
+        }
+
+        // ---------- Hav-tema: pixel-dyr, bølger og lyd ----------
+        const PIXELS = {
+            whale: {
+                rows: [
+                    "........fff........",
+                    ".....BBBBBBBB......",
+                    "...BBBBBBBBBBBBBBB.",
+                    ".BBBBBBBBBBBBBBBBBB",
+                    "BBBBBBBBBBBBBBBBBB.",
+                    ".bbbbbbbbbbbbbbbbBB",
+                    "...bbbbbbbbbbbbbbbB",
+                    ".....BBBBBBBB......",
+                    "........fff........"
+                ],
+                pal: { B: '#475569', b: '#94A3B8', s: '#E2E8F0', e: '#0F172A', m: '#0F172A', f: '#334155' },
+                spots: [[5,2],[8,1],[11,2],[6,3],[10,3],[13,4],[5,4],[9,5],[12,5],[7,6],[11,6]],
+                eye: [2, 4],
+                mouth: [[0,5],[1,5],[2,5]]
+            },
+            fish: {
+                rows: [
+                    "......fff.....",
+                    "....BBBBBBBB..",
+                    ".BBBBBBBBBBB..",
+                    "BBBBBBBBBBBBBm",
+                    ".BBBBBBBBBBB..",
+                    "....bbbbbbbb..",
+                    "......fff....."
+                ],
+                pal: { B: '#0E7490', b: '#A5F3FC', e: '#082F49', m: '#082F49', f: '#155E75' },
+                spots: [],
+                eye: [11, 2],
+                mouth: [[13, 3]]
+            }
+        };
+
+        function pixelSvg(name) {
+            const p = PIXELS[name];
+            const grid = p.rows.map((r) => r.split(''));
+            (p.spots || []).forEach(([x, y]) => { grid[y][x] = 's'; });
+            if (p.eye) grid[p.eye[1]][p.eye[0]] = 'e';
+            (p.mouth || []).forEach(([x, y]) => { grid[y][x] = 'm'; });
+            const h = grid.length;
+            const w = grid[0].length;
+            let rects = '';
+            grid.forEach((row, y) => {
+                row.forEach((ch, x) => {
+                    if (ch !== '.' && p.pal[ch]) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${p.pal[ch]}"/>`;
+                });
+            });
+            return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges">${rects}</svg>`;
+        }
+
+        const SOUND_KEY = 'mathaid_sound';
+        const SOUND_SOURCES = {
+            waves: 'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1f/Waves.ogg/Waves.ogg.mp3',
+            lofi: 'https://ice5.somafm.com/groovesalad-128-mp3'
+        };
+        let bgAudio = null;
+
+        function getSoundPref() {
+            try {
+                return JSON.parse(localStorage.getItem(SOUND_KEY)) || { on: false, source: 'waves' };
+            } catch (e) {
+                return { on: false, source: 'waves' };
+            }
+        }
+
+        function saveSoundPref(p) {
+            try { localStorage.setItem(SOUND_KEY, JSON.stringify(p)); } catch (e) { /* ignorer */ }
+        }
+
+        function updateSoundBtn() {
+            const p = getSoundPref();
+            const btn = document.getElementById('sound-toggle');
+            if (btn) btn.textContent = p.on ? '🔊 LYD TIL' : '🔇 LYD FRA';
+            const sel = document.getElementById('sound-source');
+            if (sel) sel.value = p.source;
+        }
+
+        function startSound() {
+            const p = getSoundPref();
+            if (!bgAudio) {
+                bgAudio = new Audio();
+                bgAudio.loop = true;
+            }
+            bgAudio.src = SOUND_SOURCES[p.source] || SOUND_SOURCES.waves;
+            bgAudio.play().catch(() => {});
+        }
+
+        function toggleSound() {
+            const p = getSoundPref();
+            p.on = !p.on;
+            saveSoundPref(p);
+            if (p.on) startSound();
+            else if (bgAudio) bgAudio.pause();
+            updateSoundBtn();
+        }
+
+        function setSoundSource(v) {
+            const p = getSoundPref();
+            p.source = v;
+            p.on = true;
+            saveSoundPref(p);
+            startSound();
+            updateSoundBtn();
+        }
+
+        function spawnFish() {
+            const n = 1 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < n; i++) {
+                const shark = Math.random() < 0.2;
+                const el = document.createElement('div');
+                el.className = 'swimmer' + (shark ? ' shark' : '');
+                el.innerHTML = pixelSvg(shark ? 'whale' : 'fish');
+                el.style.top = (8 + Math.random() * 70) + '%';
+                el.style.animationDuration = (shark ? 6 : 3.5) + 's';
+                document.body.appendChild(el);
+                el.addEventListener('animationend', () => el.remove());
+            }
         }
 
         function renderStats() {
