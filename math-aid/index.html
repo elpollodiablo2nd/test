@@ -580,7 +580,7 @@
                     <div class="chart-caption">Besvarede opgaver pr. dag — seneste 7 dage</div>
                 </div>
             </div>
-            <div class="chart-caption">Gemmes lokalt på enheden · kun første svar på en opgave tæller · tallet står under hver søjle</div>
+            <div class="chart-caption">Gemmes lokalt på enheden (localStorage + cookie) · kun første svar på en opgave tæller · tallet står under hver søjle</div>
         </div>
 
         <p class="hint"><kbd>ENTER</kbd> TJEK SVAR &nbsp;&nbsp; <kbd>R</kbd> NY OPGAVE</p>
@@ -1359,18 +1359,42 @@
 
         const HISTORY_KEY = 'mathaid_history_v1';
 
-        function loadHistory() {
+        const COOKIE_KEY = 'mathaid_history';
+
+        function readCookieHistory() {
             try {
-                return JSON.parse(localStorage.getItem(HISTORY_KEY)) || {};
+                const m = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_KEY + '=([^;]*)'));
+                return m ? (JSON.parse(decodeURIComponent(m[1])) || {}) : {};
             } catch (e) {
                 return {};
             }
         }
 
+        function writeCookieHistory(h) {
+            try {
+                // Cookies er maks ~4 KB — behold kun de seneste 90 dage
+                const keys = Object.keys(h).sort().slice(-90);
+                const trimmed = {};
+                keys.forEach((k) => { trimmed[k] = h[k]; });
+                const expires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
+                document.cookie = COOKIE_KEY + '=' + encodeURIComponent(JSON.stringify(trimmed)) + '; expires=' + expires + '; path=/; SameSite=Lax';
+            } catch (e) { /* cookie blokeret — localStorage bærer stadig */ }
+        }
+
+        function loadHistory() {
+            let ls = {};
+            try {
+                ls = JSON.parse(localStorage.getItem(HISTORY_KEY)) || {};
+            } catch (e) { /* ignorer */ }
+            // cookie og localStorage smeltes sammen; localStorage vinder pr. nøgle
+            return Object.assign({}, readCookieHistory(), ls);
+        }
+
         function saveHistory(h) {
             try {
                 localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
-            } catch (e) { /* lokalt lager utilgængeligt — ignorer */ }
+            } catch (e) { /* lokalt lager utilgængeligt — cookie bærer stadig */ }
+            writeCookieHistory(h);
         }
 
         function dateKey(d) {
