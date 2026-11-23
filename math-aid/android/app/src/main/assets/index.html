@@ -202,6 +202,15 @@
             margin-bottom: 1.5rem;
         }
 
+        .sound-status {
+            width: 100%;
+            text-align: center;
+            font-size: 1.05rem;
+            line-height: 1.2;
+            min-height: 1.2em;
+            color: rgba(165, 243, 252, 0.75);
+        }
+
         .pixel-select {
             font-family: 'VT323', monospace;
             font-size: 1.3rem;
@@ -628,6 +637,7 @@
                 <option value="waves">🌊 Havbølger (loop)</option>
                 <option value="lofi">📻 Lofi-radio (SomaFM)</option>
             </select>
+            <div id="sound-status" class="sound-status"></div>
         </div>
 
         <div class="math-card">
@@ -1653,35 +1663,109 @@
         }
 
         const SOUND_KEY = 'mathaid_sound';
+        // SomaFM-listen følger deres officielle directstreamlinks (nov 2026):
+        // ice5 = main, ice6 = alt, ice.somafm.com/groovesalad = permanent umbrella-URL.
+        // ice1 er udgået. HLS (.m3u8) ligger sidst og afspilles via hls.js (MSE).
         const SOUND_SOURCES = {
             waves: [
                 'https://upload.wikimedia.org/wikipedia/commons/transcoded/1/1f/Waves.ogg/Waves.ogg.mp3',
                 'https://upload.wikimedia.org/wikipedia/commons/1/1f/Waves.ogg'
             ],
             lofi: [
+                'https://ice.somafm.com/groovesalad',
                 'https://ice5.somafm.com/groovesalad-128-mp3',
                 'https://ice6.somafm.com/groovesalad-128-mp3',
-                'https://ice1.somafm.com/groovesalad-128-mp3'
+                'https://ice5.somafm.com/groovesalad-256-mp3',
+                'https://ice6.somafm.com/groovesalad-256-mp3',
+                'https://ice5.somafm.com/groovesalad-128-aac',
+                'https://ice6.somafm.com/groovesalad-128-aac',
+                'https://hls.somafm.com/hls/groovesalad/128k/program.m3u8',
+                'https://hls.somafm.com/hls/groovesalad/320k/program.m3u8'
             ]
         };
+        const WATCHDOG_MS = 9000;
         let bgAudio = null;
+        let hlsInst = null;
+        let hlsLoading = null;
         let srcIdx = 0;
+        let attempt = 0;     // token pr. forsøg — forældede error/play-kald må ikke tælle dobbelt
+        let watchdog = null; // stream kan hænge uden error hvis serveren ikke sender data
+
+        function shortUrl(u) {
+            try { const x = new URL(u); return x.host + x.pathname; } catch (e) { return u; }
+        }
+
+        function setSoundStatus(txt) {
+            const el = document.getElementById('sound-status');
+            if (el) el.textContent = txt;
+        }
+
+        function clearWatchdog() {
+            if (watchdog) { clearTimeout(watchdog); watchdog = null; }
+        }
+
+        function loadHls() {
+            if (window.Hls) return Promise.resolve(window.Hls);
+            if (hlsLoading) return hlsLoading;
+            hlsLoading = new Promise((resolve) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
+                s.onload = () => resolve(window.Hls || null);
+                s.onerror = () => resolve(null);
+                (document.head || document.body).appendChild(s);
+            });
+            return hlsLoading;
+        }
+
+        function stopHls() {
+            if (hlsInst) { try { hlsInst.destroy(); } catch (e) { /* ignorer */ } hlsInst = null; }
+        }
 
         function playCurrent() {
             const p = getSoundPref();
             const list = SOUND_SOURCES[p.source] || SOUND_SOURCES.waves;
             if (srcIdx >= list.length) {
+                clearWatchdog();
                 const btn = document.getElementById('sound-toggle');
                 if (btn) btn.textContent = '⚠️ LYD?';
+                setSoundStatus('⚠️ ingen lydkilde virkede — tjek internetforbindelsen');
                 return;
             }
-            bgAudio.src = list[srcIdx];
-            const pr = bgAudio.play();
-            if (pr && pr.catch) pr.catch(() => tryNextSource());
+            const url = list[srcIdx];
+            const my = ++attempt;
+            clearWatchdog();
+            setSoundStatus('prøver ' + shortUrl(url) + ' …');
+            const isHls = url.indexOf('.m3u8') !== -1;
+            const begin = () => {
+                if (my !== attempt || !getSoundPref().on) return;
+                const pr = bgAudio.play();
+                if (pr && pr.catch) pr.catch(() => { if (my === attempt) tryNextSource(my); });
+            };
+            if (isHls) {
+                stopHls();
+                bgAudio.removeAttribute('src');
+                bgAudio.load();
+                loadHls().then((Hls) => {
+                    if (my !== attempt || !getSoundPref().on) return;
+                    if (!Hls || !Hls.isSupported()) { tryNextSource(my); return; }
+                    hlsInst = new Hls();
+                    hlsInst.loadSource(url);
+                    hlsInst.attachMedia(bgAudio);
+                    begin();
+                });
+            } else {
+                stopHls();
+                bgAudio.src = url;
+                begin();
+            }
+            watchdog = setTimeout(() => {
+                if (my === attempt && bgAudio.readyState < 2) tryNextSource(my);
+            }, WATCHDOG_MS);
         }
 
-        function tryNextSource() {
+        function tryNextSource(fromAttempt) {
             if (!getSoundPref().on) return;
+            if (fromAttempt !== undefined && fromAttempt !== attempt) return; // forældet kald
             srcIdx++;
             playCurrent();
         }
@@ -1704,13 +1788,25 @@
             if (btn) btn.textContent = p.on ? '🔊 LYD TIL' : '🔇 LYD FRA';
             const sel = document.getElementById('sound-source');
             if (sel) sel.value = p.source;
+            if (!p.on) setSoundStatus('');
         }
 
         function startSound() {
             if (!bgAudio) {
                 bgAudio = new Audio();
                 bgAudio.loop = true;
-                bgAudio.addEventListener('error', () => tryNextSource());
+                bgAudio.preload = 'auto';
+                bgAudio.addEventListener('error', () => {
+                    // MEDIA_ERR_ABORTED (1) sker når vi skifter src — ikke en reel fejl
+                    if (bgAudio.error && bgAudio.error.code === 1) return;
+                    tryNextSource(attempt);
+                });
+                bgAudio.addEventListener('playing', () => {
+                    clearWatchdog();
+                    const p = getSoundPref();
+                    const list = SOUND_SOURCES[p.source] || SOUND_SOURCES.waves;
+                    setSoundStatus('▶ spiller: ' + shortUrl(list[Math.min(srcIdx, list.length - 1)]));
+                });
             }
             srcIdx = 0;
             playCurrent();
@@ -1721,7 +1817,11 @@
             p.on = !p.on;
             saveSoundPref(p);
             if (p.on) startSound();
-            else if (bgAudio) bgAudio.pause();
+            else {
+                clearWatchdog();
+                stopHls();
+                if (bgAudio) bgAudio.pause();
+            }
             updateSoundBtn();
         }
 
