@@ -1372,8 +1372,8 @@
 
         function writeCookieHistory(h) {
             try {
-                // Cookies er maks ~4 KB — behold kun de seneste 90 dage
-                const keys = Object.keys(h).sort().slice(-90);
+                // Cookies er maks ~4 KB — behold kun de seneste 50 dage (~3 KB URL-kodet)
+                const keys = Object.keys(h).sort().slice(-50);
                 const trimmed = {};
                 keys.forEach((k) => { trimmed[k] = h[k]; });
                 const expires = new Date(Date.now() + 365 * 24 * 3600 * 1000).toUTCString();
