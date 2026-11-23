@@ -72,6 +72,6 @@ jobs:
         run: |
           TAG="$GITHUB_REF_NAME"
           APK="math-aid/android/app/build/outputs/apk/release/app-release.apk"
-          NOTES="Math Aid $TAG — pixel-udgaven i Mistral-stil (4 moduler: tal & ligninger, geometri, brøker, enheder; dagens % rigtige + 14-dages graf gemt lokalt). Installer på Android: download app-release.apk og åbn den på telefonen, eller brug \`adb install app-release.apk\`."
+          NOTES="Math Aid $TAG — Hav-udgaven (pixel-art hvalhaj-tema). 4 moduler: tal & ligninger, geometri, brøker, enheder. Dagens % rigtige + grafer over 7 dage gemt lokalt (localStorage + cookie) — kun første svar tæller. Valgfri lyd (havbølger / SomaFM lofi-radio med fallback-kæde), pixel-fisk ved rigtige svar. Installer på Android: download app-release.apk og åbn den på telefonen (afinstaller evt. ældre version først), eller brug \`adb install app-release.apk\`."
           gh release create "$TAG" "$APK" --title "Math Aid $TAG" --notes "$NOTES" \
             || gh release upload "$TAG" "$APK" --clobber
