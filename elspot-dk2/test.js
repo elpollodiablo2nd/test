@@ -80,7 +80,7 @@ check("tipLines published", Core.tipLines(tsA, null)[1][0].indexOf("published") 
 
 // modelCacheKey: bundled models are not cached, downloadable ones are
 check("modelCacheKey 5M bundled -> null", Core.modelCacheKey("5M") === null);
-check("modelCacheKey 28M parts -> cache URL", /28M\.onnx$/.test(Core.modelCacheKey("28M")));
+check("modelCacheKey 28M parts -> cache URL", /28M\.h168\.onnx$/.test(Core.modelCacheKey("28M")));
 
 // parseHourUtc treats naive timestamps as UTC
 check("parseHourUtc naive = UTC", Core.parseHourUtc("2026-11-20T22:00:00").toISOString() === "2026-11-20T22:00:00.000Z");
@@ -231,18 +231,19 @@ const nmap = {};
 for (let i = 0; i < 900; i++) { const d = new Date(h0 + i * 3600e3); wmap[Core.utcHourKey(d)] = [5, 2, 100]; nmap[Core.utcHourKey(d)] = [300, 350]; }
 const inp = Core.buildOnnxInputs(hist, wmap, nmap);
 check("buildOnnxInputs context len", inp.context.length === 768);
-check("buildOnnxInputs known len", inp.known.length === 7 * 864);
-check("buildOnnxInputs hours len", inp.hours.length === 864);
+check("buildOnnxInputs known len", inp.known.length === 13 * 936);
+check("buildOnnxInputs hours len", inp.hours.length === 936);
 check("buildOnnxInputs no pad when 800h", isFinite(inp.context[0]));
 check("buildOnnxInputs last ctx price", close(inp.context[767], hist[799].price, 1e-3));
-check("buildOnnxInputs weather row", inp.known[0] === 5 && inp.known[864] === 2 && inp.known[2 * 864] === 100);
-check("buildOnnxInputs neighbor rows DE/SE3", inp.known[3 * 864 + 700] === 300 && inp.known[4 * 864 + 700] === 350);
-check("buildOnnxInputs enc rows finite", isFinite(inp.known[5 * 864 + 700]) && isFinite(inp.known[6 * 864 + 700]));
+check("buildOnnxInputs weather row", inp.known[0] === 5 && inp.known[936] === 2 && inp.known[2 * 936] === 100);
+check("buildOnnxInputs neighbor rows DE/SE3", inp.known[3 * 936 + 700] === 300 && inp.known[4 * 936 + 700] === 350);
+check("buildOnnxInputs enc rows finite", isFinite(inp.known[11 * 936 + 700]) && isFinite(inp.known[12 * 936 + 700]));
+check("buildOnnxInputs deWx rows NaN without deWxMap", isNaN(inp.known[5 * 936 + 700]) && isNaN(inp.known[10 * 936 + 700]));
 const inp2 = Core.buildOnnxInputs(hist.slice(0, 100), {});
 check("buildOnnxInputs left-pads NaN", isNaN(inp2.context[0]) && isFinite(inp2.context[668]));
-check("buildOnnxInputs weather NaN when missing", isNaN(inp2.known[0]) && isNaN(inp2.known[864]));
-check("buildOnnxInputs neighbor NaN when missing", isNaN(inp2.known[3 * 864 + 700]) && isNaN(inp2.known[4 * 864 + 700]));
-check("buildOnnxInputs enc NaN in padding", isNaN(inp2.known[5 * 864 + 10]) && isFinite(inp2.known[5 * 864 + 700]));
+check("buildOnnxInputs weather NaN when missing", isNaN(inp2.known[0]) && isNaN(inp2.known[936]));
+check("buildOnnxInputs neighbor NaN when missing", isNaN(inp2.known[3 * 936 + 700]) && isNaN(inp2.known[4 * 936 + 700]));
+check("buildOnnxInputs enc NaN in padding", isNaN(inp2.known[11 * 936 + 10]) && isFinite(inp2.known[11 * 936 + 700]));
 
 // conformal band calibration (q10-q90 recalibration)
 check("quantileOf median", Core.quantileOf([1, 2, 3, 4], 0.5) === 2.5 && Core.quantileOf([], 0.5) === null);
@@ -260,7 +261,54 @@ check("scaleBand no k -> unchanged", JSON.stringify(Core.scaleBand(100, 80, 120,
 const biased = Array.from({length: 20}, (_, i) => ({ med: 100 + i, act: 90 + i })); // med-act = +10 always
 check("medianError = +10 constant bias", Core.medianError(biased) === 10);
 check("medianError null when few", Core.medianError(biased.slice(0, 5)) === null);
-check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72);
+check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72
+    && Core.horizonBucket(72) === 96 && Core.horizonBucket(95) === 96 && Core.horizonBucket(96) === 120 && Core.horizonBucket(143) === 144
+    && Core.horizonBucket(144) === 168 && Core.horizonBucket(500) === 168);
+check("K_BUCKETS 24..168", Array.isArray(Core.K_BUCKETS) && Core.K_BUCKETS.join(",") === "24,48,72,96,120,144,168");
+
+// ridge neighbour fill: solveLinear / ridgeFit / deFeatRow / buildNeighborFill / buildOnnxInputs fill
+{
+    const A = [[2, 1, 0], [1, 3, 1], [0, 1, 4]], b = [4, 10, 14]; // A·x with x = 1,2,3
+    const x = Core.solveLinear(A, b);
+    check("solveLinear 3x3", !!x && Math.abs(x[0] - 1) < 1e-9 && Math.abs(x[1] - 2) < 1e-9 && Math.abs(x[2] - 3) < 1e-9);
+    check("solveLinear singular -> null", Core.solveLinear([[1, 1], [1, 1]], [1, 2]) === null);
+    check("windPowerProxy", Core.windPowerProxy(25) === 1 && Core.windPowerProxy(3) === 0 && Core.windPowerProxy(0) === 0 && isNaN(Core.windPowerProxy(NaN)));
+    const d0 = new Date(h0 + 18 * 3600e3); // hour 18
+    const deWx0 = {}; deWx0[Core.utcHourKey(d0)] = [10, 9, 100, 12, 40, 1010];
+    const r0 = Core.deFeatRow(d0, deWx0);
+    check("deFeatRow shape/dummies", r0.length === 38 && r0[0] === 1 && r0[1 + 18] === 1 && r0[1 + 3] === 0 && r0[32] === Core.windPowerProxy(10));
+    // synthetic linear target learned by ridgeFit
+    const rows = [], ys = [];
+    for (let i = 0; i < 300; i++) {
+        const d = new Date(h0 + i * 3600e3);
+        const w100 = 5 + (i % 10), temp = 10 + (i % 7);
+        const dw = {}; dw[Core.utcHourKey(d)] = [w100, w100 - 1, 100, temp, 50, 1013];
+        rows.push(Core.deFeatRow(d, dw));
+        ys.push(200 + 3 * temp - 0.5 * Core.windPowerProxy(w100) + (d.getUTCHours() === 18 ? 100 : 0));
+    }
+    const m = Core.ridgeFit(rows, ys);
+    check("ridgeFit recovers linear target", !!m && Math.abs(Core.ridgePredict(m, rows[250]) - ys[250]) < 0.05); // tiny ridge shrinkage
+    check("ridgeFit too few rows -> null", Core.ridgeFit(rows.slice(0, 10), ys.slice(0, 10)) === null);
+    // buildNeighborFill: published hours kept, unpublished future filled
+    const nmap2 = {};
+    for (let i = 0; i < 900; i++) { const d = new Date(h0 + i * 3600e3); nmap2[Core.utcHourKey(d)] = [300 + i * 0.1, 350]; } // covers future hours h0+800..899 as published
+    const deWxAll = {};
+    for (let i = 0; i < 1000; i++) { const d = new Date(h0 + i * 3600e3); deWxAll[Core.utcHourKey(d)] = [8, 7, 100, 12, 40, 1010]; }
+    const lastCtx = new Date(h0 + 799 * 3600e3);
+    const fut = []; for (let i = 1; i <= 168; i++) fut.push(new Date(h0 + (799 + i) * 3600e3));
+    const fill = Core.buildNeighborFill(nmap2, deWxAll, lastCtx.getTime(), fut);
+    check("buildNeighborFill keeps published hour", fill.DE[Core.utcHourKey(fut[0])] === undefined && fill.DE[Core.utcHourKey(fut[99])] === undefined); // h0+800..899h published in nmap2
+    check("buildNeighborFill fills unpublished future", isFinite(fill.DE[Core.utcHourKey(fut[167])]) && isFinite(fill.SE3[Core.utcHourKey(fut[167])]));
+    check("buildNeighborFill respects trainEnd", (function () { // hours after trainEnd must not be trained on: fill still works with only 700 rows
+        const nm = {}; for (let i = 0; i < 700; i++) { const d = new Date(h0 + i * 3600e3); nm[Core.utcHourKey(d)] = [300, 350]; }
+        const f2 = Core.buildNeighborFill(nm, deWxAll, new Date(h0 + 699 * 3600e3).getTime(), fut);
+        return isFinite(f2.DE[Core.utcHourKey(fut[167])]);
+    })());
+    const inp3 = Core.buildOnnxInputs(hist, wmap, nmap, deWxAll); // nmap covers 900h: future i=768..867 published, 868..935 filled
+    check("buildOnnxInputs published nb kept with fill on", inp3.known[3 * 936 + 800] === 300);
+    check("buildOnnxInputs ridge fill beyond published", isFinite(inp3.known[3 * 936 + 935]) && isFinite(inp3.known[4 * 936 + 935]));
+    check("buildOnnxInputs deWx rows from deWxMap", isFinite(inp3.known[5 * 936 + 800]) && close(inp3.known[5 * 936 + 800], Core.windPowerProxy(8), 1e-9) && inp3.known[6 * 936 + 800] === 7 && inp3.known[10 * 936 + 800] === 1010);
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

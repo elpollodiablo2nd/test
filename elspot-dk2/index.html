@@ -245,9 +245,9 @@
         <section class="card" id="aboutPanel" hidden>
             <h2>ABOUT · HOW IT WORKS · SOURCES</h2>
             <p class="dim"><b>elspot</b> forecasts day-ahead electricity prices in Denmark — pick <b>DK2 · EAST</b> (default) or <b>DK1 · WEST</b> in the RUN card (remembered). Timestral runs <b>on-device via ONNX</b>: no API key, no server.</p>
-            <p><b>What to push:</b> 1) prices load automatically — live from Energinet (retries + Retry-After); if the network blocks it (common on shared mobile IPs, remembered for 1h), the app falls back to the <b>Pages snapshot</b> (CI-refreshed every 30 min, Nord Pool fallback), then the local cache (freshest wins), then the APK-bundled snapshot — the banner always names the source; <b>LOAD PRICES</b> forces a live retry. 2) optionally pick the model (<b>5M</b> bundled in the APK; <b>28M</b> downloaded once from Pages, then kept in the app cache across restarts; 123M/209M disabled, too big on-device), the <b>horizon</b> (24/48/72h) and the <b>EV window</b> (4/6/8h). 3) press <b>RUN TIMESTRAL</b> — the ONNX-exported Timestral runs on this device in ~1–5 s.</p>
-            <p><b>What to expect:</b> RUN feeds Timestral the price history plus <b>covariates</b>: weather at the zone (Open-Meteo — Copenhagen for DK2, Esbjerg for DK1) and DE/SE3 day-ahead prices — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — plus hour-of-day/weekday encodings. Output: the orange dashed <b>median</b> with the red <b>q10–q90 band</b> (recalibrated on-device from recent forecast errors, per horizon). The chart starts <b>at the current hour</b>: green = published day-ahead prices ahead of now; the cream dashed <b>baseline</b> is the naive reference guess “tomorrow repeats today’s hourly pattern” (forecast hour h = actual hour h−24), shown so you can see what the AI adds over it; then the NOW line and the green shaded <b>EV charge window</b>. The x-axis shows time of day plus <b>weekday + DD/MM</b> at each day boundary. Prices are in <b>kr/kWh</b>; with <b>INCL. FEES+VAT</b> ticked they include the mandatory fees — Energinet transmission + system tariff, elafgift, and the DSO Nettarif C (N1 for DK2, TREFOR for DK1; low at night, peak 17–21; seasonal changes automatic via ValidFrom/ValidTo) — plus 25% VAT: what you actually pay per kWh.</p>
-            <p><b>Wind, sun &amp; negative prices:</b> 92% of negative-price hours had wind &gt;15 m/s, and gust-driven drops are tracked while DE/SE3 day-ahead is published — neighbour prices are only known to ~+36h, and beyond that the model has no neighbour signal, so error grows with horizon (h24 4.0% → h48 8.7% → h72 12.3% MAE; the largest errors are all beyond +36h). Wind/solar <i>generation</i> forecasts add nothing on top (4.3% vs 4.1%), and there are no weather gaps (0 of 864 input hours missing). The clamp at 0 — active only when the recent context has no negative hour — measured more accurate on negative-price hours than an unclamped run, so it is kept.</p>
+            <p><b>What to push:</b> 1) prices load automatically — live from Energinet (retries + Retry-After); if the network blocks it (common on shared mobile IPs, remembered for 1h), the app falls back to the <b>Pages snapshot</b> (CI-refreshed every 30 min, Nord Pool fallback), then the local cache (freshest wins), then the APK-bundled snapshot — the banner always names the source; <b>LOAD PRICES</b> forces a live retry. 2) optionally pick the model (<b>5M</b> bundled in the APK; <b>28M</b> downloaded once from Pages, then kept in the app cache across restarts; 123M/209M disabled, too big on-device), the <b>horizon</b> (24–168h, up to 7 days) and the <b>EV window</b> (4/6/8h). 3) press <b>RUN TIMESTRAL</b> — the ONNX-exported Timestral runs on this device in ~1–5 s.</p>
+            <p><b>What to expect:</b> RUN feeds Timestral the price history plus <b>covariates</b>: weather at the zone (Open-Meteo — Copenhagen for DK2, Esbjerg for DK1) and DE/SE3 day-ahead prices — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) plus N-German weather (wind/solar/temp/cloud/pressure at 3 points near the DK border) and hour-of-day/weekday encodings. DE/SE3 prices are only published to ~+36h; beyond that the app fills them with a small on-device ridge forecast from that N-German weather + calendar (7-month backtest: day 3–7 MAE 32–45% → <b>24–28%</b>). Output: the orange dashed <b>median</b> with the red <b>q10–q90 band</b> (recalibrated on-device from recent forecast errors, per horizon). The chart starts <b>at the current hour</b>: green = published day-ahead prices ahead of now; the cream dashed <b>baseline</b> is the naive reference guess “tomorrow repeats today’s hourly pattern” (forecast hour h = actual hour h−24), shown so you can see what the AI adds over it; then the NOW line and the green shaded <b>EV charge window</b>. The x-axis shows time of day plus <b>weekday + DD/MM</b> at each day boundary. Prices are in <b>kr/kWh</b>; with <b>INCL. FEES+VAT</b> ticked they include the mandatory fees — Energinet transmission + system tariff, elafgift, and the DSO Nettarif C (N1 for DK2, TREFOR for DK1; low at night, peak 17–21; seasonal changes automatic via ValidFrom/ValidTo) — plus 25% VAT: what you actually pay per kWh.</p>
+            <p><b>Wind, sun &amp; negative prices:</b> 92% of negative-price hours had wind &gt;15 m/s, and gust-driven drops are tracked while DE/SE3 day-ahead is published — neighbour prices are only published to ~+36h (beyond that the ridge fill above takes over), so error still grows with horizon: 7-month backtest, 28M + ridge fill + DE-weather rows, day1 6.3% → day2 16.0% → day3 27.7% → day7 26.9% MAE (the largest errors are wind-gust hours beyond +36h). Wind/solar <i>generation</i> forecasts add nothing on top (4.3% vs 4.1%), and there are no weather gaps (0 of 864 input hours missing). The ONNX export no longer clamps at 0, so negative prices can be forecast (in the backtest the old clamp scored slightly better on those rare hours, at the cost of never predicting them).</p>
             <p class="dim">Prices: <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service — DayAheadPrices (DK1/DK2)</a>, day-ahead, published daily ~13:00 CET.
             Fees: <a href="https://www.energidataservice.dk/tso-electricity/DatahubPricelist">DatahubPricelist</a> (Energinet GLN 5790000432752; N1 5790001089030 for DK2; TREFOR 5790000392261 for DK1) + 25% VAT.
             Model: <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX export on-device in the Android app
@@ -287,10 +287,14 @@
                     <option value="123M" disabled>123M (too big on-device)</option>
                     <option value="209M" disabled>209M (too big on-device)</option>
                 </select>
-                <select id="horizon" class="pixel" title="Forecast horizon">
+                <select id="horizon" class="pixel" title="Forecast horizon (up to 7 days)">
                     <option value="24" selected>24h ahead</option>
                     <option value="48">48h ahead</option>
-                    <option value="72">72h ahead</option>
+                    <option value="72">72h · 3d</option>
+                    <option value="96">96h · 4d</option>
+                    <option value="120">120h · 5d</option>
+                    <option value="144">144h · 6d</option>
+                    <option value="168">168h · 7d</option>
                 </select>
                 <select id="evHours" class="pixel" title="EV charging window length">
                     <option value="4">EV 4h</option>
@@ -347,7 +351,10 @@
                 Price18: 0.3863, Price19: 0.3863, Price20: 0.3863, Price21: 0.3863,
                 Price22: 0.1288, Price23: 0.1288, Price24: 0.1288 }] })
         };
-        var ONNX_T = 768, ONNX_H = 96, ONNX_Q = 21, ONNX_C = 7; // fixed export shapes (patch 32 | 768, 96); 7 covariate rows
+        var ONNX_T = 768, ONNX_H = 168, ONNX_Q = 21, ONNX_C = 13; // fixed export shapes (768 ctx + 168 h = up to 7 days); 13 covariate rows
+        var K_BUCKETS = [24, 48, 72, 96, 120, 144, 168]; // horizon buckets for band calibration + level bias
+        var DE_WX_POINTS = [[54.79789, 9.445545], [54.024605, 10.465116], [53.60281, 10.0]]; // N-Germany (Flensburg, Fehmarn area, Hamburg) for the neighbour-price ridge
+        var DE_WX_VARS = ["wind_speed_100m", "wind_speed_10m", "shortwave_radiation", "temperature_2m", "cloud_cover", "surface_pressure"];
         var ONNX_MED_I = 10, ONNX_Q10_I = 2, ONNX_Q90_I = 18; // quantile levels 0.01..0.99
         var ONNX_MODEL_URLS = { "5M": "assets/timestral-5m.onnx" }; // bundled in the APK
         var PAGES_BASE = "https://elpollodiablo2nd.github.io/test/";
@@ -397,7 +404,7 @@
         }
 
         function modelCacheKey(modelSize) {
-            return ONNX_MODEL_URLS[modelSize] ? null : "https://elspot.app/cache/models/" + modelSize + ".onnx";
+            return ONNX_MODEL_URLS[modelSize] ? null : "https://elspot.app/cache/models/" + modelSize + ".h168.onnx"; // h168 = 7-day no-clamp export
         }
 
         function nearestSeriesEntry(series, tMs) {
@@ -466,7 +473,122 @@
             return [med - k * (med - q10), med + k * (q90 - med)];
         }
 
-        function horizonBucket(h) { return h < 24 ? 24 : (h < 48 ? 48 : 72); }
+        function horizonBucket(h) {
+            return h < 24 ? 24 : h < 48 ? 48 : h < 72 ? 72 : h < 96 ? 96 : h < 120 ? 120 : h < 144 ? 144 : 168;
+        }
+
+        // ---- neighbour-price ridge fill (DE/SE3 beyond the published ~+36h day-ahead) ----
+        // Mirrors the sandbox prototype (proto7.py): walk-forward ridge per area on
+        // [1, 24 hour dummies, 7 weekday dummies, windpw, wind10, solar, temp, cloud, pres],
+        // trained on published hours only. Backtest (35 origins, 7 months, 28M):
+        // day 3-7 MAE 32-45% -> 25-29% with this fill.
+
+        function windPowerProxy(w100) { // cubic power curve above 3 m/s, capped at 25 m/s
+            if (!isFinite(w100)) return NaN;
+            var v = Math.max(0, Math.min(w100, 25) - 3);
+            return v * v * v / (22 * 22 * 22);
+        }
+
+        function deFeatRow(date, deWx) { // 38-col feature row; deWx: utcHourKey -> [w100, w10, solar, temp, cloud, pres]
+            var w = deWx ? deWx[utcHourKey(date)] : null;
+            var row = [1], hr = date.getUTCHours(), wd = weekdayMon0(date), i;
+            for (i = 0; i < 24; i++) row.push(i === hr ? 1 : 0);
+            for (i = 0; i < 7; i++) row.push(i === wd ? 1 : 0);
+            row.push(w ? windPowerProxy(w[0]) : NaN, w && isFinite(w[1]) ? w[1] : NaN,
+                     w && isFinite(w[2]) ? w[2] : NaN, w && isFinite(w[3]) ? w[3] : NaN,
+                     w && isFinite(w[4]) ? w[4] : NaN, w && isFinite(w[5]) ? w[5] : NaN);
+            return row;
+        }
+
+        function solveLinear(A, b) { // Gaussian elimination with partial pivoting; null if singular
+            var n = b.length, i, j, k;
+            var M = A.map(function (row, r) { return row.concat([b[r]]); });
+            for (k = 0; k < n; k++) {
+                var piv = k;
+                for (i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[piv][k])) piv = i;
+                if (!(Math.abs(M[piv][k]) > 1e-12)) return null;
+                if (piv !== k) { var t = M[piv]; M[piv] = M[k]; M[k] = t; }
+                for (i = k + 1; i < n; i++) {
+                    var f = M[i][k] / M[k][k];
+                    for (j = k; j <= n; j++) M[i][j] -= f * M[k][j];
+                }
+            }
+            var x = new Array(n);
+            for (i = n - 1; i >= 0; i--) {
+                var s = M[i][n];
+                for (j = i + 1; j < n; j++) s -= M[i][j] * x[j];
+                x[i] = s / M[i][i];
+            }
+            return x;
+        }
+
+        function ridgeFit(rows, ys) { // normal equations on standardized features (col 0 = intercept, not standardized)
+            var n = rows.length;
+            if (!n || n < 60) return null;
+            var k = rows[0].length, i, j;
+            var mu = new Array(k).fill(0), sd = new Array(k).fill(1);
+            for (i = 1; i < k; i++) {
+                var s = 0, c = 0;
+                for (j = 0; j < n; j++) if (isFinite(rows[j][i])) { s += rows[j][i]; c++; }
+                if (c > 0) mu[i] = s / c;
+            }
+            for (i = 1; i < k; i++) {
+                var v = 0, c2 = 0;
+                for (j = 0; j < n; j++) if (isFinite(rows[j][i])) { var d = rows[j][i] - mu[i]; v += d * d; c2++; }
+                sd[i] = c2 > 1 && v > 0 ? Math.sqrt(v / c2) : 1;
+            }
+            var A = [], b = new Array(k).fill(0);
+            for (i = 0; i < k; i++) A.push(new Array(k).fill(0));
+            for (j = 0; j < n; j++) {
+                var xs = new Array(k);
+                for (i = 0; i < k; i++) xs[i] = i === 0 ? 1 : (isFinite(rows[j][i]) ? (rows[j][i] - mu[i]) / sd[i] : 0);
+                for (i = 0; i < k; i++) {
+                    b[i] += xs[i] * ys[j];
+                    for (var l = i; l < k; l++) A[i][l] += xs[i] * xs[l];
+                }
+            }
+            for (i = 0; i < k; i++) {
+                for (j = 0; j < i; j++) A[i][j] = A[j][i];
+                A[i][i] += 1e-6 * n; // tiny ridge for numerical stability
+            }
+            var beta = solveLinear(A, b);
+            return beta ? { mu: mu, sd: sd, beta: beta, k: k } : null;
+        }
+
+        function ridgePredict(m, row) {
+            var s = 0;
+            for (var i = 0; i < m.k; i++) {
+                var x = i === 0 ? 1 : (isFinite(row[i]) ? (row[i] - m.mu[i]) / m.sd[i] : 0); // missing -> train mean
+                s += m.beta[i] * x;
+            }
+            return s;
+        }
+
+        function buildNeighborFill(neighborMap, deWxMap, trainEndMs, futureHours) {
+            var fill = { DE: {}, SE3: {} };
+            if (!neighborMap || !deWxMap) return fill;
+            [["DE", 0], ["SE3", 1]].forEach(function (area) {
+                var name = area[0], idx = area[1], rows = [], ys = [], key;
+                for (key in neighborMap) {
+                    var nb = neighborMap[key];
+                    if (!nb || !isFinite(nb[idx])) continue;
+                    var t = parseHourUtc(key + ":00").getTime();
+                    if (t > trainEndMs) continue; // train on known/published hours only
+                    var row = deFeatRow(new Date(t), deWxMap), ok = true;
+                    for (var i = 0; i < row.length; i++) if (!isFinite(row[i])) { ok = false; break; }
+                    if (ok) { rows.push(row); ys.push(nb[idx]); }
+                }
+                var m = ridgeFit(rows, ys);
+                if (!m) return;
+                futureHours.forEach(function (fh) {
+                    if (!fh) return;
+                    var fk = utcHourKey(fh), nbv = neighborMap[fk];
+                    if (nbv && isFinite(nbv[idx])) return; // published day-ahead wins
+                    fill[name][fk] = ridgePredict(m, deFeatRow(fh, deWxMap));
+                });
+            });
+            return fill;
+        }
 
         function dkDay(dkStr) { return dkStr.slice(8, 10) + "/" + dkStr.slice(5, 7); } // "26/11"
         function dkShort(dkStr) { return dkDay(dkStr) + " " + dkStr.slice(11, 16); } // "26/11 14:00"
@@ -715,9 +837,11 @@
             };
         }
 
-        function buildOnnxInputs(history, weatherMap, neighborMap) {
+        function buildOnnxInputs(history, weatherMap, neighborMap, deWxMap) {
             // last ONNX_T hours (NaN left-padded) + ONNX_H future hours; known covariates
-            // rows = [wind, temp, solar, DE, SE3, enc_hour, enc_weekday] over T+H, NaN = missing
+            // rows = [wind, temp, solar, DE, SE3, de_windpw, de_wind10, de_solar, de_temp, de_cloud, de_pres,
+            //         enc_hour, enc_weekday] over T+H, NaN = missing
+            // DE/SE3 beyond the published day-ahead (~+36h) are filled from buildNeighborFill(deWxMap)
             var pts = (history || []).slice(-ONNX_T);
             var pad = ONNX_T - pts.length, i;
             var hours = [], prices = [];
@@ -726,6 +850,7 @@
             var last = hours[ONNX_T - 1];
             for (i = 1; i <= ONNX_H; i++) hours.push(new Date(last.getTime() + i * HOUR_MS));
             var L = ONNX_T + ONNX_H;
+            var nbFill = deWxMap ? buildNeighborFill(neighborMap, deWxMap, hours[ONNX_T - 1].getTime(), hours.slice(ONNX_T)) : null;
             var context = new Float32Array(ONNX_T);
             for (i = 0; i < ONNX_T; i++) context[i] = prices[i];
             var hourCodes = new Array(L), weekCodes = new Array(L);
@@ -746,13 +871,21 @@
                 known[1 * L + i] = w ? w[1] : NaN;
                 known[2 * L + i] = w ? w[2] : NaN;
                 var nb = hh ? (neighborMap || {})[utcHourKey(hh)] : null;
-                known[3 * L + i] = nb && isFinite(nb[0]) ? nb[0] : NaN; // DE day-ahead DKK/MWh
-                known[4 * L + i] = nb && isFinite(nb[1]) ? nb[1] : NaN; // SE3 day-ahead DKK/MWh
+                var fkey = hh ? utcHourKey(hh) : null;
+                known[3 * L + i] = nb && isFinite(nb[0]) ? nb[0] : (nbFill && fkey && isFinite(nbFill.DE[fkey]) ? nbFill.DE[fkey] : NaN); // DE day-ahead, else ridge fill
+                known[4 * L + i] = nb && isFinite(nb[1]) ? nb[1] : (nbFill && fkey && isFinite(nbFill.SE3[fkey]) ? nbFill.SE3[fkey] : NaN); // SE3 day-ahead, else ridge fill
+                var dw = hh && deWxMap ? deWxMap[fkey] : null; // N-Germany weather rows (deWxMap: [w100, w10, solar, temp, cloud, pres])
+                known[5 * L + i] = dw ? windPowerProxy(dw[0]) : NaN;
+                known[6 * L + i] = dw && isFinite(dw[1]) ? dw[1] : NaN;
+                known[7 * L + i] = dw && isFinite(dw[2]) ? dw[2] : NaN;
+                known[8 * L + i] = dw && isFinite(dw[3]) ? dw[3] : NaN;
+                known[9 * L + i] = dw && isFinite(dw[4]) ? dw[4] : NaN;
+                known[10 * L + i] = dw && isFinite(dw[5]) ? dw[5] : NaN;
                 var eh = encHour(hourCodes[i]), ew = encWeek(weekCodes[i]);
                 if (i < ONNX_T && !isFinite(target[i]) && !isFinite(hourCodes[i])) eh = NaN;
                 if (i < ONNX_T && !isFinite(target[i]) && !isFinite(weekCodes[i])) ew = NaN;
-                known[5 * L + i] = eh;
-                known[6 * L + i] = ew;
+                known[11 * L + i] = eh;
+                known[12 * L + i] = ew;
             }
             return { context: context, known: known, hours: hours };
         }
@@ -796,6 +929,13 @@
             medianError: medianError,
             scaleBand: scaleBand,
             horizonBucket: horizonBucket,
+            K_BUCKETS: K_BUCKETS,
+            windPowerProxy: windPowerProxy,
+            deFeatRow: deFeatRow,
+            solveLinear: solveLinear,
+            ridgeFit: ridgeFit,
+            ridgePredict: ridgePredict,
+            buildNeighborFill: buildNeighborFill,
             tipLines: tipLines,
             dkDay: dkDay,
             dkShort: dkShort
@@ -1251,38 +1391,59 @@
         }
 
         function fetchWeatherMap(daysBack) {
-            var hourly = "wind_speed_10m,temperature_2m,shortwave_radiation";
+            // DK zone point (3 vars -> ONNX weather rows) + 3 N-Germany points (6 vars -> neighbour ridge);
+            // archive (daysBack) + 8-day forecast each. Returns { dk: map, de: map }.
             var zw = zoneConfig(state.zone);
-            var common = { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: hourly };
+            var dkVars = ["wind_speed_10m", "temperature_2m", "shortwave_radiation"];
+            var deLats = DE_WX_POINTS.map(function (p) { return p[0]; }).join(",");
+            var deLons = DE_WX_POINTS.map(function (p) { return p[1]; }).join(",");
             function q(base, extra) {
-                var params = new URLSearchParams(Object.assign({}, common, extra));
+                var params = new URLSearchParams(extra);
                 return apiGet(base + "?" + params.toString()).then(function (r) {
                     if (!r.ok) throw new Error("Open-Meteo " + r.status);
                     return r.json();
                 });
             }
             var end = new Date(), start = new Date(Date.now() - daysBack * 86400000);
-            return Promise.all([
-                q("https://archive-api.open-meteo.com/v1/archive", { start_date: start.toISOString().slice(0, 10), end_date: end.toISOString().slice(0, 10) }),
-                q("https://api.open-meteo.com/v1/forecast", { forecast_days: 7 })
-            ]).then(function (resps) {
-                var map = {};
+            var sd = start.toISOString().slice(0, 10), ed = end.toISOString().slice(0, 10);
+            function parseMulti(resps, vars) { // multi-location responses are arrays of per-point objects; average per hour
+                var acc = {};
                 resps.forEach(function (data) {
-                    var h = data.hourly || {}, times = h.time || [];
-                    ["wind_speed_10m", "temperature_2m", "shortwave_radiation"].forEach(function (v, vi) {
-                        var col = h[v] || [];
-                        times.forEach(function (t, i) {
-                            var key = utcHourKey(parseHourUtc(String(t)));
-                            if (!map[key]) map[key] = [NaN, NaN, NaN];
-                            if (i < col.length && col[i] != null) map[key][vi] = Number(col[i]);
+                    var locs = Array.isArray(data) ? data : [data];
+                    locs.forEach(function (loc) {
+                        var h = loc.hourly || {}, times = h.time || [];
+                        vars.forEach(function (v, vi) {
+                            var col = h[v] || [];
+                            times.forEach(function (t, i) {
+                                if (i >= col.length || col[i] == null) return;
+                                var key = utcHourKey(parseHourUtc(String(t)));
+                                if (!acc[key]) acc[key] = { s: vars.map(function () { return 0; }), c: vars.map(function () { return 0; }) };
+                                acc[key].s[vi] += Number(col[i]); acc[key].c[vi]++;
+                            });
                         });
                     });
                 });
+                var map = {};
+                Object.keys(acc).forEach(function (key) {
+                    map[key] = acc[key].s.map(function (s, vi) { return acc[key].c[vi] > 0 ? s / acc[key].c[vi] : NaN; });
+                });
                 return map;
-            });
+            }
+            var dkReq = [
+                q("https://archive-api.open-meteo.com/v1/archive", { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: dkVars.join(","), start_date: sd, end_date: ed }),
+                q("https://api.open-meteo.com/v1/forecast", { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: dkVars.join(","), forecast_days: 8 })
+            ];
+            var deReq = [
+                q("https://archive-api.open-meteo.com/v1/archive", { latitude: deLats, longitude: deLons, timezone: "UTC", hourly: DE_WX_VARS.join(","), start_date: sd, end_date: ed }),
+                q("https://api.open-meteo.com/v1/forecast", { latitude: deLats, longitude: deLons, timezone: "UTC", hourly: DE_WX_VARS.join(","), forecast_days: 8 })
+            ];
+            return Promise.all([
+                Promise.all(dkReq).then(function (r) { return parseMulti(r, dkVars); }),
+                Promise.all(deReq).then(function (r) { return parseMulti(r, DE_WX_VARS); })
+            ]).then(function (r) { return { dk: r[0], de: r[1] }; });
         }
 
-        var DEFAULT_K = { 24: 1.5, 48: 1.4, 72: 1.35 }; // full-year backtest fallback (neighbour-covariate config)
+        var DEFAULT_K = { 24: 1.5, 48: 1.4, 72: 1.35, 96: 1.35, 120: 1.35, 144: 1.35, 168: 1.35 }; // backtest fallback per horizon bucket (neighbour-covariate config)
 
         function loadNeighbors() {
             function toMap(snap) {
@@ -1321,13 +1482,14 @@
             var preds = loadPreds();
             var histMap = {};
             state.history.forEach(function (p) { histMap[p.utc.getTime()] = p.price; });
-            var byBucket = { 24: [], 48: [], 72: [] };
+            var byBucket = {};
+            K_BUCKETS.forEach(function (H) { byBucket[H] = []; });
             preds.forEach(function (p) {
                 var act = histMap[p.t];
                 if (act != null) byBucket[horizonBucket(p.h)].push({ med: p.med, q10: p.q10, q90: p.q90, act: act });
             });
             var k = {}, bias = {};
-            [24, 48, 72].forEach(function (H) {
+            K_BUCKETS.forEach(function (H) {
                 k[H] = conformalK(byBucket[H], 0.85) || DEFAULT_K[H];
                 bias[H] = medianError(byBucket[H]) || 0; // level correction: shift p50 by median past error
             });
@@ -1342,12 +1504,12 @@
             var t0 = Date.now();
             feedback("Loading on-device ONNX model " + modelSize + " (WASM)…", "correct");
             getOnnxSession(modelSize).then(function (session) {
-                feedback("Fetching weather (Open-Meteo)…", "correct");
-                return fetchWeatherMap(32).catch(function () { return {}; }).then(function (weatherMap) {
+                feedback("Fetching weather (Open-Meteo · DK + N-Germany)…", "correct");
+                return fetchWeatherMap(32).catch(function () { return { dk: {}, de: {} }; }).then(function (weatherMap) {
                     return { session: session, weatherMap: weatherMap };
                 });
             }).then(function (env) {
-                var inputs = buildOnnxInputs(state.history, env.weatherMap, state.neighborMap);
+                var inputs = buildOnnxInputs(state.history, env.weatherMap.dk, state.neighborMap, env.weatherMap.de);
                 return env.session.run({
                     context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
                     known_covariates: new ort.Tensor("float32", inputs.known, [1, ONNX_C, ONNX_T + ONNX_H])
@@ -1384,10 +1546,11 @@
                     wind_avg_ms: (state.workflowStats && state.workflowStats.wind_avg_ms) || null
                 };
                 renderAll();
+                var kTxt = K_BUCKETS.map(function (b) { return kByBucket[b].toFixed(2); }).join("/");
+                var bTxt = K_BUCKETS.map(function (b) { return (biasByBucket[b] || 0).toFixed(0); }).join("/");
                 feedback("On-device ONNX forecast ready — Timestral " + modelSize + ", " + horizon + "h, " +
-                    ((Date.now() - t0) / 1000).toFixed(1) + "s on this device. No API key used. Band calibrated (k 24/48/72h = " +
-                    kByBucket[24].toFixed(2) + "/" + kByBucket[48].toFixed(2) + "/" + kByBucket[72].toFixed(2) + "), level bias 24/48/72h = " +
-                    biasByBucket[24].toFixed(0) + "/" + biasByBucket[48].toFixed(0) + "/" + biasByBucket[72].toFixed(0) + " DKK/MWh).", "correct");
+                    ((Date.now() - t0) / 1000).toFixed(1) + "s on this device. No API key used. Band calibrated (k 24…168h = " +
+                    kTxt + "), level bias 24…168h = " + bTxt + " DKK/MWh.", "correct");
             }).catch(function (err) {
                 feedback("On-device run failed: " + err.message, "wrong");
             }).finally(function () { setBusy(false); });

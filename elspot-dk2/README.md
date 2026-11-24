@@ -33,7 +33,7 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    **baseline** (tomorrow ≈ today — each forecast hour repeats the actual price 24h earlier). The HUD shows the cheapest hour and the EV window.
 2. Press **RUN TIMESTRAL** — in the Android app (`elspot-dk2-android/app-debug.apk`) the
    ONNX-exported Timestral runs **on-device** (no API key): pick the checkpoint (5M bundled, 28M
-   downloaded once in 4 parts) and the **horizon** (24/48/72h — beyond 24h there is no published
+   downloaded once in 4 parts) and the **horizon** (24–168h, up to 7 days — beyond 24h there is no published
    day-ahead price to check against and the q10–q90 band widens). In a plain browser the button
    explains that on-device ONNX needs the app. The server-side `dk2-elspot-forecast` workflow
    (`elspot-dk2-workflows/`) is still available via the Mistral API for anyone who wants it.
@@ -77,8 +77,51 @@ No retraining is involved: Timestral is zero-shot — the price history is the i
 neighbour-NaN hours vs 82 when present). Errors also peak in the 16–19 UTC price peak. Gust events (3h price drop
 >300 DKK/MWh with wind +8 m/s; 36 in the year) are forecast about as well as average when neighbours are published
 (the German day-ahead moves with the same wind), and 92% of the 109 negative-price hours had wind10m > 15 m/s.
-Negative-price hours: MAE 32 DKK/MWh with the non-negative clamp (kept — unclamped measured worse, 82).
-Skipped weather indicators: none — 0 of 864 app input hours missing (Open-Meteo 32d archive + 7d forecast covers the window).
+Negative-price hours: with the old non-negative clamp MAE was 32 DKK/MWh on those hours (unclamped 82 in that
+run) — but the clamp also meant negative prices could never be *predicted*; the current export (v3) is unclamped
+(`clip_nonnegative=False`), so high-wind negative hours are forecastable.
+Skipped weather indicators: none — 0 of 936 app input hours missing (Open-Meteo 32d archive + 8d forecast covers the 768+168 window).
+
+### 7-day horizon: neighbour-forecast ridge fill + no-clamp ONNX v3 export (H=168)
+
+Neighbour day-ahead (DE/SE3) is only published to ~+36h, which is why error exploded beyond day 2 when the app
+was capped at 72h. The app now **fills DE/SE3 beyond the published window with an on-device walk-forward ridge**
+(38 features: intercept + 24 hour-of-day + 7 weekday dummies + 6 N-Germany weather features — wind-power proxy,
+wind10, solar, temp, cloud, pressure — from 3 Open-Meteo points near the DK border, Flensburg/Fehmarn/Hamburg;
+trained on published hours only at RUN time, solved as a 38×38 normal-equation system in JS, milliseconds on
+device). The fill needs no ONNX change (the DE/SE3 rows already existed); the export was redone anyway at
+**H=168 with 13 covariate rows** (T+H = 936, output `quantiles` (1,1,168,21)) with **`clip_nonnegative=False`**,
+so the UI offers horizons 24…168h and negative prices are predictable. Extra-covariate ablation (same harness,
+all variants with ridge fill): +6 DE-weather rows help at day 3–7 (e.g. day4 25.12 → 24.41, day7 27.75 → 26.87);
++DK wind100 adds nothing on top (27.58 day7 ≈ 27.65); day 1 is within noise (6.07 → 6.31).
+
+7-month backtest (35 origins every 5 days, CTX=768, H=168, DK2, 28M, app-faithful +36h mask), MAE % of mean
+actual per day ahead:
+
+| day ahead | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| neighbours NaN beyond +36h (old app) | 6.16 | 16.77 | 31.65 | 32.41 | 40.51 | 45.11 | 39.78 |
+| hour-of-week climatology fill | 6.13 | 21.83 | 35.85 | 34.50 | 49.25 | 54.75 | 39.00 |
+| ridge fill DE+SE3 (7 covariate rows) | 6.07 | 16.01 | 28.60 | 25.12 | 26.49 | 29.00 | 27.75 |
+| **ridge fill + 6 DE-weather rows (shipped, ONNX v4 = 13 rows)** | **6.31** | **15.95** | **27.65** | **24.41** | **26.12** | **28.26** | **26.87** |
+| naive baseline (repeat yesterday) | 27.74 | 35.01 | 40.43 | 37.25 | 46.36 | 51.03 | 42.76 |
+
+Per-day comparison against the other methods (DK2 spot, MAE %): elforbrug.nu / Spotprisprognose, 90-day repo
+backtest: 18.7 / 25.0 / 25.0 / 24.4 / 25.4 / 24.5 (day 7 n/a — their forecast is only ~130 h); elpriser.dk,
+published 30 d window (their day-1 is scored pre-auction, ours uses published DE/SE3 day-ahead):
+15.1 / 16.4 / 16.7 / 18.8 / 21.8 / 21.1 / 22.5. We win day 1–2 decisively, match elpriser.dk on day 2, and with
+the ridge fill beat elforbrug.nu from day 4 on; elpriser.dk's ECMWF→generation→quantile-regression pipeline
+remains the strongest on days 3–7.
+
+**ONNX contract v4**: `context` float32 (1,1,768) NaN-left-padded; `known_covariates` float32 (1,13,936), rows
+`[wind, temp, solar, DE, SE3, de_windpw, de_wind10, de_solar, de_temp, de_cloud, de_pres, enc_hour, enc_weekday]`
+over 768+168 (de_* = N-Germany weather at 3 points near the DK border; de_windpw = cubic wind-power proxy from
+wind100); output `quantiles` float32 (1,1,168,21)
+levels 0.01…0.99 (median idx 10, q10 idx 2, q90 idx 18); **no clamp at 0**. 5M bundled in the APK
+(`www/assets/timestral-5m.onnx`); 28M served as 4 byte-parts on Pages (`models/timestral-28m.part0..3`,
+concatenated then cached in CacheStorage under key `…28M.h168.onnx`). Export:
+`elspot-dk2-android/export_onnx.py --size 28M --quant fp32` — wrapper vs public API (`clip_nonnegative=False`)
+max diff 0.0, ONNX vs torch ≤ 3.1e-3, `test/ort-wasm-test.js <size> fp32` PASS.
 
 ## How it works
 

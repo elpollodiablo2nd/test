@@ -1,20 +1,27 @@
 """Export Timestral checkpoints to ONNX for on-device (Android/Pixel) inference.
 
-The exported graph has FIXED shapes (context T=768 hourly steps, horizon H=96) so no
+The exported graph has FIXED shapes (context T=768 hourly steps, horizon H=168) so no
 dynamic-axis massaging is needed; the app left-pads shorter history with NaN and slices
-the 96-step output to the requested horizon (24/48/72).
+the 168-step output to the requested horizon (24..168 = up to 7 days).
 
 Inputs:
   context          float32 (1, 1, 768)  hourly prices DKK/MWh, NaN = missing (left padding)
-  known_covariates float32 (1, 7, 864)  rows [wind, temp, solar, DE, SE3, enc_hour, enc_weekday]
-                                       over context+horizon (864 = 768 + 96); NaN = missing.
+  known_covariates float32 (1, 13, 936) rows [wind, temp, solar, DE, SE3,
+                                       de_windpw, de_wind10, de_solar, de_temp, de_cloud, de_pres,
+                                       enc_hour, enc_weekday] over context+horizon (936 = 768 + 168);
+                                       NaN = missing. The 6 de_* rows are N-Germany weather (wind-power
+                                       proxy from wind100, wind10, solar, temp, cloud, pressure) — they
+                                       help at day 3-7 on top of the ridge-filled DE/SE3 rows.
                                        DE/SE3 = neighbour-zone day-ahead prices DKK/MWh (the big
-                                       zero-shot signal: full-year backtest 28M h24 MAE% 16.5 -> 4.3).
+                                       zero-shot signal: full-year backtest 28M h24 MAE% 16.5 -> 4.3);
+                                       beyond the published ~+36h the app fills them with an on-device
+                                       ridge forecast (see index.html Core.buildNeighborFill).
                                        enc_* are the target-encoded categorical codes, computed
                                        exactly like TimestralForecaster._encode_categorical —
                                        the app replicates that in JS (see index.html Core).
 Output:
-  quantiles        float32 (1, 1, 96, 21) monotone quantiles 0.01..0.99 (median = index 10)
+  quantiles        float32 (1, 1, 168, 21) monotone quantiles 0.01..0.99 (median = index 10).
+  NO non-negative clamp (clip_nonnegative=False): negative prices are predictable.
 
 Run with the workflows venv:
   elspot-dk2-workflows/.venv/bin/python elspot-dk2-android/export_onnx.py --size 28M
@@ -34,12 +41,18 @@ from torch import nn
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-HF_CACHE = Path("/tmp/timestral-android-hf-cache")
+HF_CACHE = Path("/tmp/timestral-hf-cache")
 T_CTX = 768  # context steps (multiple of patch_size 32); app pads/truncates to this
-H = 96       # horizon steps exported (multiple of 32); app slices 24/48/72
+H = 168      # horizon steps exported (7 days; app slices 24..168)
 PATCH = 32
 WEATHER_VARS = ("wind_speed_10m", "temperature_2m", "shortwave_radiation")
 WEATHER_LAT, WEATHER_LON = 55.6761, 12.5683
+DE_WX_POINTS = ((54.79789, 9.445545), (54.024605, 10.465116), (53.60281, 10.0))  # Flensburg, Fehmarn area, Hamburg
+DE_WX_VARS = ("wind_speed_100m", "wind_speed_10m", "shortwave_radiation", "temperature_2m", "cloud_cover", "surface_pressure")
+
+def wind_power_proxy(w100):
+    v = max(0.0, min(float(w100), 25.0) - 3.0)
+    return v ** 3 / 22.0 ** 3
 ENERGINET = "https://api.energidataservice.dk/dataset/DayAheadPrices"
 OM_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
 OM_FORECAST = "https://api.open-meteo.com/v1/forecast"
@@ -105,26 +118,45 @@ def fetch_neighbor_maps(days=34):
     return {a: {k: sum(v) / len(v) for k, v in m.items()} for a, m in out.items()}
 
 
+def _merge_payloads(payloads, variables):
+    # payloads: archive + forecast; multi-location responses are lists of per-point objects -> average per hour
+    acc = {}
+    for payload in payloads:
+        locs = payload if isinstance(payload, list) else [payload]
+        for loc in locs:
+            h = loc.get("hourly", {})
+            times = h.get("time", [])
+            cols = [h.get(v, []) for v in variables]
+            for i, t in enumerate(times):
+                key = datetime.fromisoformat(str(t)).strftime("%Y-%m-%dT%H:00")
+                a = acc.setdefault(key, [0.0] * len(variables) + [0] * len(variables))
+                for vi, c in enumerate(cols):
+                    if i < len(c) and c[i] is not None:
+                        a[vi] += float(c[i]); a[len(variables) + vi] += 1
+    return {k: [a[vi] / a[len(variables) + vi] if a[len(variables) + vi] else float("nan")
+                for vi in range(len(variables))] for k, a in acc.items()}
+
+
 def fetch_weather_map(points):
     hours = [h for h, _ in points]
     start = hours[0].date()
     end = min((hours[-1] + timedelta(hours=H)).date(), datetime.now(timezone.utc).date())  # archive has no future
-    hourly = ",".join(WEATHER_VARS)
-    common = {"latitude": WEATHER_LAT, "longitude": WEATHER_LON, "timezone": "UTC", "hourly": hourly}
-    arch = http_json(OM_ARCHIVE + "?" + urllib.parse.urlencode({**common, "start_date": str(start), "end_date": str(end)}))
-    fc = http_json(OM_FORECAST + "?" + urllib.parse.urlencode({**common, "forecast_days": 7}))
-    weather = {}
-    for payload in (arch, fc):
-        h = payload.get("hourly", {})
-        times = h.get("time", [])
-        cols = [h.get(v, []) for v in WEATHER_VARS]
-        for i, t in enumerate(times):
-            key = datetime.fromisoformat(str(t)).strftime("%Y-%m-%dT%H:00")
-            weather[key] = [float(c[i]) if i < len(c) and c[i] is not None else float("nan") for c in cols]
-    return weather
+    dk_common = {"latitude": WEATHER_LAT, "longitude": WEATHER_LON, "timezone": "UTC", "hourly": ",".join(WEATHER_VARS)}
+    de_common = {"latitude": ",".join(str(p[0]) for p in DE_WX_POINTS),
+                 "longitude": ",".join(str(p[1]) for p in DE_WX_POINTS),
+                 "timezone": "UTC", "hourly": ",".join(DE_WX_VARS)}
+    weather = _merge_payloads([
+        http_json(OM_ARCHIVE + "?" + urllib.parse.urlencode({**dk_common, "start_date": str(start), "end_date": str(end)})),
+        http_json(OM_FORECAST + "?" + urllib.parse.urlencode({**dk_common, "forecast_days": 8})),
+    ], WEATHER_VARS)
+    de_weather = _merge_payloads([
+        http_json(OM_ARCHIVE + "?" + urllib.parse.urlencode({**de_common, "start_date": str(start), "end_date": str(end)})),
+        http_json(OM_FORECAST + "?" + urllib.parse.urlencode({**de_common, "forecast_days": 8})),
+    ], DE_WX_VARS)
+    return weather, de_weather
 
 
-def build_inputs(points, weather, neighbors):
+def build_inputs(points, weather, de_weather, neighbors):
     """Reference inputs mirroring the app: last T_CTX hours (NaN-padded), covariates over T_CTX+H."""
     hours = [h for h, _ in points][-T_CTX:]
     prices = [p for _, p in points][-T_CTX:]
@@ -141,9 +173,13 @@ def build_inputs(points, weather, neighbors):
     for i in range(3):  # wind, temp, solar
         rows.append([weather.get(h.strftime("%Y-%m-%dT%H:00"), [float("nan")] * 3)[i] if h else float("nan")
                      for h in all_hours])
-    for area in ("DE", "SE3"):  # neighbour day-ahead prices
+    for area in ("DE", "SE3"):  # neighbour day-ahead prices (app fills a ridge forecast beyond ~+36h)
         nmap = neighbors.get(area, {})
         rows.append([nmap.get(h.strftime("%Y-%m-%dT%H:00"), float("nan")) if h else float("nan") for h in all_hours])
+    for i, v in enumerate(DE_WX_VARS):  # N-Germany weather rows (row order matches the app)
+        rows.append([(wind_power_proxy(de_weather.get(h.strftime("%Y-%m-%dT%H:00"), [float("nan")] * 6)[0]) if i == 0
+                      else de_weather.get(h.strftime("%Y-%m-%dT%H:00"), [float("nan")] * 6)[i]) if h else float("nan")
+                     for h in all_hours])
     known_w = np.asarray([rows], dtype=np.float64)
     return context, cat, known_w, all_hours
 
@@ -158,14 +194,13 @@ class OnnxWrapper(nn.Module):
         self.horizon = horizon
 
     def forward(self, context, known_covariates):
+        # mirrors forecast(..., clip_nonnegative=False): symmetric averaging, NO clamp at 0
+        # (negative day-ahead prices are real in high-wind hours and must be predictable)
         f = self.f
         inputs, mask = f._as_context(context, None)
         q = f._forecast_raw(inputs, mask, self.horizon, None, known_covariates)
         m = f._forecast_raw(-inputs, mask, self.horizon, None, -known_covariates)
-        q = 0.5 * (q + (-m).flip(-1))
-        from timestral.forecaster import nonnegative_context
-        elig = nonnegative_context(inputs, mask)
-        return torch.where(elig[..., None, None], q.clamp_min(0), q)
+        return 0.5 * (q + (-m).flip(-1))
 
 
 def main():
@@ -188,9 +223,9 @@ def main():
 
     print("fetching reference data (Energinet + Open-Meteo) ...")
     points = fetch_reference_points()
-    weather = fetch_weather_map(points)
+    weather, de_weather = fetch_weather_map(points)
     neighbors = fetch_neighbor_maps()
-    context, cat, known_w, all_hours = build_inputs(points, weather, neighbors)
+    context, cat, known_w, all_hours = build_inputs(points, weather, de_weather, neighbors)
 
     # torch reference via the public API (with categorical codes, target-encoded internally)
     with torch.inference_mode():
@@ -199,6 +234,7 @@ def main():
             prediction_length=H,
             categorical_known_covariates=torch.as_tensor(cat),
             known_covariates=torch.as_tensor(known_w),
+            clip_nonnegative=False,
         )
     q_ref = ref.quantiles[0, 0].numpy()  # (H, Q)
     levels = ref.quantile_levels
@@ -209,7 +245,7 @@ def main():
     target = forecaster._encoding_target(inputs, mask)
     enc = forecaster._encode_categorical(torch.as_tensor(cat), target)
     known_all = torch.cat([torch.as_tensor(known_w, dtype=torch.float32), enc], dim=1).contiguous()
-    assert known_all.shape == (1, 7, T_CTX + H), known_all.shape
+    assert known_all.shape == (1, 13, T_CTX + H), known_all.shape
 
     wrapper = OnnxWrapper(forecaster, H)
     with torch.inference_mode():
