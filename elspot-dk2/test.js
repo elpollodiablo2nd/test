@@ -212,6 +212,20 @@ check("xAxisStep 8d window -> 24h", Core.xAxisStep(8 * 24 * 3600e3, 12) === 24);
 check("xAxisStep 1h window -> 1h", Core.xAxisStep(3600e3, 12) === 1);
 check("xAxisStep huge window -> 96h cap", Core.xAxisStep(400 * 24 * 3600e3, 12) === 96);
 
+// chart zoom/pan view math
+const F0 = 0, F1 = 168 * 3600e3, MINS = 6 * 3600e3;
+const cv = Core.clampView({ start: -1e15, span: 1e15 }, F0, F1, MINS);
+check("clampView clamps to full window", cv.span === F1 - F0 && cv.start === F0);
+check("clampView enforces min span", Core.clampView({ start: 1e12, span: 1 }, F0, F1, MINS).span === MINS);
+const zv = Core.zoomView({ start: F0, span: F1 - F0 }, F0, F1, MINS, 2, F1 / 2);
+check("zoomView halves span around center", zv.span === (F1 - F0) / 2 && zv.start === F1 / 2 - (F1 - F0) / 4);
+const zEdge = Core.zoomView(zv, F0, F1, MINS, 100, 0);
+check("zoomView clamps at left edge, min span", zEdge.span === MINS && zEdge.start === F0);
+const pv = Core.panView(zv, F0, F1, MINS, -10 * 3600e3);
+check("panView shifts start", pv.start === zv.start - 10 * 3600e3 && pv.span === zv.span);
+check("panView clamps at right edge", Core.panView(zv, F0, F1, MINS, 1e15).start === F1 - zv.span);
+check("clampView tiny full window", (function () { const c = Core.clampView({ start: 5, span: 99 }, 0, MINS - 1, MINS); return c.start === 0 && c.span === MINS - 1; })());
+
 // utcHourKey / weekdayMon0
 check("utcHourKey", Core.utcHourKey(new Date(Date.UTC(2026, 10, 21, 7, 30))) === "2026-11-21T07:00");
 check("weekdayMon0 monday=0", Core.weekdayMon0(new Date(Date.UTC(2026, 10, 23))) === 0);
