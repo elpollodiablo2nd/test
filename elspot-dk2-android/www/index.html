@@ -813,6 +813,8 @@
             return nh;
         }
         // fetch()-compatible GET: { ok, status, headers.get(), json() }
+        // native first (no CORS, real HTTP statuses); if the native call itself fails, retry via
+        // fetch; if both fail, the error carries BOTH messages for debugging.
         function apiGet(url) {
             var nh = nativeHttp();
             if (nh) {
@@ -825,9 +827,26 @@
                         headers: { get: function (k) { k = String(k).toLowerCase(); for (var kk in hdrs) if (String(kk).toLowerCase() === k) return hdrs[kk]; return null; } },
                         json: function () { return Promise.resolve(typeof r.data === "string" ? JSON.parse(r.data) : r.data); }
                     };
+                }).catch(function (nerr) {
+                    return fetch(url).catch(function (ferr) {
+                        throw new Error("native[" + (nerr && nerr.message ? nerr.message : String(nerr)) + "] fetch[" + ferr.message + "]");
+                    });
                 });
             }
             return fetch(url);
+        }
+        // one-line runtime debug info for network failure banners
+        function debugInfo() {
+            var p = [];
+            try {
+                p.push("platform=" + (window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : "?"));
+                p.push("native=" + (window.Capacitor && window.Capacitor.isNativePlatform ? window.Capacitor.isNativePlatform() : "?"));
+                p.push("Cap=" + typeof window.Capacitor);
+                p.push("CapHttp=" + typeof window.CapacitorHttp);
+                p.push("avail=" + (window.Capacitor && window.Capacitor.isPluginAvailable ? window.Capacitor.isPluginAvailable("CapacitorHttp") : "?"));
+                p.push("fetchPatched=" + (/nativePromise|CapacitorHttp/.test(String(window.fetch)) ? "yes" : "no"));
+            } catch (e) { p.push("dbgErr=" + e.message); }
+            return p.join(" ");
         }
 
         function tariffsFor() { return state.tariffs || DEFAULT_TARIFFS[state.zone] || DEFAULT_TARIFFS.DK2; }
@@ -1119,10 +1138,10 @@
                         if (nb !== best) { best = nb; bestMsg = c.msg; }
                     });
                     if (best && best.length >= 7 * HOURS_PER_DAY) {
-                        applyHistory(best, "Energinet failed (" + err.message + ") — showing " + bestMsg + ".");
+                        applyHistory(best, "Energinet failed (" + err.message + ") — showing " + bestMsg + ".  [" + debugInfo() + "]");
                         return;
                     }
-                    feedback("Energinet failed (" + err.message + ") and no usable cache/remote snapshot — trying the bundled snapshot…", "wrong");
+                    feedback("Energinet failed (" + err.message + ") and no usable cache/remote snapshot — trying the bundled snapshot…  [" + debugInfo() + "]", "wrong");
                     return apiGet(zoneConfig(zone).snapshot).then(function (r) {
                         if (!r.ok) throw new Error("snapshot HTTP " + r.status);
                         return r.json();
