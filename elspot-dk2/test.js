@@ -75,7 +75,7 @@ check("nearestSeriesEntry exact", Core.nearestSeriesEntry(tipS, Date.UTC(2026, 1
 check("nearestSeriesEntry between rounds to nearest", Core.nearestSeriesEntry(tipS, Date.UTC(2026, 10, 22, 10) + 30 * 60e3) === tsA && Core.nearestSeriesEntry(tipS, Date.UTC(2026, 10, 22, 10) + 31 * 60e3) === tsB);
 check("nearestSeriesEntry empty -> null", Core.nearestSeriesEntry([], 0) == null);
 const tlF = Core.tipLines(tsB, 1.4);
-check("tipLines forecast = label + median + q10-q90 + lag-1", tlF[0][0] === "22/11 12:00" && tlF[1][0].indexOf("median") > 0 && tlF[2][0].indexOf("q10") === 0 && tlF[3][0].indexOf("lag-1") === 0);
+check("tipLines forecast = label + median + q10-q90 + baseline", tlF[0][0] === "22/11 12:00" && tlF[1][0].indexOf("median") > 0 && tlF[2][0].indexOf("q10") === 0 && tlF[3][0].indexOf("baseline") === 0);
 check("tipLines published", Core.tipLines(tsA, null)[1][0].indexOf("published") > 0 && Core.tipLines(tsA, null).length === 2);
 
 // modelCacheKey: bundled models are not cached, downloadable ones are

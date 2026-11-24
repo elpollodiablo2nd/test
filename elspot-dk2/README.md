@@ -30,7 +30,7 @@ All prices are shown in **kr/kWh** — the source data is DKK/MWh, divided by 10
    the **snapshot bundled in the APK** (refreshed at app build time). The banner always says which source was used.
    Day-ahead prices for tomorrow are published
    **once a day (~13:00 CET)**, and tomorrow usually tracks today: the chart always shows the
-   **lag-1 baseline** (tomorrow ≈ today). The HUD shows the cheapest hour and the EV window.
+   **baseline** (tomorrow ≈ today — each forecast hour repeats the actual price 24h earlier). The HUD shows the cheapest hour and the EV window.
 2. Press **RUN TIMESTRAL** — in the Android app (`elspot-dk2-android/app-debug.apk`) the
    ONNX-exported Timestral runs **on-device** (no API key): pick the checkpoint (5M bundled, 28M
    downloaded once in 4 parts) and the **horizon** (24/48/72h — beyond 24h there is no published
@@ -97,7 +97,7 @@ Skipped weather indicators: none — 0 of 864 app input hours missing (Open-Mete
   temperature, solar radiation from [Open-Meteo](https://open-meteo.com/), keyless, for Zealand) as
   numeric known-future covariates over context + horizon — weather drives both generation and prices
   (`use_weather=false` disables it). The page also shows a next-24h weather line under the chart.
-- **Baseline**: lag-1 ("tomorrow = today, same hour"), scored against Timestral on a 7-day
+- **Baseline**: "tomorrow = today, same hour" (lag-1), scored against Timestral on a 7-day
   rolling-origin backtest — reported as MAE stats in both the workflow result and the HUD.
 - Styled with the **Mistral pixel UI** skill (Press Start 2P / VT323, rainbow gradient, chunky
   borders, CRT scanlines); chart is an inline SVG with `shape-rendering: crispEdges`.

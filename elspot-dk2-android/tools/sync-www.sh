@@ -17,6 +17,7 @@ s = s.replace(old, tag + old)
 io.open(p, "w", encoding="utf-8").write(s)
 print("injected ort loader into www/index.html")
 PY
+mkdir -p www/vendor/ort
 cp node_modules/onnxruntime-web/dist/ort.min.js www/vendor/ort/
 cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs www/vendor/ort/
 cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm www/vendor/ort/
