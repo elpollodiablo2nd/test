@@ -451,6 +451,17 @@
             return isFinite(k) ? Math.max(1, k) : null;
         }
 
+        // level correction: median signed error (med - act) of past forecasts; null if too few
+        function medianError(pairs) {
+            var e = [];
+            for (var i = 0; i < pairs.length; i++) {
+                var p = pairs[i];
+                if (isFinite(p.med) && isFinite(p.act)) e.push(p.med - p.act);
+            }
+            if (e.length < 8) return null;
+            return quantileOf(e, 0.5);
+        }
+
         function scaleBand(med, q10, q90, k) {
             if (!isFinite(k)) return [q10, q90];
             return [med - k * (med - q10), med + k * (q90 - med)];
@@ -783,6 +794,7 @@
             quantileOf: quantileOf,
             bandRatios: bandRatios,
             conformalK: conformalK,
+            medianError: medianError,
             scaleBand: scaleBand,
             horizonBucket: horizonBucket,
             tipLines: tipLines,
@@ -1315,9 +1327,12 @@
                 var act = histMap[p.t];
                 if (act != null) byBucket[horizonBucket(p.h)].push({ med: p.med, q10: p.q10, q90: p.q90, act: act });
             });
-            var k = {};
-            [24, 48, 72].forEach(function (H) { k[H] = conformalK(byBucket[H], 0.85) || DEFAULT_K[H]; });
-            return k;
+            var k = {}, bias = {};
+            [24, 48, 72].forEach(function (H) {
+                k[H] = conformalK(byBucket[H], 0.85) || DEFAULT_K[H];
+                bias[H] = medianError(byBucket[H]) || 0; // level correction: shift p50 by median past error
+            });
+            return { k: k, bias: bias };
         }
 
         function runLocal() {
@@ -1342,11 +1357,12 @@
                 var q = out.quantiles.data;
                 var last = state.history[state.history.length - 1].utc;
                 var lag1 = lag1Forecast(state.history, horizon);
-                var kByBucket = calibrationFactors();
+                var cal = calibrationFactors();
+                var kByBucket = cal.k, biasByBucket = cal.bias;
                 var forecast = [], preds = loadPreds();
                 for (var i = 0; i < horizon; i++) {
                     var t = new Date(last.getTime() + (i + 1) * HOUR_MS);
-                    var med = q[i * ONNX_Q + ONNX_MED_I];
+                    var med = q[i * ONNX_Q + ONNX_MED_I] + (biasByBucket[horizonBucket(i)] || 0); // level-corrected median
                     var q10raw = q[i * ONNX_Q + ONNX_Q10_I], q90raw = q[i * ONNX_Q + ONNX_Q90_I];
                     var band = scaleBand(med, q10raw, q90raw, kByBucket[horizonBucket(i)]);
                     forecast.push({
@@ -1371,7 +1387,8 @@
                 renderAll();
                 feedback("On-device ONNX forecast ready — Timestral " + modelSize + ", " + horizon + "h, " +
                     ((Date.now() - t0) / 1000).toFixed(1) + "s on this device. No API key used. Band calibrated (k 24/48/72h = " +
-                    kByBucket[24].toFixed(2) + "/" + kByBucket[48].toFixed(2) + "/" + kByBucket[72].toFixed(2) + ").", "correct");
+                    kByBucket[24].toFixed(2) + "/" + kByBucket[48].toFixed(2) + "/" + kByBucket[72].toFixed(2) + "), level bias 24/48/72h = " +
+                    biasByBucket[24].toFixed(0) + "/" + biasByBucket[48].toFixed(0) + "/" + biasByBucket[72].toFixed(0) + " DKK/MWh).", "correct");
             }).catch(function (err) {
                 feedback("On-device run failed: " + err.message, "wrong");
             }).finally(function () { setBusy(false); });
