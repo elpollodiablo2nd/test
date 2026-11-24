@@ -257,6 +257,9 @@ const wide = pairs.map(p => ({ ...p, act: p.med + 40 })); // all 40 above median
 check("conformalK = 2 when all overshoot 2x", Math.abs(Core.conformalK(wide, 0.85) - 2) < 1e-9);
 check("scaleBand widens by k", JSON.stringify(Core.scaleBand(100, 80, 120, 2)) === JSON.stringify([60, 140]));
 check("scaleBand no k -> unchanged", JSON.stringify(Core.scaleBand(100, 80, 120, NaN)) === JSON.stringify([80, 120]));
+const biased = Array.from({length: 20}, (_, i) => ({ med: 100 + i, act: 90 + i })); // med-act = +10 always
+check("medianError = +10 constant bias", Core.medianError(biased) === 10);
+check("medianError null when few", Core.medianError(biased.slice(0, 5)) === null);
 check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72);
 
 console.log(`\n${passed} passed, ${failed} failed`);
