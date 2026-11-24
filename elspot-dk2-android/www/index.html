@@ -185,7 +185,7 @@
         #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
         #chart .axis {
             font-family: 'VT323', monospace;
-            font-size: var(--axis-px, 30px);
+            font-size: var(--axis-px, 34px);
             fill: var(--cream);
             opacity: 1;
             paint-order: stroke;
@@ -506,8 +506,8 @@
         function panView(view, fullStart, fullEnd, minSpanMs, dMs) {
             return clampView({ start: view.start + dMs, span: view.span }, fullStart, fullEnd, minSpanMs);
         }
-        // axis label size grows with zoom (1x -> 30px viewBox units, ~4x -> capped 44px) + matching pads
-        function axisFontPx(zoomF) { return Math.round(Math.min(44, 30 * Math.pow(Math.max(1, zoomF), 0.35))); }
+        // axis label size grows with zoom (1x -> 34px viewBox units, high zoom -> capped 44px) + matching pads
+        function axisFontPx(zoomF) { return Math.round(Math.min(44, 34 * Math.pow(Math.max(1, zoomF), 0.3))); }
         function chartPads(axisPx) { return { padL: Math.round(18 + axisPx * 2.0), padB: Math.round(34 + axisPx * 1.05) }; }
 
         // ---- neighbour-price ridge fill (DE/SE3 beyond the published ~+36h day-ahead) ----
@@ -1157,7 +1157,7 @@
                 s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
                      '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + Math.round(axisPx * 0.22)) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
             }
-            var xStep = xAxisStep(x1 - x0, vw.span > 72 * HOUR_MS ? 6 : 10), stepMs = xStep * HOUR_MS, prevDate = null;
+            var xStep = xAxisStep(x1 - x0, vw.span > 72 * HOUR_MS ? 6 : 8), stepMs = xStep * HOUR_MS, prevDate = null;
             for (var t = Math.ceil(x0 / stepMs) * stepMs; t <= x1; t += stepMs) {
                 var dl = dkLabel(new Date(t));
                 var dl2 = xAxisDateLine(t, prevDate);
