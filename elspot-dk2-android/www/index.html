@@ -795,6 +795,41 @@
 
         var state = { zone: "DK2", history: [], forecast: null, tariffs: null, showFees: true, neighborMap: {} };
 
+        // In the Android APK, API calls go through native HTTP (CapacitorHttp is built into
+        // @capacitor/core + @capacitor/android since Capacitor 6): no WebView CORS, and real HTTP
+        // statuses (429 + Retry-After are visible to the retry logic instead of "Failed to fetch").
+        // On web, plain fetch.
+        var BROWSER_UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+        function nativeHttp() {
+            if (state.nativeHttp !== undefined) return state.nativeHttp;
+            var nh = null;
+            try {
+                if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+                    nh = window.CapacitorHttp ||
+                         (typeof window.Capacitor.registerPlugin === "function" ? window.Capacitor.registerPlugin("CapacitorHttp") : null);
+                }
+            } catch (e) { nh = null; }
+            state.nativeHttp = nh;
+            return nh;
+        }
+        // fetch()-compatible GET: { ok, status, headers.get(), json() }
+        function apiGet(url) {
+            var nh = nativeHttp();
+            if (nh) {
+                return nh.get({ url: url, headers: { "Accept": "application/json", "User-Agent": BROWSER_UA },
+                                connectTimeout: 20000, readTimeout: 90000 }).then(function (r) {
+                    var hdrs = r.headers || {};
+                    return {
+                        ok: r.status >= 200 && r.status < 300,
+                        status: r.status,
+                        headers: { get: function (k) { k = String(k).toLowerCase(); for (var kk in hdrs) if (String(kk).toLowerCase() === k) return hdrs[kk]; return null; } },
+                        json: function () { return Promise.resolve(typeof r.data === "string" ? JSON.parse(r.data) : r.data); }
+                    };
+                });
+            }
+            return fetch(url);
+        }
+
         function tariffsFor() { return state.tariffs || DEFAULT_TARIFFS[state.zone] || DEFAULT_TARIFFS.DK2; }
 
         function feedback(message, kind) {
@@ -817,7 +852,7 @@
                 sort: "TimeUTC asc",
                 limit: (days + 2) * 96 + 200
             });
-            return fetch(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
+            return apiGet(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
                 if (!resp.ok) {
                     if ((resp.status === 429 || resp.status >= 500) && attempt < 6) {
                         var ra = parseFloat(resp.headers.get("Retry-After"));
@@ -995,7 +1030,7 @@
                 sort: "ValidFrom DESC",
                 limit: 60
             });
-            return fetch(DATAHUB_URL + "?" + params.toString()).then(function (resp) {
+            return apiGet(DATAHUB_URL + "?" + params.toString()).then(function (resp) {
                 if (!resp.ok) {
                     if ((resp.status === 429 || resp.status >= 500) && attempt < 4) {
                         return sleep(1500 * attempt).then(function () { return fetchTariffRecords(gln, notes, attempt + 1); });
@@ -1067,7 +1102,7 @@
                     ? cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; }) : null;
                 // remote Pages snapshot: refreshed every few hours by a GitHub Actions job (Nord Pool fallback there)
                 var remoteUrl = new URL(zoneConfig(zone).snapshot, PAGES_BASE + "elspot-dk2/").href;
-                return fetch(remoteUrl).then(function (r) {
+                return apiGet(remoteUrl).then(function (r) {
                     if (!r.ok) throw new Error("HTTP " + r.status);
                     return r.json();
                 }).then(function (snap) {
@@ -1088,7 +1123,7 @@
                         return;
                     }
                     feedback("Energinet failed (" + err.message + ") and no usable cache/remote snapshot — trying the bundled snapshot…", "wrong");
-                    return fetch(zoneConfig(zone).snapshot).then(function (r) {
+                    return apiGet(zoneConfig(zone).snapshot).then(function (r) {
                         if (!r.ok) throw new Error("snapshot HTTP " + r.status);
                         return r.json();
                     }).then(function (snap) {
@@ -1111,10 +1146,10 @@
                 return loadFallback(new Error("live fetch skipped: failed " + Math.round((Date.now() - liveState.at) / 60000) + " min ago"))
                     .finally(function () { setBusy(false); });
             }
-            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days)…", "correct");
+            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days" + (nativeHttp() ? ", native HTTP in the app" : "") + ")…", "correct");
             return fetchPrices(35).then(function (points) {
                 markLive(true);
-                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet, last " +
+                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet" + (nativeHttp() ? " (native HTTP)" : "") + ", last " +
                     dkLabel(points[points.length - 1].utc) + " (DK).");
             }).catch(function (err) {
                 markLive(false);
@@ -1191,7 +1226,7 @@
             var common = { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: hourly };
             function q(base, extra) {
                 var params = new URLSearchParams(Object.assign({}, common, extra));
-                return fetch(base + "?" + params.toString()).then(function (r) {
+                return apiGet(base + "?" + params.toString()).then(function (r) {
                     if (!r.ok) throw new Error("Open-Meteo " + r.status);
                     return r.json();
                 });
@@ -1233,7 +1268,7 @@
                 return m;
             }
             var remote = new URL("assets/prices-neighbors.json", PAGES_BASE + "elspot-dk2/").href;
-            return fetch(remote).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+            return apiGet(remote).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
                 .then(function (snap) { state.neighborMap = toMap(snap); })
                 .catch(function () {
                     return fetch("assets/prices-neighbors.json").then(function (r) {
@@ -1338,7 +1373,7 @@
                 latitude: zw.lat, longitude: zw.lon, timezone: "UTC",
                 hourly: "wind_speed_10m,temperature_2m,shortwave_radiation", forecast_days: "2"
             });
-            fetch(OPEN_METEO_FORECAST_URL + "?" + params.toString()).then(function (r) {
+            apiGet(OPEN_METEO_FORECAST_URL + "?" + params.toString()).then(function (r) {
                 if (!r.ok) throw new Error("Open-Meteo " + r.status);
                 return r.json();
             }).then(function (data) {
