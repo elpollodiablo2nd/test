@@ -185,7 +185,7 @@
         #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
         #chart .axis {
             font-family: 'VT323', monospace;
-            font-size: 20px;
+            font-size: var(--axis-px, 30px);
             fill: var(--cream);
             opacity: 1;
             paint-order: stroke;
@@ -506,6 +506,9 @@
         function panView(view, fullStart, fullEnd, minSpanMs, dMs) {
             return clampView({ start: view.start + dMs, span: view.span }, fullStart, fullEnd, minSpanMs);
         }
+        // axis label size grows with zoom (1x -> 30px viewBox units, ~4x -> capped 44px) + matching pads
+        function axisFontPx(zoomF) { return Math.round(Math.min(44, 30 * Math.pow(Math.max(1, zoomF), 0.35))); }
+        function chartPads(axisPx) { return { padL: Math.round(18 + axisPx * 2.0), padB: Math.round(34 + axisPx * 1.05) }; }
 
         // ---- neighbour-price ridge fill (DE/SE3 beyond the published ~+36h day-ahead) ----
         // Mirrors the sandbox prototype (proto7.py): walk-forward ridge per area on
@@ -963,6 +966,8 @@
             clampView: clampView,
             zoomView: zoomView,
             panView: panView,
+            axisFontPx: axisFontPx,
+            chartPads: chartPads,
             windPowerProxy: windPowerProxy,
             deFeatRow: deFeatRow,
             solveLinear: solveLinear,
@@ -1102,7 +1107,7 @@
 
         function renderChart() {
             var svg = document.getElementById("chart");
-            var W = 760, H = 460, padL = 60, padR = 14, padT = 16, padB = 52;
+            var W = 760, H = 460, padR = 14, padT = 16;
             var history = state.history;
             var fc = state.forecast;
             if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
@@ -1117,6 +1122,9 @@
             var vw = state.chartView ? clampView(state.chartView, x0f, x1f, CHART_MIN_SPAN_MS)
                                       : { start: x0f, span: x1f - x0f };
             var x0 = vw.start, x1 = vw.start + vw.span;
+            var axisPx = axisFontPx((x1f - x0f) / vw.span);
+            var pads = chartPads(axisPx);
+            var padL = pads.padL, padB = pads.padB;
             var series = combinedSeries(history, fc, nowMs, tariffs, state.showFees);
             var inView = function (t) { return t >= x0 - HOUR_MS && t <= x1 + HOUR_MS; };
             var vis = series.filter(function (e) { return inView(e.t); });
@@ -1147,19 +1155,19 @@
             var s = "";
             for (var v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
                 s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
-                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + 5) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
+                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + Math.round(axisPx * 0.22)) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
             }
-            var xStep = xAxisStep(x1 - x0, 12), stepMs = xStep * HOUR_MS, prevDate = null;
+            var xStep = xAxisStep(x1 - x0, vw.span > 72 * HOUR_MS ? 6 : 10), stepMs = xStep * HOUR_MS, prevDate = null;
             for (var t = Math.ceil(x0 / stepMs) * stepMs; t <= x1; t += stepMs) {
                 var dl = dkLabel(new Date(t));
                 var dl2 = xAxisDateLine(t, prevDate);
                 prevDate = dl2.date;
                 s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
-                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 17) + '" text-anchor="middle">' + dl2.line + '</text>' +
-                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + 40) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + Math.round(axisPx * 0.7)) + '" text-anchor="middle">' + dl2.line + '</text>' +
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + Math.round(axisPx * 1.65)) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
             }
             s += '<line class="now" x1="' + X(nowMs) + '" y1="' + padT + '" x2="' + X(nowMs) + '" y2="' + (H - padB) + '"/>' +
-                 '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + 12) + '" text-anchor="middle">NOW</text>';
+                 '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + Math.round(axisPx * 0.5)) + '" text-anchor="middle">NOW</text>';
             var pub = series.filter(function (e) { return e.kind === "pub"; });
             if (pub.length) {
                 s += '<polyline class="line-actual" points="' + pub.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
@@ -1175,7 +1183,7 @@
             var bw = series.length ? bestWindowEntries(series, evH) : null;
             if (bw) {
                 s += '<rect class="ev-window" x="' + X(bw.startT) + '" y="' + padT + '" width="' + Math.max(4, X(bw.endT) - X(bw.startT)) + '" height="' + (H - padT - padB) + '"/>' +
-                     '<text class="axis" x="' + ((X(bw.startT) + X(bw.endT)) / 2) + '" y="' + (padT + 12) + '" text-anchor="middle">EV</text>';
+                     '<text class="axis" x="' + ((X(bw.startT) + X(bw.endT)) / 2) + '" y="' + (padT + Math.round(axisPx * 0.5)) + '" text-anchor="middle">EV</text>';
             }
             if (fc) {
                 var fPts = fc.map(function (f) {
@@ -1193,6 +1201,7 @@
             s += '<line id="tipLine" y1="' + padT + '" y2="' + (H - padB) + '" stroke="rgba(255,250,235,0.75)" stroke-width="2" stroke-dasharray="4 4" style="display:none"/>' +
                  '<circle id="tipDot" r="6" fill="#FFFAEB" stroke="#000000" stroke-width="2" style="display:none"/>';
             svg.innerHTML = s;
+            svg.style.setProperty("--axis-px", axisPx + "px");
             state.chartGeom = { W: W, H: H, padL: padL, padR: padR, x0: x0, x1: x1, X: X, Y: Y, series: series, lag1: lag1Tip, full0: x0f, full1: x1f };
             var zb = document.getElementById("zoomReset");
             if (zb) zb.textContent = (x1f - x0f <= vw.span + 1 ? "1×" : Math.round((x1f - x0f) / vw.span) + "×");
