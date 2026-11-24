@@ -232,6 +232,8 @@ check("axisFontPx grows with zoom", Core.axisFontPx(2) === 42 && Core.axisFontPx
 check("axisFontPx capped at 44", Core.axisFontPx(100) === 44 && Core.axisFontPx(4) === 44);
 const cp = Core.chartPads(Core.axisFontPx(4));
 check("chartPads bigger font -> bigger pads", cp.padL > Core.chartPads(34).padL && cp.padB > Core.chartPads(34).padB);
+check("xMaxTicks shrinks with bigger labels", Core.xMaxTicks(34, 660) === 6 && Core.xMaxTicks(44, 656) === 4 && Core.xMaxTicks(44, 656) < Core.xMaxTicks(34, 660));
+check("xMaxTicks floor 3", Core.xMaxTicks(44, 100) === 3);
 
 // utcHourKey / weekdayMon0
 check("utcHourKey", Core.utcHourKey(new Date(Date.UTC(2026, 10, 21, 7, 30))) === "2026-11-21T07:00");
