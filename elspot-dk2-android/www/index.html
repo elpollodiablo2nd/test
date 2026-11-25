@@ -289,10 +289,8 @@
                     <button id="zoomIn" class="btn-alt zoom-btn" title="Zoom chart in">+</button>
                 </span>
                 <select id="modelSize" class="pixel" title="Timestral checkpoint">
-                    <option value="5M">5M</option>
-                    <option value="28M" selected>28M</option>
-                    <option value="123M" disabled>123M (too big on-device)</option>
-                    <option value="209M" disabled>209M (too big on-device)</option>
+                    <option value="5M">5M (fast)</option>
+                    <option value="28M" selected>28M (accurate)</option>
                 </select>
                 <select id="horizon" class="pixel" title="Forecast horizon (up to 7 days)">
                     <option value="24" selected>24h ahead</option>
@@ -1305,7 +1303,7 @@
             renderAll();
             var lastUtc = points[points.length - 1].utc.getTime();
             var stale = lastUtc < Date.now() ? " — data ends " + dkShort(dkLabel(points[points.length - 1].utc)) + " DK, nothing published ahead" : "";
-            feedback(sourceMsg + stale + " Prices shown in kr/kWh (DKK/MWh ÷ 1000).", "correct");
+            feedback(sourceMsg + stale, "correct");
         }
 
         function markLive(ok) {
@@ -1367,7 +1365,7 @@
                 return loadFallback(new Error("live fetch skipped: failed " + Math.round((Date.now() - liveState.at) / 60000) + " min ago"))
                     .finally(function () { setBusy(false); });
             }
-            feedback("Fetching " + state.zone + " day-ahead prices from Energinet (last 35 days" + (nativeHttp() ? ", native HTTP in the app" : "") + ")…", "correct");
+            feedback("Fetching " + state.zone + " prices from Energinet (35 days" + (nativeHttp() ? ", native HTTP" : "") + ")…", "correct");
             return fetchPrices(35).then(function (points) {
                 markLive(true);
                 applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet" + (nativeHttp() ? " (native HTTP)" : "") + ", last " +
@@ -1395,7 +1393,7 @@
                 return fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
             }
             if (ONNX_MODEL_PARTS[modelSize]) {
-                feedback("Downloading on-device model " + modelSize + " (~113 MB in 4 parts, one time; then cached in the app)…", "correct");
+                feedback("Downloading Timestral " + modelSize + " once (~113 MB in 4 parts, then cached in the app)…", "correct");
                 return Promise.all(ONNX_MODEL_PARTS[modelSize].map(function (u) {
                     return fetch(u).then(function (r) { if (!r.ok) throw new Error("model part HTTP " + r.status + " " + u); return r.arrayBuffer(); });
                 })).then(function (bufs) {
@@ -1414,7 +1412,7 @@
             if (!ck || typeof caches === "undefined") return downloadModelBytes(modelSize, url);
             return caches.open("elspot-onnx-models").then(function (c) { return c.match(ck); }).then(function (resp) {
                 if (resp) return resp.arrayBuffer().then(function (buf) {
-                    feedback("Model " + modelSize + " restored from the app cache — no download needed.", "correct");
+                    feedback("Timestral " + modelSize + " loaded from the app cache — no download.", "correct");
                     return buf;
                 });
                 return null;
@@ -1553,9 +1551,9 @@
             var horizon = parseInt(document.getElementById("horizon").value, 10) || 24;
             setBusy(true);
             var t0 = Date.now();
-            feedback("Loading on-device ONNX model " + modelSize + " (WASM)…", "correct");
+            feedback("Loading Timestral " + modelSize + " on-device (ONNX/WASM)…", "correct");
             getOnnxSession(modelSize).then(function (session) {
-                feedback("Fetching weather (Open-Meteo · DK + N-Germany)…", "correct");
+                feedback("Fetching weather (Open-Meteo)…", "correct");
                 return fetchWeatherMap(32).catch(function () { return { dk: {}, de: {} }; }).then(function (weatherMap) {
                     return { session: session, weatherMap: weatherMap };
                 });
@@ -1598,11 +1596,9 @@
                     wind_avg_ms: (state.workflowStats && state.workflowStats.wind_avg_ms) || null
                 };
                 renderAll();
-                var kTxt = K_BUCKETS.map(function (b) { return kByBucket[b].toFixed(2); }).join("/");
-                var bTxt = K_BUCKETS.map(function (b) { return (biasByBucket[b] || 0).toFixed(0); }).join("/");
-                feedback("On-device ONNX forecast ready — Timestral " + modelSize + ", " + horizon + "h, " +
-                    ((Date.now() - t0) / 1000).toFixed(1) + "s on this device. No API key used. Band calibrated (k 24…168h = " +
-                    kTxt + "), level bias 24…168h = " + bTxt + " DKK/MWh.", "correct");
+                if (window.console && console.log) console.log("[elspot] band k", kByBucket, "level bias DKK/MWh", biasByBucket);
+                feedback("Forecast ready — Timestral " + modelSize + " on-device, " + horizon + "h in " +
+                    ((Date.now() - t0) / 1000).toFixed(1) + "s. No API key; band & level auto-calibrated (ABOUT).", "correct");
             }).catch(function (err) {
                 feedback("On-device run failed: " + err.message, "wrong");
             }).finally(function () { setBusy(false); });
@@ -1610,7 +1606,7 @@
 
         function runTimestral() {
             if (!onnxAvailable()) {
-                feedback("RUN TIMESTRAL runs Timestral on-device (ONNX) in the Android app — grab elspot-dk2-android/app-debug.apk; a plain browser has no ONNX runtime.", "wrong");
+                feedback("On-device ONNX needs the Android app — see elspot-dk2-android/app-debug.apk.", "wrong");
                 return;
             }
             runLocal();

@@ -82,7 +82,7 @@ run) — but the clamp also meant negative prices could never be *predicted*; th
 (`clip_nonnegative=False`), so high-wind negative hours are forecastable.
 Skipped weather indicators: none — 0 of 936 app input hours missing (Open-Meteo 32d archive + 8d forecast covers the 768+168 window).
 
-### 7-day horizon: neighbour-forecast ridge fill + no-clamp ONNX v3 export (H=168)
+### 7-day horizon: neighbour-forecast ridge fill + no-clamp ONNX v4 export (H=168, 13 rows)
 
 Neighbour day-ahead (DE/SE3) is only published to ~+36h, which is why error exploded beyond day 2 when the app
 was capped at 72h. The app now **fills DE/SE3 beyond the published window with an on-device walk-forward ridge**
@@ -122,6 +122,73 @@ levels 0.01…0.99 (median idx 10, q10 idx 2, q90 idx 18); **no clamp at 0**. 5M
 concatenated then cached in CacheStorage under key `…28M.h168.onnx`). Export:
 `elspot-dk2-android/export_onnx.py --size 28M --quant fp32` — wrapper vs public API (`clip_nonnegative=False`)
 max diff 0.0, ONNX vs torch ≤ 3.1e-3, `test/ort-wasm-test.js <size> fp32` PASS.
+
+## Benchmarks vs other methods (precision per day ahead) & covariate analysis
+
+All errors are MAE as % of the mean actual DK2 spot price over that day's hours. Our numbers are walk-forward
+backtests with Timestral-28M, context 768h, app-faithful (neighbour day-ahead masked NaN beyond ~+36h at each
+origin, since that is all that is published).
+
+### Per-day comparison over a 7-day horizon
+
+| day ahead | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| naive baseline (repeat yesterday) | 27.7 | 35.0 | 40.4 | 37.3 | 46.4 | 51.0 | 42.8 |
+| elspot, old app (neighbours NaN > +36h, 7 rows) | 6.16 | 16.77 | 31.65 | 32.41 | 40.51 | 45.11 | 39.78 |
+| elspot + ridge fill (7 rows) | 6.07 | 16.01 | 28.60 | 25.12 | 26.49 | 29.00 | 27.75 |
+| **elspot shipped (13 rows + ridge fill, ONNX v4)** | **6.31** | **15.95** | **27.65** | **24.41** | **26.12** | **28.26** | **26.87** |
+| elforbrug.nu (Spotprisprognose, 90-day repo backtest) | 18.7 | 25.0 | 25.0 | 24.4 | 25.4 | 24.5 | n/a (~130 h forecast) |
+| elpriser.dk (published 30 d, DK2 nmae) | 15.1* | 16.4 | 16.7 | 18.8 | 21.8 | 21.1 | 22.5 |
+
+\* elpriser.dk's day-1 is scored **pre-auction** (harder); ours uses the published DE/SE3 day-ahead. Windows differ
+(ours: 35 origins over 7 months; elforbrug.nu: 90 published forecasts over 90 days; elpriser.dk: their own published
+30-day window) and normalizations slightly (they average per-day MAE/day-mean; we pool per-day MAE / mean of that
+day's hours). Live spot-to-spot check over 29 published hours: elforbrug.nu 14.8% vs elspot 28M **6.3%** (5M 7.0%).
+
+Method notes: elforbrug.nu = `solmoller/Spotprisprognose` `prognose.json` (EUR/MWh, UTC hours, ~130 h, updated ~4×/day;
+historical repo backtest: h24 18.6%, h48 25.3%, h72 25.4%, h96 25.1%, h120 25.8%). elpriser.dk: ECMWF IFS at ~26 points →
+weather→generation model → per-area quantile regression with German residual load, gas/CO₂, calendar and the last
+known day-ahead; 90-day median-error level correction + conformal band; daily oracle scoring.
+**Reading:** we win day 1 decisively (published DE/SE3 day-ahead), match elpriser.dk on day 2, and with the ridge fill
+beat elforbrug.nu from day 4 on; elpriser.dk's ECMWF pipeline remains strongest on days 3–7.
+
+### Covariate ablations (what was tested; only the winners shipped)
+
+- Full-year h24/h48/h72 (table above): spot only 16.5/22.6/23.5 → +weather 14.1/19.9/20.5 → +DE/SE3 neighbours
+  4.13/9.11/13.27 → **+weather+neighbours 3.97/8.68/12.34** (shipped base); + wind/solar *generation* forecast
+  (`Forecasts_Hour`) 4.32/9.40/13.53 — no gain. 5M with weather+neighbours: 5.34/9.38/12.89.
+- 7-day horizon, all variants with the ridge fill: +6 N-Germany weather rows (shipped): 6.31/15.95/27.65/24.41/26.12/28.26/26.87;
+  +DK wind100 instead: 6.05/15.94/28.46/25.07/26.42/28.93/27.58; +both: no additive effect (day7 26.68 vs 26.87).
+- Gusts (`wind_gusts_10m`, 6 DK + 3 DE points): +DE gust row day4 24.20, +both 24.22 vs base 24.41 → ≤0.2 pp, **not shipped**;
+  area-averaged gusts correlate **0.983** with mean wind10, so there is no extra signal at hourly resolution.
+- Neighbour fill beyond +36h (day 3–7): NaN 31.7–45.1%; hour-of-week climatology *worse* (34.5–54.8%); calendar-only ridge ≈ NaN;
+  ridge on N-German weather + calendar → 24.4–28.6% (**shipped**).
+- Weather correlation study (7 months hourly, 6 DK + 3 DE Open-Meteo points, n=5017): corr with DK2 level — solar −0.50,
+  wind10 −0.43, temp −0.43, wind100 −0.36, pressure +0.25; DE +0.97, SE3 +0.75; corr(ΔDE, ΔDK2) = +0.94. R² of
+  calendar+DE+SE3 = 0.957 → + all weather 0.975. Weather matters mostly **via DE prices**.
+- Information floor: best *linear* model on calendar+DE/SE3 alone = **6.8%** MAE (R² 0.970), + DK weather 5.9% (R² 0.985) —
+  our day-1 6.3% is at that floor. A walk-forward linear ridge with the same covariates + lags only reaches day1 13.8%:
+  zero-shot Timestral beats a trained linear model ~2×.
+
+### Error localization (shipped config, full year)
+
+MAE grows with horizon (rel 1–24: 69, 25–48: 197, 49–72: 335 DKK/MWh); every top-20 error is at rel ≥ 42 where DE/SE3 are
+NaN (MAE 325 on neighbour-NaN hours vs 82 when present). Errors peak 16–19 UTC. Gust events (3 h price drop >300 DKK/MWh
+with wind +8 m/s; 36/year) are tracked about as well as average while neighbours are published. 92% of the 109
+negative-price hours had wind10m > 15 m/s; the v4 export is not clamped at 0, so they are forecastable. Weather gaps:
+0 of 936 input hours.
+
+### Fine-tuning assessment (not done — deliberately)
+
+The official package is inference-only; training means a horizon-weighted pinball loss over the 21 quantiles via
+`forecast.__wrapped__` (community tooling: `timestral-tune`, `timestral-ft`, `RINNECODER/timestral-research`); weights are
+Modified MIT ($20 M revenue cap) — fine for personal use. Community fine-tune results are marginal (Kalshi BTC validation
+pinball .2756→.2744; 12 stock-return comparisons with 95% CIs spanning zero). Data would be plentiful (Energinet hourly
+since 2019 ≈ 60 k samples + Open-Meteo archive; non-stationarity argues for recent years — Timestral's per-block asinh
+normalization handles level, and our on-device bias correction already covers drift). Expected gain is small: day 1–2 we are
+at the information floor, and the day 3–7 gap is missing *inputs* (unpublished neighbours, weather-forecast uncertainty),
+not weights. LoRA r8 on the 28M needs a GPU (~50 min on a T4; this sandbox has none). Conclusion: the cheap wins shipped
+first (ridge fill, no-clamp, DE-weather rows); fine-tuning is an optional experiment on top, e.g. jointly on DK1+DK2+DE+SE3.
 
 ## How it works
 
