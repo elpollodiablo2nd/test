@@ -170,7 +170,8 @@
             padding: 0.7rem;
         }
 
-        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; touch-action: pan-y; cursor: crosshair; }
+        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .screen { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
         .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
         .chart-head h2 { margin: 0; }
         .zoom-ctl { display: inline-flex; gap: 0.25rem; flex: none; }
@@ -1701,6 +1702,7 @@
             });
             document.getElementById("evHours").addEventListener("change", renderAll);
             var chartSvg = document.getElementById("chart");
+            chartSvg.addEventListener("contextmenu", function (ev) { ev.preventDefault(); });
             var ptrs = {}, pan = null, pinch = null;
             function curView() {
                 var g = state.chartGeom;
@@ -1751,7 +1753,7 @@
                 }
                 if (pan && g) {
                     var dx = ev.clientX - pan.x0;
-                    if (Math.abs(dx) > 6) { pan.moved = true; hideChartTip(); }
+                    if (Math.abs(dx) > 6) pan.moved = true;
                     if (pan.moved && pan.view0) {
                         var r2 = chartSvg.getBoundingClientRect();
                         if (r2.width) {
@@ -1759,6 +1761,7 @@
                             var dMs = -dx * (g.W / r2.width) * msPerPxVb;
                             state.chartView = panView(pan.view0, g.full0, g.full1, CHART_MIN_SPAN_MS, dMs);
                             renderChart();
+                            onChartMove(ev); // tooltip keeps tracking the finger while panning
                         }
                         return;
                     }
