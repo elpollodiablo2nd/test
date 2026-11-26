@@ -470,9 +470,34 @@ bullets(s, Inches(8.5), Inches(1.9), Inches(4.25), Inches(4.9), [
     "Support the slower lane: \"Pacing the Frontier\" signatories, EU AI Act enforcement, and efficient models (less compute = less risk surface).",
 ], size=11.5)
 
-# 11 - coding perf
+# 11 - whistleblowers
 s = add_slide()
-header(s, "Performance - coding and agentic work", "SWE-bench Verified: real GitHub issues, tests must pass; Copilot is the harness, not the model", 11)
+header(s, "Whistleblower signals inside the labs", "Internal dissent is the strongest evidence about real safety culture - and the law is starting to protect it", 11)
+table(s, Inches(0.45), Inches(1.2), Inches(7.7), Inches(4.4), [
+    ["When", "Who", "What happened"],
+    ["Jun-Jul 2024", "OpenAI staff (Kokotajlo, Aschenbrenner, Saunders + others), via Sen. Grassley", "\"Right to Warn\" open letter (righttowarn.ai) + SEC complaint alleging NDAs illegally waived whistleblower rights and chilled reports to regulators; OpenAI later published a Raising Concerns policy (Oct 2024)"],
+    ["May 2024", "Jan Leike, OpenAI superalignment co-lead", "Resigned: \"safety culture and processes have taken a backseat to shiny products\"; later joined Anthropic. Kokotajlo also left (public p(doom) ~70%)"],
+    ["Jul 2026", "1,386+ frontier-lab employees (incl. Amodei, 4 Anthropic co-founders, Leike)", "\"Pacing the Frontier\" open letter calling for slower, verifiably safe development"],
+    ["Sep 2026", "Jacob Coxon (ex-OpenAI, ex-Anthropic)", "Public resignation, forfeited unvested equity: labs are \"racing straight to self-improving superintelligence and gambling with our lives\" (150M+ views)"],
+    ["Sep 2026", "Evan Hubinger, Anthropic alignment lead (still employed)", "Publicly agreed: \">10% chance AI could kill all humans within the next decade... we do not yet have a plan to solve alignment for superintelligence\""],
+    ["Scorecard", "AI Whistleblower Initiative (AIWI)", "Only Anthropic explicitly states NDAs / non-disparagement cannot block safety whistleblowing (10/10); OpenAI & Google 7/10; Meta / xAI 0"],
+], [1.0, 2.3, 4.4], font=8.5)
+bullets(s, Inches(0.45), Inches(5.75), Inches(7.7), Inches(1.3), [
+    ("Read: safety culture is contested inside ALL four vendors - even Anthropic's. Whistleblower posts are individual views (sometimes contested as PR), but the pattern - resignations, SEC complaints, employee letters - is consistent: commercial race pressure overrides safety plans.", {"size": 11, "bold": True}),
+], size=11)
+rect(s, Inches(8.4), Inches(1.2), Inches(4.5), Inches(5.7), LIGHT)
+textbox(s, Inches(8.6), Inches(1.4), Inches(4.1), Inches(0.4),
+        [("Legal protections & our levers", {"size": 14, "bold": True, "color": DARK})])
+bullets(s, Inches(8.6), Inches(1.9), Inches(4.15), Inches(4.9), [
+    "EU AI Act Art. 87 applies the EU Whistleblower Directive (2019/1937) to reports of AI Act breaches (from Aug 2026) - protects staff of EU AI providers and reporters.",
+    "California SB 53 (in force Jan 2026): protects frontier-lab employees disclosing catastrophic-risk concerns; anonymous internal channel mandatory at large developers (but retaliation fines are weak, ~$10k). NY RAISE Act & Illinois SB 315 similar; US federal AI Whistleblower Protection Act proposed (Grassley, 2025).",
+    "Gap: classic whistleblower law only covers illegal acts - \"Right to Warn\" campaigns push to cover unregulated catastrophic risk.",
+    "As a buyer: ask vendors about NDA / whistleblower carve-outs (AIWI scores above); put right-to-warn clauses in OUR employment NDAs; contract for incident notification; favour \"Pacing the Frontier\" signatories.",
+], size=11)
+
+# 12 - coding perf
+s = add_slide()
+header(s, "Performance - coding and agentic work", "SWE-bench Verified: real GitHub issues, tests must pass; Copilot is the harness, not the model", 12)
 pic(s, chart_swe(), Inches(0.45), Inches(1.3), w=Inches(6.3))
 bullets(s, Inches(7.0), Inches(1.35), Inches(5.9), Inches(5.6), [
     "Claude leads agentic coding: Opus 4.5 ~81%, Sonnet 4.5 77.2% (82% with parallel compute) on SWE-bench Verified; GPT-5 ~73%; Mistral Large 3 (open-weight base) ~40%* (third-party evals; reasoning variants score higher but still trail).",
@@ -485,7 +510,7 @@ bullets(s, Inches(7.0), Inches(1.35), Inches(5.9), Inches(5.6), [
 
 # 12 - bio + office perf
 s = add_slide()
-header(s, "Performance - biomedicine and office work", "Medical knowledge is saturated; realistic clinical behaviour is not - and that is what matters", 12)
+header(s, "Performance - biomedicine and office work", "Medical knowledge is saturated; realistic clinical behaviour is not - and that is what matters", 13)
 pic(s, chart_med(), Inches(0.45), Inches(1.35), w=Inches(6.1))
 pic(s, chart_general(), Inches(6.85), Inches(1.35), w=Inches(6.1))
 bullets(s, Inches(0.45), Inches(5.0), Inches(12.4), Inches(2.0), [
@@ -497,7 +522,7 @@ bullets(s, Inches(0.45), Inches(5.0), Inches(12.4), Inches(2.0), [
 
 # 13 - cost
 s = add_slide()
-header(s, "Cost for a 350-employee company", "Seats are predictable; API cost scales with tokens - Mistral is 5-6x cheaper per token", 13)
+header(s, "Cost for a 350-employee company", "Seats are predictable; API cost scales with tokens - Mistral is 5-6x cheaper per token", 14)
 pic(s, chart_cost(), Inches(0.45), Inches(1.25), w=Inches(12.4))
 bullets(s, Inches(0.45), Inches(5.0), Inches(12.4), Inches(2.0), [
     "Seat prices (list, late 2026): GitHub Copilot Business $19 / Enterprise $39 per user/mo; M365 Copilot ~$21-30 per user/mo add-on; Claude Team $20-25 per seat/mo; ChatGPT Business $25/seat.",
@@ -508,7 +533,7 @@ bullets(s, Inches(0.45), Inches(5.0), Inches(12.4), Inches(2.0), [
 
 # 14 - scorecard
 s = add_slide()
-header(s, "Scorecard", "FULL = strong   HALF = partial / conditional   EMPTY = weak   -  scored for our profile (green, EU-minded, biomedicine)", 14)
+header(s, "Scorecard", "FULL = strong   HALF = partial / conditional   EMPTY = weak   -  scored for our profile (green, EU-minded, biomedicine)", 15)
 table(s, Inches(0.45), Inches(1.25), Inches(12.45), Inches(5.4), [
     ["Dimension", "M365 / GitHub Copilot (Microsoft)", "OpenAI (direct / Azure)", "Anthropic (direct / Bedrock EU)", "Mistral (la Plateforme / self-hosted)"],
     ["EU residency by default", "FULL M365 (EUDB); HALF GitHub Copilot (US)", "HALF only via Azure EU regions", "HALF only via Bedrock/Vertex EU", "FULL EU-hosted; FULL self-hosted"],
@@ -526,7 +551,7 @@ table(s, Inches(0.45), Inches(1.25), Inches(12.45), Inches(5.4), [
 
 # 15 - recommendation
 s = add_slide()
-header(s, "Recommendation", "Layered setup: keep what works, pin everything to the EU, and measure", 15)
+header(s, "Recommendation", "Layered setup: keep what works, pin everything to the EU, and measure", 16)
 bullets(s, Inches(0.45), Inches(1.3), Inches(12.4), Inches(5.6), [
     ("1. Office work - keep M365 Copilot on an EU tenant: it is inside the EU Data Boundary, not used for training, GDPR DPA + ISO 42001. Configure it: disable Bing web grounding and disable Anthropic models inside Copilot (currently outside the EUDB), set Purview retention, and never enter patient data.", {"bold": True}),
     "2. Coding - keep GitHub Copilot Business ($19/seat) for everyday development (accept US processing under DPA/SCCs, or restrict sensitive repos); route frontier agentic work on sensitive biomedical code through Claude on AWS Bedrock with the EU inference profile (Frankfurt/Paris/Stockholm, zero retention) - best capability with EU processing.",
@@ -538,7 +563,7 @@ bullets(s, Inches(0.45), Inches(1.3), Inches(12.4), Inches(5.6), [
 
 # 16 - sources
 s = add_slide()
-header(s, "Sources and assumptions", "Figures as published; prices and benchmarks change - re-check before external use", 16)
+header(s, "Sources and assumptions", "Figures as published; prices and benchmarks change - re-check before external use", 17)
 bullets(s, Inches(0.45), Inches(1.2), Inches(12.4), Inches(5.9), [
     "IEA, \"Energy and AI\" special report (Apr 2025): 415 TWh data centres 2024 (1.5% global), ~945 TWh by 2030; US 45% / China 25% / Europe 15% share - iea.org/reports/energy-and-ai",
     "Communications Sustainability (Nature Portfolio, 2026): AI-optimised data centres ~118 TWh (2024) -> 239-295 TWh (2030)",
@@ -553,6 +578,7 @@ bullets(s, Inches(0.45), Inches(1.2), Inches(12.4), Inches(5.9), [
     "Benchmarks: SWE-bench Verified (swebench.com; Opus 4.5 ~80.9%, Sonnet 4.5 77.2%, GPT-5 ~72.8%; SWE-bench Pro ~23-46%); HumanEval (Claude 4.x ~96%, Mistral Large 3 ~92%); Nature Medicine 2026 independent eval: MedQA GPT-5.2 94.2 / Claude Opus 4.6 90.2; HealthBench GPT-5.2 88.0 / Claude 77.0, Hard 46.2%; MMLU/GPQA vendor model cards (GPT-5 94.2/85.7, Sonnet 4.5 ~89/83.4, Mistral Large 3 85.5/43.9)",
     "Safety / x-risk: Anthropic RSP v3.x & ASL-3 (Opus 4.1+); Axios (Sep 2025) Amodei p(doom) 10-25%; OpenAI Preparedness Framework v2 (Apr 2025); EA Forum comparison of lab safety plans (2025)",
     "Prices (list, ~Nov 2026): GitHub Copilot Pro $10, Business $19, Enterprise $39 /user/mo (AI credits $0.01); M365 Copilot ~$21-30 /user/mo; Claude Team $20-25 /seat/mo, Sonnet 4.5 $3/$15 per M tokens; GPT-5 $1.25/$10; Mistral Large 3 $0.50/$1.50 - github.com/features/copilot/plans, console.anthropic.com, openai.com, docs.mistral.ai",
+    "Whistleblowers: righttowarn.ai open letter (Jun 2024); SEC complaint via Sen. Grassley (Jul 2024, AP/Law360); Leike resignation (May 2024); Kokotajlo departure; \"Pacing the Frontier\" letter (Jul 2026, 1,386 signatories); Coxon resignation + Hubinger post (Sep 2026, BBC/CNBC/Forbes); AIWI lab scorecard; EU AI Act Art. 87 + Directive (EU) 2019/1937; CA SB 53 Labor Code 1107.1; NY RAISE Act; US AI Whistleblower Protection Act (proposed 2025)",
     ("Assumptions (ours, editable in build_deck.py): 140/350 AI-active staff; 50 heavy x 150 and 90 light x 20 queries/day; 250 workdays; 0.5 Wh/query base, 5 Wh heavy-agentic; ~30 mL water/query; 3k-in/1k-out tokens per heavy query for API cost; seat counts as above.", {"size": 11, "color": GREY}),
 ], size=10.5, gap=5)
 

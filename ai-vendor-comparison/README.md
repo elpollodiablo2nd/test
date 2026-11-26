@@ -9,6 +9,10 @@ platform) and **Mistral AI** across:
   GDPR Art. 9 (health data), EU AI Act (GPAI Code of Practice, Art. 55 systemic risk)
 - societal / moral / ethical posture and **existential-risk stance** (safety frameworks,
   published p(doom) statements, what a buyer can actually do)
+- **whistleblower signals** — OpenAI SEC/NDA complaint (2024), safety-staff resignations
+  (Leike, Kokotajlo), "Pacing the Frontier" (2026), Coxon resignation + Hubinger's >10%
+  x-risk post (2026), AIWI NDA-carve-out scorecard, and legal protections (EU AI Act Art. 87 /
+  Whistleblower Directive 2019/1937, CA SB 53, NY RAISE Act)
 - model performance — coding/agentic (SWE-bench Verified, HumanEval), biomedicine (MedQA,
   HealthBench) and office/knowledge work (MMLU, GPQA, OSWorld)
 - cost for 350 employees (seats vs API tokens)
