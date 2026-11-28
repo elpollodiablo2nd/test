@@ -252,6 +252,11 @@ async def mock_synthesize_and_deliver_chunk(
 ) -> "object":
     from worker.workflows.podcast_fr_en_voxtral import ChunkResult, PartInfo
 
+    git_path = None
+    git_url = None
+    if not dry_run and delivery in ("git", "both"):
+        git_path = f"{git_output_dir}/.staging/{base_filename}/{base_filename}-c{chunk_index:02d}p01.mp3.b64"
+        git_url = "https://github.com/example/blob/main/x.b64"
     return ChunkResult(
         chunk_index=chunk_index,
         turns_synthesized=len(turns),
@@ -259,8 +264,8 @@ async def mock_synthesize_and_deliver_chunk(
             PartInfo(
                 filename=f"{base_filename}-c{chunk_index:02d}p01.mp3",
                 bytes=1234,
-                git_path=f"{git_output_dir}/.staging/{base_filename}/{base_filename}-c{chunk_index:02d}p01.mp3.b64",
-                git_url="https://github.com/example/blob/main/x.b64",
+                git_path=git_path,
+                git_url=git_url,
             )
         ],
     )
