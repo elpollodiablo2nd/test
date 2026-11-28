@@ -166,6 +166,12 @@ beat elforbrug.nu from day 4 on; elpriser.dk's ECMWF pipeline remains strongest 
 - Weather correlation study (7 months hourly, 6 DK + 3 DE Open-Meteo points, n=5017): corr with DK2 level — solar −0.50,
   wind10 −0.43, temp −0.43, wind100 −0.36, pressure +0.25; DE +0.97, SE3 +0.75; corr(ΔDE, ΔDK2) = +0.94. R² of
   calendar+DE+SE3 = 0.957 → + all weather 0.975. Weather matters mostly **via DE prices**.
+- On-device calibration backtest (35 origins, 7 months, H=168, app-faithful simulation of `elspot_preds`):
+  conformal k alone lifts q10–q90 coverage from 24–32% to 62–85% at day 3–7 (and 84→88% day 1) — clearly worth it.
+  The per-bucket level bias, however, is noise at 48h+ (estimates swing ±100–450 DKK/MWh, sign flips per origin) and
+  **overcorrects**: MAE day1 6.35→6.87%, day4 24.33→22.43% (helped), day6 28.11→**36.70%** (harmed). Conclusion shipped:
+  level-bias correction applies to the day-1 bucket only; conformal k to all buckets.
+
 - Information floor: best *linear* model on calendar+DE/SE3 alone = **6.8%** MAE (R² 0.970), + DK weather 5.9% (R² 0.985) —
   our day-1 6.3% is at that floor. A walk-forward linear ridge with the same covariates + lags only reaches day1 13.8%:
   zero-shot Timestral beats a trained linear model ~2×.
