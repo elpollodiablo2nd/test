@@ -920,6 +920,7 @@ class PodcastFrEnVoxtralWorkflow:
         chunks = plan_chunks(transcript.turns)
         subject = f"[Voxtral EN] {episode.title[:80]}"
         base = slugify(episode.title)
+        out_dir = f"{input.git_output_dir}/{base}-{workflows.workflow.uuid4().hex[:8]}"
         parts: list[PartInfo] = []
         total = len(chunks)
         for index, chunk in enumerate(chunks, start=1):
@@ -937,7 +938,7 @@ class PodcastFrEnVoxtralWorkflow:
                 input.git_owner,
                 input.git_repo,
                 input.git_branch,
-                input.git_output_dir,
+                out_dir,
                 input.dry_run,
             )
             parts.extend(result.parts)
@@ -954,7 +955,7 @@ class PodcastFrEnVoxtralWorkflow:
                 input.git_owner,
                 input.git_repo,
                 input.git_branch,
-                input.git_output_dir,
+                out_dir,
                 base,
                 input.dry_run,
             )
@@ -976,6 +977,6 @@ class PodcastFrEnVoxtralWorkflow:
             transcript_message_id=email_result.get("id"),
             delivery=input.delivery,
             git_branch=input.git_branch if input.delivery in ("git", "both") else None,
-            git_output_dir=input.git_output_dir if input.delivery in ("git", "both") else None,
+            git_output_dir=out_dir if input.delivery in ("git", "both") else None,
             dry_run=input.dry_run,
         )
