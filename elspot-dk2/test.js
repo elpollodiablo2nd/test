@@ -295,6 +295,14 @@ check("applyCalibration clamps non-monotone raw", ac4.q10 === 100 && ac4.q90 ===
 const biased = Array.from({length: 20}, (_, i) => ({ med: 100 + i, act: 90 + i })); // med-act = +10 always
 check("medianError = +10 constant bias", Core.medianError(biased) === 10);
 check("medianError null when few", Core.medianError(biased.slice(0, 5)) === null);
+// seedOrigins: past context-end indices with horizon inside history, >= ctxLen
+{
+    const o1 = Core.seedOrigins(7190, 768, 72, 10, 1);
+    check("seedOrigins 300d history -> 10 origins", o1.length === 10 && o1.every(o => o >= 768 && o + 72 <= 7190));
+    check("seedOrigins 35d live history -> 1 origin", JSON.stringify(Core.seedOrigins(840, 768, 72, 10, 1)) === "[768]");
+    check("seedOrigins too-short history -> none", Core.seedOrigins(800, 768, 72, 10, 1).length === 0);
+    check("seedOrigins respects maxOrigins", Core.seedOrigins(7190, 768, 72, 3, 2).length === 3);
+}
 check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72
     && Core.horizonBucket(72) === 96 && Core.horizonBucket(95) === 96 && Core.horizonBucket(96) === 120 && Core.horizonBucket(143) === 144
     && Core.horizonBucket(144) === 168 && Core.horizonBucket(500) === 168);

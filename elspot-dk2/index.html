@@ -252,7 +252,7 @@
             <p class="dim"><b>elspot</b> forecasts Danish day-ahead electricity prices — pick <b>DK2 · EAST</b> (default) or <b>DK1 · WEST</b> in the RUN card (remembered). Everything runs <b>on your device</b>: no API key, no server.</p>
             <p><b>What Timestral is:</b> <a href="https://mistral.ai/news/timestral/">Timestral</a> is Mistral AI's open time-series <b>foundation model</b> — a small patch-transformer that reads the past of a series (here: up to 768 hourly prices) and predicts every future hour at once as <b>21 quantiles</b>, i.e. a full uncertainty curve, not just a point estimate. We use it <b>zero-shot</b> — never retrained — and only feed it context + covariates. In the Android app it runs fully offline as an ONNX graph on the phone CPU (~1–5 s): the <b>5M</b> checkpoint is bundled in the APK, the <b>28M</b> (default, more accurate) is downloaded once from this page and then kept in the app cache. A plain browser has no ONNX runtime, so RUN TIMESTRAL there just explains this.</p>
             <p><b>Data:</b> prices load automatically — live from Energinet (retries + Retry-After); if the network blocks it, the <b>Pages snapshot</b> (CI-refreshed every 30 min, Nord Pool fallback), then the local cache (freshest wins), then the snapshot bundled in the APK. The banner always names the source; <b>LOAD PRICES</b> forces a live retry. With <b>INCL. FEES+VAT</b> ticked, prices include the mandatory fees — Energinet transmission + system tariff + elafgift, the DSO Nettarif C of your zone (N1 for DK2, TREFOR for DK1; seasonal changes automatic via ValidFrom/ValidTo) — plus 25% VAT: what you actually pay per kWh.</p>
-            <p><b>A run:</b> RUN TIMESTRAL feeds the price history plus <b>covariates</b> to the model: weather at your zone (Open-Meteo), <b>DE/SE3 day-ahead prices</b> — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — N-German weather, and hour-of-day/weekday encodings. DE/SE3 prices are published only to ~+36h; beyond that the app fills them with a small on-device <b>ridge forecast</b> (N-German weather + calendar, trained on published hours at run time), which cut day 3–7 error from 32–45% to <b>24–28%</b>. Output: the orange dashed <b>median</b> with a red <b>q10–q90 band</b>, recalibrated on-device from recent forecast errors (conformal band width; day-1 level-bias correction). Horizons: <b>24–168h (7 days)</b>. The chart starts at the current hour: green = published day-ahead, then the forecast; the cream dashed <b>baseline</b> is the naive reference "tomorrow repeats today's hourly pattern", shown so you can see what the AI adds. Zoom the chart with the <b>+ / − / 1×</b> buttons next to the zone picker, by pinching, or by dragging sideways — labels grow and re-step (down to 1h) as you zoom; tap a point for exact values. The green shaded <b>EV window</b> is the cheapest contiguous 4/6/8h charge run from now; the grid below lists every hour in kr/kWh with its q10–q90 range.</p>
+            <p><b>A run:</b> RUN TIMESTRAL feeds the price history plus <b>covariates</b> to the model: weather at your zone (Open-Meteo), <b>DE/SE3 day-ahead prices</b> — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — N-German weather, and hour-of-day/weekday encodings. DE/SE3 prices are published only to ~+36h; beyond that the app fills them with a small on-device <b>ridge forecast</b> (N-German weather + calendar, trained on published hours at run time), which cut day 3–7 error from 32–45% to <b>24–28%</b>. Output: the orange dashed <b>median</b> with a red <b>q10–q90 band</b>, recalibrated on-device from past forecast errors (conformal band width; day-1 level-bias correction) — on the first RUN the app re-runs the last ~10 days on-device to seed this immediately, then it updates itself daily. Horizons: <b>24–168h (7 days)</b>. The chart starts at the current hour: green = published day-ahead, then the forecast; the cream dashed <b>baseline</b> is the naive reference "tomorrow repeats today's hourly pattern", shown so you can see what the AI adds. Zoom the chart with the <b>+ / − / 1×</b> buttons next to the zone picker, by pinching, or by dragging sideways — labels grow and re-step (down to 1h) as you zoom; tap a point for exact values. The green shaded <b>EV window</b> is the cheapest contiguous 4/6/8h charge run from now; the grid below lists every hour in kr/kWh with its q10–q90 range.</p>
             <p><b>Accuracy</b> (DK2 backtests, MAE as % of mean price): full-year 28M: h24 <b>4.0%</b>, h48 8.7%, h72 12.3%; 7-month 7-day run with the ridge fill: day1 6.3% → day2 16.0% → day3 27.7% → day7 26.9% (naive baseline 28–51%). For reference, published competitors land at ~19–25% (elforbrug.nu) and 15–22% (elpriser.dk; their day-1 is scored pre-auction) from day 1. The largest remaining errors are wind-gust hours beyond +36h. Negative prices (92% of them occur in hours with wind >15 m/s) are forecastable — the ONNX export is not clamped at 0.</p>
             <p class="dim">Sources: prices &amp; fees — <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service (Energinet)</a>, DayAheadPrices (day-ahead, published daily ~13:00 CET) + DatahubPricelist (Energinet GLN 5790000432752; N1 5790001089030 DK2; TREFOR 5790000392261 DK1); weather — <a href="https://open-meteo.com/">Open-Meteo</a>; model — <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX-exported and bundled in <b>elspot-dk2-android/</b>; snapshots refreshed every 30 min by a GitHub Actions workflow. Full docs: <a href="README.md">README.md</a>.</p>
             <p id="weatherLine" class="dim" style="margin-top:0.6rem"></p>
@@ -487,6 +487,14 @@
             var med = medRaw - b, lo = q10raw - b, hi = q90raw - b;
             var band = scaleBand(med, lo, hi, k);
             return { med: med, q10: Math.min(band[0], med), q90: Math.max(band[1], med) };
+        }
+
+        // past context-end indices (into the history array) for one-time calibration seeding:
+        // origins 1..maxOrigins days apart, each with `horizon` forecast hours inside the history
+        function seedOrigins(historyLen, ctxLen, horizon, maxOrigins, stepDays) {
+            var out = [], o = historyLen - horizon, step = stepDays * HOURS_PER_DAY;
+            while (out.length < maxOrigins && o >= ctxLen) { out.push(o); o -= step; }
+            return out;
         }
 
         function horizonBucket(h) {
@@ -968,6 +976,7 @@
             scaleBand: scaleBand,
             applyCalibration: applyCalibration,
             horizonBucket: horizonBucket,
+            seedOrigins: seedOrigins,
             K_BUCKETS: K_BUCKETS,
             clampView: clampView,
             zoomView: zoomView,
@@ -1558,6 +1567,40 @@
             return { k: k, bias: bias };
         }
 
+        // One-time walk-forward seeding: re-run the model at past origins over the loaded history so
+        // elspot_preds is populated and bias/conformal-k are active on the very first RUN (then cached).
+        function seedCalibration(session, weatherMap) {
+            var preds = loadPreds();
+            var histMap = {};
+            state.history.forEach(function (p) { histMap[p.utc.getTime()] = p.price; });
+            var matured = preds.filter(function (p) { return histMap[p.t] != null; }).length;
+            if (matured >= 24 || state.history.length < ONNX_T + 72) return Promise.resolve(0);
+            var origins = seedOrigins(state.history.length, ONNX_T, 72, 10, 1); // up to 10 past days, 72h each
+            if (!origins.length) return Promise.resolve(0);
+            feedback("Seeding calibration from " + origins.length + " past days (one-time)…", "correct");
+            var chain = Promise.resolve(0);
+            origins.forEach(function (o, idx) {
+                chain = chain.then(function () {
+                    var inputs = buildOnnxInputs(state.history.slice(0, o), weatherMap.dk, state.neighborMap, weatherMap.de);
+                    return session.run({
+                        context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
+                        known_covariates: new ort.Tensor("float32", inputs.known, [1, ONNX_C, ONNX_T + ONNX_H])
+                    }).then(function (out) {
+                        var q = out.quantiles.data;
+                        var last = state.history[o - 1].utc;
+                        for (var j = 0; j < 72; j++) {
+                            var t = new Date(last.getTime() + (j + 1) * HOUR_MS);
+                            if (histMap[t.getTime()] == null) continue; // only keep hours with actuals
+                            preds.push({ h: j, t: t.getTime(), med: q[j * ONNX_Q + ONNX_MED_I],
+                                         q10: q[j * ONNX_Q + ONNX_Q10_I], q90: q[j * ONNX_Q + ONNX_Q90_I] });
+                        }
+                        feedback("Seeding calibration from history… " + (idx + 1) + "/" + origins.length, "correct");
+                    });
+                });
+            });
+            return chain.then(function () { savePreds(preds); return origins.length; });
+        }
+
         function runLocal() {
             if (!state.history.length) { feedback("No prices loaded yet — wait for LOAD PRICES (or the cached copy) first.", "wrong"); return; }
             var modelSize = document.getElementById("modelSize").value;
@@ -1571,12 +1614,17 @@
                     return { session: session, weatherMap: weatherMap };
                 });
             }).then(function (env) {
+                return seedCalibration(env.session, env.weatherMap).then(function (nSeed) {
+                    return { session: env.session, weatherMap: env.weatherMap, nSeed: nSeed };
+                });
+            }).then(function (env) {
                 var inputs = buildOnnxInputs(state.history, env.weatherMap.dk, state.neighborMap, env.weatherMap.de);
                 return env.session.run({
                     context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
                     known_covariates: new ort.Tensor("float32", inputs.known, [1, ONNX_C, ONNX_T + ONNX_H])
-                });
-            }).then(function (out) {
+                }).then(function (out) { return { out: out, nSeed: env.nSeed }; });
+            }).then(function (res) {
+                var out = res.out, nSeed = res.nSeed;
                 var q = out.quantiles.data;
                 var last = state.history[state.history.length - 1].utc;
                 var lag1 = lag1Forecast(state.history, horizon);
@@ -1612,7 +1660,8 @@
                 renderAll();
                 if (window.console && console.log) console.log("[elspot] band k", kByBucket, "level bias DKK/MWh", biasByBucket);
                 feedback("Forecast ready — Timestral " + modelSize + " on-device, " + horizon + "h in " +
-                    ((Date.now() - t0) / 1000).toFixed(1) + "s. No API key; band & level auto-calibrated (ABOUT).", "correct");
+                    ((Date.now() - t0) / 1000).toFixed(1) + "s. No API key; band & level auto-calibrated (ABOUT)." +
+                    (nSeed ? " Calibration seeded from " + nSeed + " past days." : ""), "correct");
             }).catch(function (err) {
                 feedback("On-device run failed: " + err.message, "wrong");
             }).finally(function () { setBusy(false); });
