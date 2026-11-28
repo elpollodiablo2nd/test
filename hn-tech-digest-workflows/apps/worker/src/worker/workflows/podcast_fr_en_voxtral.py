@@ -29,6 +29,7 @@ from mistralai.workflows.plugins.mistralai.connectors import (
 from worker.workflows.hn_tech_digest import extract_json_object, extract_text_content
 
 gmail_connector = connector("gmail")
+github_connector = connector("github_app")
 
 TRANSCRIBE_MODEL = "voxtral-small-transcribe-3"
 CHAT_MODEL = "mistral-large-latest"
@@ -72,6 +73,11 @@ class PodcastVoxtralInput(pydantic.BaseModel):
     recipient: str = DEFAULT_RECIPIENT
     host_voice_id: str = DEFAULT_HOST_VOICE_ID
     guest_voice_id: str = DEFAULT_GUEST_VOICE_ID
+    delivery: str = "git"
+    git_owner: str = "elpollodiablo2nd"
+    git_repo: str = "test"
+    git_branch: str = "vibe/podcast-voxtral-75b01f"
+    git_output_dir: str = "podcast-fr-en-voxtral-output"
     max_segments: int = 0
     dry_run: bool = False
 
@@ -134,6 +140,8 @@ class FeedItem(pydantic.BaseModel):
 class PartInfo(pydantic.BaseModel):
     filename: str
     bytes: int
+    git_path: str | None = None
+    git_url: str | None = None
     message_id: str | None = None
 
 
@@ -156,7 +164,11 @@ class PodcastVoxtralResult(pydantic.BaseModel):
     parts: list[PartInfo]
     transcript_en: str
     transcript_fr: str
+    transcript_git_path: str | None = None
     transcript_message_id: str | None = None
+    delivery: str = "git"
+    git_branch: str | None = None
+    git_output_dir: str | None = None
     dry_run: bool = False
 
 
@@ -646,12 +658,56 @@ async def _send_gmail(
     return {}
 
 
+async def _push_git_file(
+    github: ToolCallClient,
+    owner: str,
+    repo: str,
+    branch: str,
+    path: str,
+    content: str,
+    message: str,
+) -> dict:
+    result = await github.call_tool(
+        tool_name="create_or_update_file",
+        arguments={
+            "owner": owner,
+            "repo": repo,
+            "branch": branch,
+            "path": path,
+            "content": content,
+            "message": message,
+        },
+    )
+    if isinstance(result, dict):
+        structured = result.get("structuredContent")
+        if isinstance(structured, dict):
+            return structured
+        content_block = result.get("content")
+        if isinstance(content_block, list):
+            import json
+
+            for block in content_block:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    try:
+                        parsed = json.loads(block.get("text", ""))
+                        if isinstance(parsed, dict):
+                            return parsed
+                    except (ValueError, TypeError):
+                        continue
+        return result
+    return {}
+
+
+def _part_git_path(output_dir: str, base_filename: str, filename: str) -> str:
+    return f"{output_dir}/.staging/{base_filename}/{filename}.b64"
+
+
 @workflows.activity(
-    name="podcast-synthesize-and-email-chunk",
+    name="podcast-synthesize-and-deliver-chunk",
     start_to_close_timeout=timedelta(seconds=3600),
     retry_policy_max_attempts=2,
 )
-async def synthesize_and_email_chunk(
+async def synthesize_and_deliver_chunk(
     turns: list[Turn],
     chunk_index: int,
     total_chunks: int,
@@ -661,8 +717,14 @@ async def synthesize_and_email_chunk(
     base_filename: str,
     host_voice_id: str,
     guest_voice_id: str,
+    delivery: str,
+    git_owner: str,
+    git_repo: str,
+    git_branch: str,
+    git_output_dir: str,
     dry_run: bool,
     gmail: ToolCallClient = Depends(gmail_connector),
+    github: ToolCallClient = Depends(github_connector),
 ) -> ChunkResult:
     client = get_mistral_client()
     buffer = b""
@@ -673,27 +735,52 @@ async def synthesize_and_email_chunk(
         if not buffer:
             return
         filename = f"{base_filename}-c{chunk_index:02d}p{len(parts) + 1:02d}.mp3"
+        git_path: str | None = None
+        git_url: str | None = None
         message_id: str | None = None
         if not dry_run:
-            sent = await _send_gmail(
-                gmail,
-                recipient,
-                f"{subject} — audio part {filename}",
-                (
-                    f"Audio part {filename} of the English Voxtral narration of: "
-                    f"{episode_title}.\n\nConcatenate all parts in filename order to rebuild "
-                    f"the full interview MP3, e.g.: cat {base_filename}-*.mp3 > {base_filename}.mp3"
-                ),
-                [
-                    {
-                        "filename": filename,
-                        "mimeType": "audio/mpeg",
-                        "content": base64.b64encode(buffer).decode(),
-                    }
-                ],
+            if delivery in ("git", "both"):
+                git_path = _part_git_path(git_output_dir, base_filename, filename)
+                pushed = await _push_git_file(
+                    github,
+                    git_owner,
+                    git_repo,
+                    git_branch,
+                    git_path,
+                    base64.b64encode(buffer).decode(),
+                    f"Add staged Voxtral audio part {filename} for {episode_title[:60]}",
+                )
+                content_info = pushed.get("content") if isinstance(pushed, dict) else None
+                if isinstance(content_info, dict):
+                    git_url = content_info.get("html_url")
+            if delivery in ("email", "both"):
+                sent = await _send_gmail(
+                    gmail,
+                    recipient,
+                    f"{subject} — audio part {filename}",
+                    (
+                        f"Audio part {filename} of the English Voxtral narration of: "
+                        f"{episode_title}.\n\nConcatenate all parts in filename order to rebuild "
+                        f"the full interview MP3, e.g.: cat {base_filename}-*.mp3 > {base_filename}.mp3"
+                    ),
+                    [
+                        {
+                            "filename": filename,
+                            "mimeType": "audio/mpeg",
+                            "content": base64.b64encode(buffer).decode(),
+                        }
+                    ],
+                )
+                message_id = sent.get("id")
+        parts.append(
+            PartInfo(
+                filename=filename,
+                bytes=len(buffer),
+                git_path=git_path,
+                git_url=git_url,
+                message_id=message_id,
             )
-            message_id = sent.get("id")
-        parts.append(PartInfo(filename=filename, bytes=len(buffer), message_id=message_id))
+        )
         buffer = b""
 
     for turn in turns:
@@ -717,46 +804,91 @@ async def synthesize_and_email_chunk(
 
 
 @workflows.activity(
-    name="podcast-send-transcript-email",
-    start_to_close_timeout=timedelta(seconds=120),
+    name="podcast-deliver-transcript",
+    start_to_close_timeout=timedelta(seconds=180),
     retry_policy_max_attempts=2,
 )
-async def send_transcript_email(
+async def deliver_transcript(
     recipient: str,
     subject: str,
     episode: PodcastEpisode,
     markdown_en: str,
     markdown_fr: str,
     part_count: int,
+    delivery: str,
+    git_owner: str,
+    git_repo: str,
+    git_branch: str,
+    git_output_dir: str,
+    base_filename: str,
+    dry_run: bool,
     gmail: ToolCallClient = Depends(gmail_connector),
+    github: ToolCallClient = Depends(github_connector),
 ) -> dict:
-    body = (
-        f"English (and French) transcript of: {episode.title}\n"
-        f"Episode page: {episode.page_url}\n"
-        f"Original audio: {episode.audio_url}\n\n"
-        f"The English audio narration ({part_count} MP3 part(s), two voices: host and guest) "
-        f"arrives in separate emails with 'audio part' in the subject. Concatenate the parts "
-        f"in filename order to rebuild the full interview MP3.\n\n"
-        "Attachments: transcript-en.md (English), transcript-fr.md (original French)."
-    )
-    return await _send_gmail(
-        gmail,
-        recipient,
-        f"{subject} — transcript (EN/FR)",
-        body,
-        [
-            {
-                "filename": "transcript-en.md",
-                "mimeType": "text/markdown",
-                "content": base64.b64encode(markdown_en.encode()).decode(),
-            },
-            {
-                "filename": "transcript-fr.md",
-                "mimeType": "text/markdown",
-                "content": base64.b64encode(markdown_fr.encode()).decode(),
-            },
-        ],
-    )
+    result: dict = {}
+    transcript_git_path: str | None = None
+    if not dry_run and delivery in ("git", "both"):
+        out_dir = f"{git_output_dir}/{base_filename}"
+        readme = (
+            f"# {episode.title} — English Voxtral narration\n\n"
+            f"- Episode page: {episode.page_url}\n"
+            f"- Original audio: {episode.audio_url}\n"
+            f"- Host voice: preset `{DEFAULT_HOST_VOICE_ID}`-style input; guest voice likewise "
+            f"(two distinct voices).\n"
+            f"- {part_count} MP3 part(s) staged as `.b64` under `.staging/{base_filename}/`; "
+            f"decode and concatenate in filename order:\n\n"
+            "```\n"
+            f"for f in .staging/{base_filename}/*.b64; do base64 -d \"$f\"; done > {base_filename}-en.mp3\n"
+            "```\n"
+        )
+        for path, content in (
+            (f"{out_dir}/transcript-en.md", markdown_en),
+            (f"{out_dir}/transcript-fr.md", markdown_fr),
+            (f"{out_dir}/README.md", readme),
+        ):
+            pushed = await _push_git_file(
+                github,
+                git_owner,
+                git_repo,
+                git_branch,
+                path,
+                content,
+                f"Add {path.split('/')[-1]} for {episode.title[:60]}",
+            )
+            if path.endswith("transcript-en.md"):
+                content_info = pushed.get("content") if isinstance(pushed, dict) else None
+                if isinstance(content_info, dict):
+                    transcript_git_path = content_info.get("path")
+                    result["transcript_git_url"] = content_info.get("html_url")
+    if not dry_run and delivery in ("email", "both"):
+        body = (
+            f"English (and French) transcript of: {episode.title}\n"
+            f"Episode page: {episode.page_url}\n"
+            f"Original audio: {episode.audio_url}\n\n"
+            f"The English audio narration ({part_count} MP3 part(s), two voices: host and guest) "
+            f"is delivered separately (git and/or email parts).\n\n"
+            "Attachments: transcript-en.md (English), transcript-fr.md (original French)."
+        )
+        result["email"] = await _send_gmail(
+            gmail,
+            recipient,
+            f"{subject} — transcript (EN/FR)",
+            body,
+            [
+                {
+                    "filename": "transcript-en.md",
+                    "mimeType": "text/markdown",
+                    "content": base64.b64encode(markdown_en.encode()).decode(),
+                },
+                {
+                    "filename": "transcript-fr.md",
+                    "mimeType": "text/markdown",
+                    "content": base64.b64encode(markdown_fr.encode()).decode(),
+                },
+            ],
+        )
+    result["transcript_git_path"] = transcript_git_path
+    return result
 
 
 @workflows.workflow.define(
@@ -766,15 +898,19 @@ async def send_transcript_email(
         "One-shot, user-triggered podcast translation + narration: resolves the episode audio "
         "from an Ausha page URL, transcribes it with Voxtral ASR (French, with speaker "
         "diarization), translates the transcript to English, re-voices the interview with "
-        "voxtral-mini-tts-3-0 using a different preset voice per speaker, and emails the "
-        "transcript (EN/FR) plus the MP3 audio parts to the recipient's Gmail."
+        "voxtral-mini-tts-3-0 using a different preset voice per speaker, and delivers the "
+        "transcript (EN/FR) plus the MP3 audio parts to git (default) and/or the recipient's "
+        "Gmail. Git delivery stages base64 parts under <output_dir>/.staging/ via the github_app "
+        "connector; the MCP channel is text-only, so binary parts are staged as .b64."
     ),
     on_behalf_of=True,
 )
-@uses_connectors(gmail_connector)
+@uses_connectors(gmail_connector, github_connector)
 class PodcastFrEnVoxtralWorkflow:
     @workflows.workflow.entrypoint
     async def run(self, input: PodcastVoxtralInput) -> PodcastVoxtralResult:
+        if input.delivery not in ("git", "email", "both"):
+            raise workflows.WorkflowError("invalid_delivery", non_retryable=True)
         episode = await resolve_episode_audio(input.episode_page_url)
         segments = await transcribe_episode(episode)
         if input.max_segments > 0:
@@ -787,7 +923,7 @@ class PodcastFrEnVoxtralWorkflow:
         parts: list[PartInfo] = []
         total = len(chunks)
         for index, chunk in enumerate(chunks, start=1):
-            result = await synthesize_and_email_chunk(
+            result = await synthesize_and_deliver_chunk(
                 chunk,
                 index,
                 total,
@@ -797,19 +933,32 @@ class PodcastFrEnVoxtralWorkflow:
                 base,
                 input.host_voice_id,
                 input.guest_voice_id,
+                input.delivery,
+                input.git_owner,
+                input.git_repo,
+                input.git_branch,
+                input.git_output_dir,
                 input.dry_run,
             )
             parts.extend(result.parts)
-        sent: dict = {}
+        delivered: dict = {}
         if not input.dry_run:
-            sent = await send_transcript_email(
+            delivered = await deliver_transcript(
                 input.recipient,
                 subject,
                 episode,
                 transcript.markdown_en,
                 transcript.markdown_fr,
                 len(parts),
+                input.delivery,
+                input.git_owner,
+                input.git_repo,
+                input.git_branch,
+                input.git_output_dir,
+                base,
+                input.dry_run,
             )
+        email_result = delivered.get("email") if isinstance(delivered.get("email"), dict) else {}
         return PodcastVoxtralResult(
             episode_title=episode.title,
             episode_page_url=episode.page_url,
@@ -823,6 +972,10 @@ class PodcastFrEnVoxtralWorkflow:
             parts=parts,
             transcript_en=transcript.markdown_en,
             transcript_fr=transcript.markdown_fr,
-            transcript_message_id=sent.get("id"),
+            transcript_git_path=delivered.get("transcript_git_path"),
+            transcript_message_id=email_result.get("id"),
+            delivery=input.delivery,
+            git_branch=input.git_branch if input.delivery in ("git", "both") else None,
+            git_output_dir=input.git_output_dir if input.delivery in ("git", "both") else None,
             dry_run=input.dry_run,
         )

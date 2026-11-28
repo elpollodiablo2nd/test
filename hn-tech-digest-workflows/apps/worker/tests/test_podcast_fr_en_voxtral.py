@@ -188,6 +188,8 @@ def test_input_defaults():
     assert "podcast.ausha.co" in model.episode_page_url
     assert model.recipient
     assert model.host_voice_id != model.guest_voice_id
+    assert model.delivery == "git"
+    assert model.git_branch.startswith("vibe/")
     assert model.max_segments == 0
     assert model.dry_run is False
 
@@ -230,8 +232,8 @@ async def mock_translate_transcript(
     )
 
 
-@workflows.activity(name="podcast-synthesize-and-email-chunk")
-async def mock_synthesize_and_email_chunk(
+@workflows.activity(name="podcast-synthesize-and-deliver-chunk")
+async def mock_synthesize_and_deliver_chunk(
     turns: list[Turn],
     chunk_index: int,
     total_chunks: int,
@@ -241,6 +243,11 @@ async def mock_synthesize_and_email_chunk(
     base_filename: str,
     host_voice_id: str,
     guest_voice_id: str,
+    delivery: str,
+    git_owner: str,
+    git_repo: str,
+    git_branch: str,
+    git_output_dir: str,
     dry_run: bool,
 ) -> "object":
     from worker.workflows.podcast_fr_en_voxtral import ChunkResult, PartInfo
@@ -248,21 +255,40 @@ async def mock_synthesize_and_email_chunk(
     return ChunkResult(
         chunk_index=chunk_index,
         turns_synthesized=len(turns),
-        parts=[PartInfo(filename=f"{base_filename}-c{chunk_index:02d}p01.mp3", bytes=1234, message_id="msg-part")],
+        parts=[
+            PartInfo(
+                filename=f"{base_filename}-c{chunk_index:02d}p01.mp3",
+                bytes=1234,
+                git_path=f"{git_output_dir}/.staging/{base_filename}/{base_filename}-c{chunk_index:02d}p01.mp3.b64",
+                git_url="https://github.com/example/blob/main/x.b64",
+            )
+        ],
     )
 
 
-@workflows.activity(name="podcast-send-transcript-email")
-async def mock_send_transcript_email(
+@workflows.activity(name="podcast-deliver-transcript")
+async def mock_deliver_transcript(
     recipient: str,
     subject: str,
     episode: PodcastEpisode,
     markdown_en: str,
     markdown_fr: str,
     part_count: int,
+    delivery: str,
+    git_owner: str,
+    git_repo: str,
+    git_branch: str,
+    git_output_dir: str,
+    base_filename: str,
+    dry_run: bool,
 ) -> dict:
     assert markdown_en and markdown_fr
-    return {"id": "msg-transcript", "threadId": "thr-1"}
+    result = {"transcript_git_path": None}
+    if delivery in ("git", "both"):
+        result["transcript_git_path"] = f"{git_output_dir}/{base_filename}/transcript-en.md"
+    if delivery in ("email", "both"):
+        result["email"] = {"id": "msg-transcript", "threadId": "thr-1"}
+    return result
 
 
 async def test_workflow_end_to_end_with_mocked_activities(temporal_env) -> None:
@@ -274,13 +300,13 @@ async def test_workflow_end_to_end_with_mocked_activities(temporal_env) -> None:
             mock_transcribe_episode,
             mock_assign_speaker_roles,
             mock_translate_transcript,
-            mock_synthesize_and_email_chunk,
-            mock_send_transcript_email,
+            mock_synthesize_and_deliver_chunk,
+            mock_deliver_transcript,
         ],
     ):
         handle = await temporal_env.client.start_workflow(
             "podcast-fr-en-voxtral",
-            {"episode_page_url": "https://podcast.ausha.co/in-security-we-trust/olvid-thomas-baigneres", "dry_run": False},
+            {"episode_page_url": "https://podcast.ausha.co/in-security-we-trust/olvid-thomas-baigneres", "dry_run": False, "delivery": "git"},
             id="test-podcast-voxtral",
             task_queue="test-task-queue",
             execution_timeout=WORKFLOW_EXECUTION_TIMEOUT,
@@ -295,7 +321,11 @@ async def test_workflow_end_to_end_with_mocked_activities(temporal_env) -> None:
         assert result["speaker_mapping"] == {"speaker_1": "host", "speaker_2": "guest"}
         assert result["part_count"] == 1
         assert result["parts"][0]["filename"].endswith(".mp3")
-        assert result["transcript_message_id"] == "msg-transcript"
+        assert result["parts"][0]["git_path"].endswith(".b64")
+        assert result["transcript_git_path"].endswith("transcript-en.md")
+        assert result["delivery"] == "git"
+        assert result["git_branch"] == "vibe/podcast-voxtral-75b01f"
+        assert result["transcript_message_id"] is None
         assert "EN:" in result["transcript_en"]
         assert "Bonjour" in result["transcript_fr"]
         assert result["dry_run"] is False
@@ -310,7 +340,7 @@ async def test_workflow_dry_run_skips_email(temporal_env) -> None:
             mock_transcribe_episode,
             mock_assign_speaker_roles,
             mock_translate_transcript,
-            mock_synthesize_and_email_chunk,
+            mock_synthesize_and_deliver_chunk,
         ],
     ):
         handle = await temporal_env.client.start_workflow(
@@ -323,4 +353,6 @@ async def test_workflow_dry_run_skips_email(temporal_env) -> None:
         result = await asyncio.wait_for(handle.result(), timeout=45)
         assert result["dry_run"] is True
         assert result["transcript_message_id"] is None
+        assert result["transcript_git_path"] is None
         assert result["part_count"] == 1
+        assert result["parts"][0]["git_path"] is None
