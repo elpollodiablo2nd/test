@@ -419,6 +419,7 @@ async def resolve_episode_audio(episode_page_url: str) -> PodcastEpisode:
         feed_ids = extract_feed_ids(html)
         title = page_title(html)
         duration: int | None = None
+        audio_url: str | None = None
         for feed_id in feed_ids:
             try:
                 feed = await client.get(f"https://feed.ausha.co/{feed_id}")
@@ -428,18 +429,17 @@ async def resolve_episode_audio(episode_page_url: str) -> PodcastEpisode:
             items = parse_feed_items(feed.text)
             match = find_episode_in_feed(items, episode_slug)
             if match is not None:
-                if not candidates:
-                    candidates = [match.enclosure_url]
-                if duration is None:
-                    duration = match.duration_seconds
+                audio_url = match.enclosure_url
+                duration = match.duration_seconds
                 if match.title:
                     title = match.title
                 break
-    if not candidates:
-        raise workflows.WorkflowError(
-            "podcast_audio_url_not_found", non_retryable=True
-        )
-    audio_url = candidates[0]
+    if audio_url is None:
+        if not candidates:
+            raise workflows.WorkflowError(
+                "podcast_audio_url_not_found", non_retryable=True
+            )
+        audio_url = candidates[0]
     if len(audio_url) > 2083:
         raise workflows.WorkflowError(
             "podcast_audio_url_too_long", non_retryable=True
@@ -454,6 +454,39 @@ async def resolve_episode_audio(episode_page_url: str) -> PodcastEpisode:
     )
 
 
+async def download_episode_audio(audio_url: str) -> bytes:
+    import httpx
+
+    header_variants = [
+        {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Referer": "https://podcast.ausha.co/",
+            "Accept": "audio/mpeg,audio/*;q=0.9,*/*;q=0.8",
+        },
+        {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+        },
+        {"User-Agent": "curl/8.5.0", "Accept": "*/*"},
+    ]
+    last_error = ""
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=httpx.Timeout(60.0, read=900.0)
+    ) as http:
+        for headers in header_variants:
+            try:
+                response = await http.get(audio_url, headers=headers)
+            except httpx.RequestError as exc:
+                last_error = f"{type(exc).__name__}: {exc}"
+                continue
+            if response.status_code == 200 and len(response.content) > 100_000:
+                return response.content
+            last_error = f"HTTP {response.status_code} ({len(response.content)} bytes)"
+    raise workflows.WorkflowError(
+        f"podcast_audio_download_failed: {last_error}", non_retryable=True
+    )
+
+
 @workflows.activity(
     name="podcast-transcribe-episode",
     start_to_close_timeout=timedelta(seconds=1800),
@@ -461,10 +494,12 @@ async def resolve_episode_audio(episode_page_url: str) -> PodcastEpisode:
 )
 async def transcribe_episode(episode: PodcastEpisode) -> list[Segment]:
     client = get_mistral_client()
+    audio_bytes = await download_episode_audio(episode.audio_url)
+    file_name = f"{slugify(episode.title)[:48] or 'episode'}.mp3"
     response = await asyncio.to_thread(
         client.audio.transcriptions.complete,
         model=TRANSCRIBE_MODEL,
-        file_url=episode.audio_url,
+        file={"file_name": file_name, "content": audio_bytes},
         language="fr",
         diarize=True,
         timestamp_granularities=["segment"],

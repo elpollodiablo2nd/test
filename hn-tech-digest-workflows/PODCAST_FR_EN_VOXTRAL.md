@@ -5,8 +5,9 @@ One-shot workflow `podcast-fr-en-voxtral` (served by the `hn-tech-digest` deploy
 Given an Ausha episode page URL (default: the *In Security We Trust* episode with Thomas Baignères, Olvid), it:
 
 1. Resolves the episode MP3 URL from the page HTML / the Ausha RSS feed (`podcast-resolve-episode-audio`).
-2. Transcribes the audio with Voxtral ASR (`voxtral-small-transcribe-3`, `language=fr`, `diarize=true`,
-   segment timestamps, context bias for names/terms) via `file_url` (`podcast-transcribe-episode`).
+2. Downloads the MP3 in the worker (the Ausha CDN 403s Mistral's `file_url` fetcher) and transcribes it
+   with Voxtral ASR (`voxtral-small-transcribe-3`, `language=fr`, `diarize=true`, segment timestamps,
+   context bias for names/terms) via multipart upload (`podcast-transcribe-episode`).
 3. Maps diarized `speaker_N` labels to host/guest roles with a chat model (`podcast-assign-speaker-roles`).
 4. Translates the transcript French → English in batches, spoken-style for TTS (`podcast-translate-transcript`).
 5. Re-voices the interview with `voxtral-mini-tts-3-0`, one preset `voice_id` per speaker
