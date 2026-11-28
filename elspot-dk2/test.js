@@ -303,6 +303,26 @@ check("medianError null when few", Core.medianError(biased.slice(0, 5)) === null
     check("seedOrigins too-short history -> none", Core.seedOrigins(800, 768, 72, 10, 1).length === 0);
     check("seedOrigins respects maxOrigins", Core.seedOrigins(7190, 768, 72, 3, 2).length === 3);
 }
+// pastForecastSeries / fcMaePct: accuracy trace + MAE stat from stored preds vs actuals
+{
+    const H = 3600e3, t0 = Date.UTC(2026, 10, 20, 0);
+    const act = {}; for (let i = 0; i < 100; i++) act[t0 + i * H] = 400 + (i % 24) * 10;
+    const preds = [
+        { h: 0, t: t0 + 10 * H, med: 500, q10: 450, q90: 550, medD: 510 },   // act 500 -> err 10
+        { h: 1, t: t0 + 11 * H, med: 500, q10: 450, q90: 550 },               // no medD -> raw used; act 510 -> err 10
+        { h: 2, t: t0 + 12 * H, med: 999, q10: 900, q90: 1000 },              // act 520 -> err 479 (medD missing)
+        { h: 30, t: t0 + 50 * H, med: 1, q10: 0, q90: 2 },                    // h>=24 -> excluded from fcMaePct(24)
+        { h: 0, t: t0 + 100 * H, med: 1, q10: 0, q90: 2, medD: 1 },           // no actual (beyond map) -> dropped
+    ];
+    const pf = Core.pastForecastSeries(preds, act, t0, t0 + 99 * H);
+    check("pastForecastSeries filters to actuals+window, sorted, medD preferred",
+        pf.length === 4 && pf[0].v === 510 && pf[1].v === 500 && pf.every((e, i) => i === 0 || e.t > pf[i - 1].t));
+    check("pastForecastSeries window cut", Core.pastForecastSeries(preds, act, t0 + 20 * H, t0 + 99 * H).length === 1);
+    const m = Core.fcMaePct(preds, act, 24);
+    // h<24 rows: errs |510-500|=10, |500-510|=10, |999-520|=479 ; acts 500,510,520
+    check("fcMaePct h<24", m && m.n === 3 && Math.abs(m.maePct - (10 + 10 + 479) / 3 / ((500 + 510 + 520) / 3) * 100) < 1e-9);
+    check("fcMaePct null when empty", Core.fcMaePct([], act, 24) === null);
+}
 check("horizonBucket", Core.horizonBucket(0) === 24 && Core.horizonBucket(23) === 24 && Core.horizonBucket(24) === 48 && Core.horizonBucket(71) === 72
     && Core.horizonBucket(72) === 96 && Core.horizonBucket(95) === 96 && Core.horizonBucket(96) === 120 && Core.horizonBucket(143) === 144
     && Core.horizonBucket(144) === 168 && Core.horizonBucket(500) === 168);

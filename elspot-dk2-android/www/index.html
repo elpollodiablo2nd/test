@@ -198,6 +198,7 @@
         #chart .line-actual { stroke: #8CFF6B; stroke-width: 4; fill: none; }
         #chart .line-lag1 { stroke: var(--cream); stroke-width: 3; fill: none; stroke-dasharray: 10 8; opacity: 0.9; }
         #chart .line-fc { stroke: var(--m-orange); stroke-width: 5; fill: none; stroke-dasharray: 14 8; }
+        #chart .line-pastfc { stroke: #C792EA; stroke-width: 3; fill: none; stroke-dasharray: 3 5; opacity: 0.95; }
         #chart .band { fill: rgba(225, 5, 0, 0.30); stroke: none; }
 
         .legend { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.5rem; font-size: 1.05rem; color: var(--cream); }
@@ -209,6 +210,7 @@
         .legend .l-fc::before { background: var(--m-orange); }
         .legend .l-band::before { background: rgba(225, 5, 0, 0.45); }
         .legend .l-ev::before { background: rgba(140, 255, 107, 0.35); border-color: #8CFF6B; }
+        .legend .l-pastfc::before { background: #C792EA; }
         #chart .ev-window { fill: rgba(140, 255, 107, 0.16); stroke: #8CFF6B; stroke-width: 2; stroke-dasharray: 6 4; }
         .hour-cell.ev { box-shadow: 0 0 0 3px #2E7D1E, 3px 3px 0 rgba(0,0,0,0.25); }
         .chk { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
@@ -270,6 +272,7 @@
                     <span class="l-actual">published ahead (day-ahead)</span>
                     <span class="l-lag1">baseline</span>
                     <span class="l-fc">timestral median</span>
+                    <span class="l-pastfc">timestral past median (vs actual)</span>
                     <span class="l-band">q10–q90</span>
                     <span class="l-ev">EV charge window</span>
                 </div>
@@ -496,6 +499,33 @@
             var out = [], o = historyLen - horizon, step = stepDays * HOURS_PER_DAY;
             while (out.length < maxOrigins && o >= ctxLen) { out.push(o); o -= step; }
             return out;
+        }
+
+        // past forecast medians whose hour already has an actual price (accuracy trace + MAE stat);
+        // uses medD (the calibrated median actually displayed) when present, else raw med
+        function pastForecastSeries(preds, actMap, fromMs, toMs) {
+            var out = [];
+            (preds || []).forEach(function (p) {
+                var a = actMap[p.t];
+                if (a == null || !isFinite(a)) return;
+                if (p.t < fromMs || p.t > toMs) return;
+                out.push({ t: p.t, v: p.medD != null ? p.medD : p.med, lo: p.q10, hi: p.q90 });
+            });
+            out.sort(function (a, b) { return a.t - b.t; });
+            return out;
+        }
+        // forecast accuracy: MAE% of displayed medians vs actuals, for preds with h < maxH (null if none)
+        function fcMaePct(preds, actMap, maxH) {
+            var sum = 0, asum = 0, n = 0;
+            (preds || []).forEach(function (p) {
+                var a = actMap[p.t];
+                if (a == null || !isFinite(a) || a === 0) return;
+                if (maxH != null && p.h >= maxH) return;
+                var m = p.medD != null ? p.medD : p.med;
+                sum += Math.abs(m - a); asum += a; n++;
+            });
+            if (!n) return null;
+            return { maePct: sum / n / (asum / n) * 100, n: n };
         }
 
         function horizonBucket(h) {
@@ -978,6 +1008,8 @@
             applyCalibration: applyCalibration,
             horizonBucket: horizonBucket,
             seedOrigins: seedOrigins,
+            pastForecastSeries: pastForecastSeries,
+            fcMaePct: fcMaePct,
             K_BUCKETS: K_BUCKETS,
             clampView: clampView,
             zoomView: zoomView,
@@ -1116,6 +1148,10 @@
                 var bw = bestWindowEntries(series, evH);
                 if (bw) items.push(["EV " + evH + "H FROM " + bw.start.slice(11, 16), fmtKwh(bw.avg) + " KR/KWH", "#8CFF6B"]);
             }
+            var histMapS = {};
+            state.history.forEach(function (p) { histMapS[p.utc.getTime()] = p.price; });
+            var acc = fcMaePct(loadPreds(), histMapS, 24);
+            if (acc) items.push(["FC MAE 24H", acc.maePct.toFixed(1) + "% · n=" + acc.n, "#C792EA"]);
             document.getElementById("stats").innerHTML = items.map(function (it) {
                 return '<div class="stat-item"><div class="stat-value" style="color:' + it[2] + '">' + it[1] +
                     '</div><div class="stat-label">' + it[0] + "</div></div>";
@@ -1143,6 +1179,9 @@
             var pads = chartPads(axisPx);
             var padL = pads.padL, padB = pads.padB;
             var series = combinedSeries(history, fc, nowMs, tariffs, state.showFees);
+            var histMapC = {};
+            history.forEach(function (p) { histMapC[p.utc.getTime()] = p.price; });
+            var pastFc = pastForecastSeries(loadPreds(), histMapC, x0f - 30 * HOUR_MS, x1f);
             var inView = function (t) { return t >= x0 - HOUR_MS && t <= x1 + HOUR_MS; };
             var vis = series.filter(function (e) { return inView(e.t); });
             var allVals = (vis.length ? vis : series).map(function (e) { return e.v; });
@@ -1160,6 +1199,7 @@
                                  dispDkkMwh(f.q90, t, tariffs, state.showFees));
                 });
             }
+            pastFc.forEach(function (p) { if (inView(p.t)) allVals.push(dispDkkMwh(p.v, p.t, tariffs, state.showFees)); });
             if (!allVals.length) allVals = series.map(function (e) { return e.v; });
             if (!allVals.length) { svg.innerHTML = ""; return; }
             var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
@@ -1214,6 +1254,11 @@
                     fPts.slice().reverse().map(function (p) { return X(p.t) + "," + Y(p.lo); }).join(" ");
                 s += '<polygon class="band" points="' + band + '"/>';
                 s += '<polyline class="line-fc" points="' + fPts.map(function (p) { return X(p.t) + "," + Y(p.m); }).join(" ") + '"/>';
+            }
+            if (pastFc.length) {
+                s += '<polyline class="line-pastfc" points="' + pastFc.map(function (p) {
+                    return X(p.t) + "," + Y(dispDkkMwh(p.v, p.t, tariffs, state.showFees));
+                }).join(" ") + '"/>';
             }
             s += '<line id="tipLine" y1="' + padT + '" y2="' + (H - padB) + '" stroke="rgba(255,250,235,0.75)" stroke-width="2" stroke-dasharray="4 4" style="display:none"/>' +
                  '<circle id="tipDot" r="6" fill="#FFFAEB" stroke="#000000" stroke-width="2" style="display:none"/>';
@@ -1593,7 +1638,8 @@
                             var t = new Date(last.getTime() + (j + 1) * HOUR_MS);
                             if (histMap[t.getTime()] == null) continue; // only keep hours with actuals
                             preds.push({ h: j, t: t.getTime(), med: q[j * ONNX_Q + ONNX_MED_I],
-                                         q10: q[j * ONNX_Q + ONNX_Q10_I], q90: q[j * ONNX_Q + ONNX_Q90_I] });
+                                         q10: q[j * ONNX_Q + ONNX_Q10_I], q90: q[j * ONNX_Q + ONNX_Q90_I],
+                                         medD: q[j * ONNX_Q + ONNX_MED_I] });
                         }
                         feedback("Seeding calibration from history… " + (idx + 1) + "/" + origins.length, "correct");
                     });
@@ -1646,7 +1692,8 @@
                         lag1: lag1[i]
                     });
                     preds.push({ h: i, t: t.getTime(), med: q[i * ONNX_Q + ONNX_MED_I],
-                                 q10: q[i * ONNX_Q + ONNX_Q10_I], q90: q[i * ONNX_Q + ONNX_Q90_I] }); // RAW values -> calibration
+                                 q10: q[i * ONNX_Q + ONNX_Q10_I], q90: q[i * ONNX_Q + ONNX_Q90_I],
+                                 medD: med }); // RAW med/q10/q90 -> calibration; medD = displayed (calibrated) median
                 }
                 savePreds(preds);
                 state.forecast = forecast;
