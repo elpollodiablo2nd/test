@@ -281,6 +281,17 @@ const wide = pairs.map(p => ({ ...p, act: p.med + 40 })); // all 40 above median
 check("conformalK = 2 when all overshoot 2x", Math.abs(Core.conformalK(wide, 0.85) - 2) < 1e-9);
 check("scaleBand widens by k", JSON.stringify(Core.scaleBand(100, 80, 120, 2)) === JSON.stringify([60, 140]));
 check("scaleBand no k -> unchanged", JSON.stringify(Core.scaleBand(100, 80, 120, NaN)) === JSON.stringify([80, 120]));
+
+// applyCalibration: level bias translates the whole curve; median always inside [q10, q90]
+const ac = Core.applyCalibration(100, 80, 120, 1, 50); // big +50 bias
+check("applyCalibration translates curve", ac.med === 150 && ac.q10 === 130 && ac.q90 === 170);
+check("applyCalibration median inside band (big bias)", ac.q10 <= ac.med && ac.med <= ac.q90);
+const ac2 = Core.applyCalibration(100, 80, 120, 2, -300); // big negative bias
+check("applyCalibration negative bias, median inside", ac2.med === -200 && ac2.q10 <= ac2.med && ac2.med <= ac2.q90 && ac2.q10 === -240 && ac2.q90 === -160);
+const ac3 = Core.applyCalibration(100, 80, 120, 1, 0);
+check("applyCalibration zero bias unchanged", ac3.med === 100 && ac3.q10 === 80 && ac3.q90 === 120);
+const ac4 = Core.applyCalibration(100, 130, 140, 1, 0); // non-monotone raw (q10 > med) -> clamped
+check("applyCalibration clamps non-monotone raw", ac4.q10 === 100 && ac4.q90 === 140);
 const biased = Array.from({length: 20}, (_, i) => ({ med: 100 + i, act: 90 + i })); // med-act = +10 always
 check("medianError = +10 constant bias", Core.medianError(biased) === 10);
 check("medianError null when few", Core.medianError(biased.slice(0, 5)) === null);
