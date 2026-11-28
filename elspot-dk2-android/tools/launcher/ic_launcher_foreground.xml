@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- elspot launcher foreground: pixel lightning bolt (from elspot-dk2/icon.svg) on the
+     108dp adaptive-icon canvas. Vertically centered; shifted +4dp right of the bbox
+     center so the bolt reads as centered to the eye. Gradient = Mistral rainbow. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M58 27.75 h7.5 v7.5 h-7.5 z M65.5 27.75 h7.5 v7.5 h-7.5 z M50.5 35.25 h7.5 v7.5 h-7.5 z M58 35.25 h7.5 v7.5 h-7.5 z M43 42.75 h7.5 v7.5 h-7.5 z M50.5 42.75 h7.5 v7.5 h-7.5 z M58 42.75 h7.5 v7.5 h-7.5 z M65.5 42.75 h7.5 v7.5 h-7.5 z M73 42.75 h7.5 v7.5 h-7.5 z M58 50.25 h7.5 v7.5 h-7.5 z M65.5 50.25 h7.5 v7.5 h-7.5 z M50.5 57.75 h7.5 v7.5 h-7.5 z M58 57.75 h7.5 v7.5 h-7.5 z M43 65.25 h7.5 v7.5 h-7.5 z M50.5 65.25 h7.5 v7.5 h-7.5 z M35.5 72.75 h7.5 v7.5 h-7.5 z M43 72.75 h7.5 v7.5 h-7.5 z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="27.75" android:endX="54" android:endY="80.25">
+                <item android:offset="0" android:color="#FFD800"/>
+                <item android:offset="0.3" android:color="#FFAF00"/>
+                <item android:offset="0.55" android:color="#FF8205"/>
+                <item android:offset="0.78" android:color="#FA500F"/>
+                <item android:offset="1" android:color="#E10500"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

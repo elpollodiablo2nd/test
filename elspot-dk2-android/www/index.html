@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>elspot — Timestral price forecast (DK1/DK2)</title>
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --m-yellow: #FFD800;
+            --m-amber: #FFAF00;
+            --m-orange: #FF8205;
+            --m-orange-dark: #FA500F;
+            --m-red: #E10500;
+            --ink: #000000;
+            --cream: #FFFAEB;
+            --night: #0B0714;
+            --screen: #150C24;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; image-rendering: pixelated; }
+
+        body {
+            font-family: 'VT323', 'Courier New', monospace;
+            font-size: 1.2rem;
+            background-color: var(--night);
+            background-image:
+                radial-gradient(ellipse at 50% -10%, rgba(255, 130, 5, 0.20), transparent 60%),
+                linear-gradient(rgba(255, 216, 0, 0.05) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(255, 216, 0, 0.05) 2px, transparent 2px);
+            background-size: auto, 32px 32px, 32px 32px;
+            color: var(--cream);
+            min-height: 100vh;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+            background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 4px);
+        }
+
+        .container { max-width: 1080px; width: 100%; margin: 0 auto; padding: 1.5rem 1rem 2.5rem; position: relative; }
+
+        header { display: flex; flex-direction: column; align-items: center; gap: 0.9rem; margin-bottom: 1.5rem; text-align: center; position: relative; }
+
+        h1, .pixel-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 1.5rem;
+            color: var(--m-yellow);
+            background: linear-gradient(180deg, var(--m-yellow) 0%, var(--m-amber) 30%, var(--m-orange) 55%, var(--m-orange-dark) 78%, var(--m-red) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            filter: drop-shadow(4px 4px 0 #000);
+        }
+        @supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+            h1, .pixel-title { background: none; color: var(--m-yellow); -webkit-text-fill-color: var(--m-yellow); }
+        }
+
+        .about-btn { position: absolute; top: 0.2rem; right: 0.2rem; font-family: 'Press Start 2P', monospace; font-size: 0.6rem; padding: 0.45rem 0.8rem; }
+        #aboutPanel p { font-size: 1.15rem; line-height: 1.5; margin: 0.7rem 0; }
+        .logo-m { width: 96px; height: 96px; shape-rendering: crispEdges; filter: drop-shadow(5px 5px 0 rgba(0,0,0,0.8)); animation: bob 1.6s steps(2, jump-none) infinite; }
+        @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .badge {
+            display: inline-block;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            padding: 0.55rem 0.8rem;
+            background: var(--m-yellow);
+            color: var(--ink);
+            border: 3px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+        }
+
+        .card {
+            background: var(--cream);
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: 8px 8px 0 var(--m-red), 8px 8px 0 4px var(--ink);
+            padding: 1.75rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .card h2 {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.8rem;
+            margin-bottom: 1rem;
+            color: var(--ink);
+            text-shadow: 3px 3px 0 rgba(225, 5, 0, 0.35);
+        }
+
+        .card p { font-size: 1.25rem; line-height: 1.35; margin-bottom: 0.9rem; }
+
+        button {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            padding: 1rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 0 6px 0 var(--ink);
+            cursor: pointer;
+            transition: transform 0.05s steps(1), box-shadow 0.05s steps(1), filter 0.1s;
+        }
+        button:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 8px 0 var(--ink); }
+        button:active { transform: translateY(6px); box-shadow: 0 0 0 var(--ink); }
+        button:disabled { filter: grayscale(0.7); cursor: wait; }
+        .btn-primary { background: var(--m-orange); color: var(--ink); }
+        .btn-alt { background: var(--cream); color: var(--ink); }
+
+        .controls { display: flex; flex-wrap: wrap; gap: 0.9rem; align-items: center; }
+
+        input.pixel, select.pixel {
+            font-family: 'VT323', monospace;
+            font-size: 1.5rem;
+            padding: 0.5rem 1rem;
+            background: #ffffff;
+            color: var(--ink);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12);
+            outline: none;
+        }
+        input.pixel:focus, select.pixel:focus { box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.12), 4px 4px 0 var(--m-orange); }
+        input.pixel::placeholder { color: #444444; opacity: 1; }
+
+        .feedback {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.9rem 1.25rem;
+            border: 4px solid var(--ink);
+            box-shadow: 4px 4px 0 var(--ink);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.65rem;
+            line-height: 1.7;
+        }
+        .feedback.visible { display: block; }
+        .feedback.correct { background: var(--m-yellow); color: var(--ink); }
+        .feedback.wrong { background: var(--m-red); color: var(--cream); animation: shake 0.25s steps(2); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-6px); } }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            background: var(--screen);
+            border: 4px solid var(--ink);
+            box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.8);
+            padding: 1rem;
+            margin-bottom: 1.75rem;
+        }
+        .stat-item { text-align: center; padding: 0.6rem 0.25rem; background: rgba(0, 0, 0, 0.35); border: 3px solid rgba(255, 250, 235, 0.25); }
+        .stat-value { font-family: 'Press Start 2P', monospace; font-size: 0.95rem; color: var(--m-yellow); text-shadow: 3px 3px 0 #000; }
+        .stat-label { font-size: 1.05rem; opacity: 0.95; }
+
+        .screen {
+            position: relative;
+            color: var(--cream);
+            background:
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 5px),
+                radial-gradient(ellipse at center, #1E1133 0%, var(--screen) 70%);
+            border: 4px solid var(--ink);
+            box-shadow: inset 4px 4px 0 rgba(0, 0, 0, 0.7), inset -4px -4px 0 rgba(255, 255, 255, 0.07);
+            padding: 0.7rem;
+        }
+
+        #chart { width: 100%; height: auto; shape-rendering: crispEdges; display: block; touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .screen { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .chart-head h2 { margin: 0; }
+        .zoom-ctl { display: inline-flex; gap: 0.25rem; flex: none; }
+        .zoom-btn { min-width: 2.6rem; padding: 0.1rem 0.4rem; font-size: 1.05rem; line-height: 1.4; }
+        #chartTip {
+            position: absolute; top: 8px; transform: translateX(-50%);
+            background: #0B0714; border: 3px solid var(--ink); box-shadow: 3px 3px 0 #000;
+            padding: 0.35rem 0.6rem; font-family: 'VT323', monospace; font-size: 1.15rem;
+            color: var(--cream); white-space: nowrap; pointer-events: none; z-index: 5; line-height: 1.25;
+        }
+        #chart .grid { stroke: rgba(255, 250, 235, 0.25); stroke-width: 2; }
+        #chart .now { stroke: var(--cream); stroke-width: 3; stroke-dasharray: 8 6; }
+        #chart .axis {
+            font-family: 'VT323', monospace;
+            font-size: var(--axis-px, 34px);
+            fill: var(--cream);
+            opacity: 1;
+            paint-order: stroke;
+            stroke: #000000;
+            stroke-width: 3px;
+        }
+        #chart .line-hist { stroke: var(--m-yellow); stroke-width: 3; fill: none; }
+        #chart .line-today { stroke: var(--m-amber); stroke-width: 5; fill: none; }
+        #chart .line-actual { stroke: #8CFF6B; stroke-width: 4; fill: none; }
+        #chart .line-lag1 { stroke: var(--cream); stroke-width: 3; fill: none; stroke-dasharray: 10 8; opacity: 0.9; }
+        #chart .line-fc { stroke: var(--m-orange); stroke-width: 5; fill: none; stroke-dasharray: 14 8; }
+        #chart .line-pastfc { stroke: #C792EA; stroke-width: 3; fill: none; stroke-dasharray: 3 5; opacity: 0.95; }
+        #chart .band { fill: rgba(225, 5, 0, 0.30); stroke: none; }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top: 0.5rem; font-size: 1.05rem; color: var(--cream); }
+        .legend span::before { content: ""; display: inline-block; width: 18px; height: 6px; margin-right: 6px; vertical-align: middle; border: 2px solid var(--ink); }
+        .legend .l-hist::before { background: var(--m-yellow); }
+        .legend .l-today::before { background: var(--m-amber); }
+        .legend .l-actual::before { background: #8CFF6B; }
+        .legend .l-lag1::before { background: var(--cream); }
+        .legend .l-fc::before { background: var(--m-orange); }
+        .legend .l-band::before { background: rgba(225, 5, 0, 0.45); }
+        .legend .l-ev::before { background: rgba(140, 255, 107, 0.35); border-color: #8CFF6B; }
+        .legend .l-pastfc::before { background: #C792EA; }
+        #chart .ev-window { fill: rgba(140, 255, 107, 0.16); stroke: #8CFF6B; stroke-width: 2; stroke-dasharray: 6 4; }
+        .hour-cell.ev { box-shadow: 0 0 0 3px #2E7D1E, 3px 3px 0 rgba(0,0,0,0.25); }
+        .chk { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+        .chk input { width: 1.4rem; height: 1.4rem; accent-color: var(--m-orange); }
+
+        .hours-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+        .hour-cell { border: 3px solid var(--ink); padding: 0.45rem 0.6rem; background: #fff; display: flex; flex-direction: column; box-shadow: 3px 3px 0 rgba(0,0,0,0.25); }
+        .hour-cell.cheapest { background: var(--m-yellow); box-shadow: 3px 3px 0 var(--ink); }
+        .hour-cell .h { font-family: 'Press Start 2P', monospace; font-size: 0.55rem; }
+        .hour-cell .v { font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: var(--m-orange-dark); margin: 0.3rem 0; }
+        .hour-cell .r { font-size: 1.05rem; opacity: 0.8; }
+        .dim { font-size: 1.25rem; opacity: 0.75; }
+        details.about { margin: 0.4rem 0 0.9rem; }
+        details.about summary { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; cursor: pointer; color: var(--m-orange); list-style: none; }
+        details.about summary::before { content: "\25B6 "; }
+        details.about[open] summary::before { content: "\25BC "; }
+        details.about p { font-size: 1.15rem; line-height: 1.5; margin: 0.7rem 0; }
+
+        footer { text-align: center; font-size: 1.15rem; opacity: 0.9; margin-top: 0.5rem; line-height: 1.5; }
+        footer .chonck { width: 2.6rem; height: auto; vertical-align: -0.55rem; margin: 0 0.2rem; }
+        footer a { color: var(--m-orange); }
+
+        @media (max-width: 640px) {
+            .card { padding: 1.25rem; }
+            .logo-m { width: 72px; height: 72px; }
+            h1 { font-size: 1.05rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img class="logo-m" src="icon.svg" alt="elspot lightning bolt">
+            <h1>ELSPOT</h1>
+            <span class="badge">Timestral 1.0 · Denmark</span>
+            <button id="aboutBtn" class="btn-alt about-btn" title="About / how it works / sources">? ABOUT</button>
+        </header>
+
+        <section class="card" id="aboutPanel" hidden>
+            <h2>ABOUT · HOW IT WORKS · SOURCES</h2>
+            <p class="dim"><b>elspot</b> forecasts Danish day-ahead electricity prices — pick <b>DK2 · EAST</b> (default) or <b>DK1 · WEST</b> in the RUN card (remembered). Everything runs <b>on your device</b>: no API key, no server.</p>
+            <p><b>What Timestral is:</b> <a href="https://mistral.ai/news/timestral/">Timestral</a> is Mistral AI's open time-series <b>foundation model</b> — a small patch-transformer that reads the past of a series (here: up to 768 hourly prices) and predicts every future hour at once as <b>21 quantiles</b>, i.e. a full uncertainty curve, not just a point estimate. We use it <b>zero-shot</b> — never retrained — and only feed it context + covariates. In the Android app it runs fully offline as an ONNX graph on the phone CPU (~1–5 s): the <b>5M</b> checkpoint is bundled in the APK, the <b>28M</b> (default, more accurate) is downloaded once from this page and then kept in the app cache. A plain browser has no ONNX runtime, so RUN TIMESTRAL there just explains this.</p>
+            <p><b>Data:</b> prices load automatically — live from Energinet (retries + Retry-After); if the network blocks it, the <b>Pages snapshot</b> (CI-refreshed every 30 min, Nord Pool fallback), then the local cache (freshest wins), then the snapshot bundled in the APK. The banner always names the source; <b>LOAD PRICES</b> forces a live retry. With <b>INCL. FEES+VAT</b> ticked, prices include the mandatory fees — Energinet transmission + system tariff + elafgift, the DSO Nettarif C of your zone (N1 for DK2, TREFOR for DK1; seasonal changes automatic via ValidFrom/ValidTo) — plus 25% VAT: what you actually pay per kWh.</p>
+            <p><b>A run:</b> RUN TIMESTRAL feeds the price history plus <b>covariates</b> to the model: weather at your zone (Open-Meteo), <b>DE/SE3 day-ahead prices</b> — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — N-German weather, and hour-of-day/weekday encodings. DE/SE3 prices are published only to ~+36h; beyond that the app fills them with a small on-device <b>ridge forecast</b> (N-German weather + calendar, trained on published hours at run time), which cut day 3–7 error from 32–45% to <b>24–28%</b>. Output: the orange dashed <b>median</b> with a red <b>q10–q90 band</b>, recalibrated on-device from past forecast errors (conformal band width; day-1 level-bias correction) — on the first RUN the app re-runs the last ~10 days on-device to seed this immediately, then it updates itself daily. Horizons: <b>24–168h (7 days)</b>. The chart shows the last 24 h of actual prices leading into the NOW line (with the purple past-median trace of earlier forecasts drawn on top), then published day-ahead + forecast; the cream dashed <b>baseline</b> is the naive reference "tomorrow repeats today's hourly pattern", shown so you can see what the AI adds. Zoom the chart with the <b>+ / − / 1×</b> buttons next to the zone picker, by pinching, or by dragging sideways — labels grow and re-step (down to 1h) as you zoom; tap a point for exact values. The green shaded <b>EV window</b> is the cheapest contiguous 4/6/8h charge run from now; the grid below lists every hour in kr/kWh with its q10–q90 range.</p>
+            <p><b>Accuracy</b> (DK2 backtests, MAE as % of mean price): full-year 28M: h24 <b>4.0%</b>, h48 8.7%, h72 12.3%; 7-month 7-day run with the ridge fill: day1 6.3% → day2 16.0% → day3 27.7% → day7 26.9% (naive baseline 28–51%). For reference, published competitors land at ~19–25% (elforbrug.nu) and 15–22% (elpriser.dk; their day-1 is scored pre-auction) from day 1. The largest remaining errors are wind-gust hours beyond +36h. Negative prices (92% of them occur in hours with wind >15 m/s) are forecastable — the ONNX export is not clamped at 0.</p>
+            <p class="dim">Sources: prices &amp; fees — <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service (Energinet)</a>, DayAheadPrices (day-ahead, published daily ~13:00 CET) + DatahubPricelist (Energinet GLN 5790000432752; N1 5790001089030 DK2; TREFOR 5790000392261 DK1); weather — <a href="https://open-meteo.com/">Open-Meteo</a>; model — <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX-exported and bundled in <b>elspot-dk2-android/</b>; snapshots refreshed every 30 min by a GitHub Actions workflow. Full docs: <a href="README.md">README.md</a>.</p>
+            <p id="weatherLine" class="dim" style="margin-top:0.6rem"></p>
+            <p id="feesLine" class="dim" style="margin-top:0.3rem"></p>
+        </section>
+
+        <div class="stats" id="stats"></div>
+
+        <section class="card">
+            <h2 id="chartTitle">PRICE CHART · KR/KWH</h2>
+            <div class="screen">
+                <svg id="chart" viewBox="0 0 760 460" role="img" aria-label="Hourly day-ahead prices and forecast"></svg>
+                <div id="chartTip" hidden></div>
+                <div class="legend">
+                    <span class="l-actual">published ahead (day-ahead)</span>
+                    <span class="l-lag1">baseline</span>
+                    <span class="l-fc">timestral median</span>
+                    <span class="l-pastfc">timestral past median (vs actual)</span>
+                    <span class="l-band">q10–q90</span>
+                    <span class="l-ev">EV charge window</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>RUN</h2>
+            <div class="controls">
+                <select id="zone" class="pixel" title="Price area: DK2 East (default) or DK1 West">
+                    <option value="DK2" selected>DK2 · EAST</option>
+                    <option value="DK1">DK1 · WEST</option>
+                </select>
+                <span class="zoom-ctl" title="Zoom the chart above: +/−, or pinch / drag sideways on the chart">
+                    <button id="zoomOut" class="btn-alt zoom-btn" title="Zoom chart out">−</button>
+                    <button id="zoomReset" class="btn-alt zoom-btn" title="Reset chart zoom (fit all)">1×</button>
+                    <button id="zoomIn" class="btn-alt zoom-btn" title="Zoom chart in">+</button>
+                </span>
+                <select id="modelSize" class="pixel" title="Timestral checkpoint">
+                    <option value="5M">5M (fast)</option>
+                    <option value="28M" selected>28M (accurate)</option>
+                </select>
+                <select id="horizon" class="pixel" title="Forecast horizon (up to 7 days)">
+                    <option value="24" selected>24h ahead</option>
+                    <option value="48">48h ahead</option>
+                    <option value="72">72h · 3d</option>
+                    <option value="96">96h · 4d</option>
+                    <option value="120">120h · 5d</option>
+                    <option value="144">144h · 6d</option>
+                    <option value="168">168h · 7d</option>
+                </select>
+                <select id="evHours" class="pixel" title="EV charging window length">
+                    <option value="4">EV 4h</option>
+                    <option value="6" selected>EV 6h</option>
+                    <option value="8">EV 8h</option>
+                </select>
+                <label class="chk" title="All-in price: spot + grid tariffs + electricity tax + 25% VAT"><input type="checkbox" id="feesToggle" checked> INCL. FEES+VAT</label>
+                <button id="loadBtn" class="btn-alt">LOAD PRICES</button>
+                <button id="runBtn" class="btn-primary">RUN TIMESTRAL</button>
+            </div>
+            <div id="feedback" class="feedback"></div>
+        </section>
+
+        <section class="card">
+            <h2 id="hoursTitle">FROM NOW — PUBLISHED + FORECAST · KR/KWH</h2>
+            <div id="hours" class="hours-grid"></div>
+        </section>
+
+        <footer>coded with <img class="chonck" src="chonck.svg" alt="Le chonck pixel sprite"> <b>Le chonck</b> from <a href="https://mistral.ai">Mistral AI</a></footer>
+    </div>
+
+    <script src="vendor/ort/ort.min.js"></script>
+    <script>
+        "use strict";
+
+        var ENERGINET_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices";
+        var OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+        var HOURS_PER_DAY = 24;
+        var HOUR_MS = 3600 * 1000;
+        var DATAHUB_URL = "https://api.energidataservice.dk/dataset/DatahubPricelist";
+        var ENERGINET_GLN = "5790000432752";
+        var FEE_NOTES = ["Elafgift", "Systemtarif", "Transmissions nettarif", "Nettarif C"];
+        var VAT_RATE = 0.25;
+        var ZONES = {
+            DK2: { area: "DK2", label: "EAST", dso: "N1 A/S", gln: "5790001089030", lat: 55.6761, lon: 12.5683, place: "Zealand", snapshot: "assets/prices-dk2.json" },
+            DK1: { area: "DK1", label: "WEST", dso: "TREFOR El-net", gln: "5790000392261", lat: 55.4669, lon: 8.4515, place: "Jutland", snapshot: "assets/prices-dk1.json" }
+        };
+        function zoneConfig(zone) { return ZONES[zone] || ZONES.DK2; }
+        var NATIONAL_FEE_DEFAULTS = {
+            "Elafgift": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.008 }],
+            "Systemtarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.072 }],
+            "Transmissions nettarif": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00", Price1: 0.043 }]
+        };
+        var DEFAULT_TARIFFS = {
+            DK2: Object.assign({}, NATIONAL_FEE_DEFAULTS, { "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
+                Price1: 0.0879, Price2: 0.0879, Price3: 0.0879, Price4: 0.0879, Price5: 0.0879, Price6: 0.0879,
+                Price7: 0.2636, Price8: 0.2636, Price9: 0.2636, Price10: 0.2636, Price11: 0.2636, Price12: 0.2636,
+                Price13: 0.2636, Price14: 0.2636, Price15: 0.2636, Price16: 0.2636, Price17: 0.2636,
+                Price18: 0.7907, Price19: 0.7907, Price20: 0.7907, Price21: 0.7907,
+                Price22: 0.2636, Price23: 0.2636, Price24: 0.2636 }] }),
+            DK1: Object.assign({}, NATIONAL_FEE_DEFAULTS, { "Nettarif C": [{ ValidFrom: "2020-01-01T00:00:00", ValidTo: "2030-01-01T00:00:00",
+                Price1: 0.0429, Price2: 0.0429, Price3: 0.0429, Price4: 0.0429, Price5: 0.0429, Price6: 0.0429,
+                Price7: 0.1288, Price8: 0.1288, Price9: 0.1288, Price10: 0.1288, Price11: 0.1288, Price12: 0.1288,
+                Price13: 0.1288, Price14: 0.1288, Price15: 0.1288, Price16: 0.1288, Price17: 0.1288,
+                Price18: 0.3863, Price19: 0.3863, Price20: 0.3863, Price21: 0.3863,
+                Price22: 0.1288, Price23: 0.1288, Price24: 0.1288 }] })
+        };
+        var ONNX_T = 768, ONNX_H = 168, ONNX_Q = 21, ONNX_C = 13; // fixed export shapes (768 ctx + 168 h = up to 7 days); 13 covariate rows
+        var K_BUCKETS = [24, 48, 72, 96, 120, 144, 168]; // horizon buckets for band calibration + level bias
+        var CHART_MIN_SPAN_MS = 6 * 3600e3; // chart zoom floor: 6h window (1h axis ticks)
+        var DE_WX_POINTS = [[54.79789, 9.445545], [54.024605, 10.465116], [53.60281, 10.0]]; // N-Germany (Flensburg, Fehmarn area, Hamburg) for the neighbour-price ridge
+        var DE_WX_VARS = ["wind_speed_100m", "wind_speed_10m", "shortwave_radiation", "temperature_2m", "cloud_cover", "surface_pressure"];
+        var ONNX_MED_I = 10, ONNX_Q10_I = 2, ONNX_Q90_I = 18; // quantile levels 0.01..0.99
+        var ONNX_MODEL_URLS = { "5M": "assets/timestral-5m.onnx" }; // bundled in the APK
+        var PAGES_BASE = "https://elpollodiablo2nd.github.io/test/";
+        var ONNX_MODEL_PARTS = { "28M": [0, 1, 2, 3].map(function (i) { return PAGES_BASE + "elspot-dk2-android/models/timestral-28m.part" + i; }) };
+
+        // ---------- pure core (unit-tested by test.js) ----------
+
+        function parseHourUtc(value) {
+            return new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : value + "Z");
+        }
+
+        function aggregateHourlyUtc(records) {
+            var buckets = {};
+            for (var i = 0; i < records.length; i++) {
+                var rec = records[i];
+                if (!rec.TimeUTC || rec.DayAheadPriceDKK == null) continue;
+                var d = parseHourUtc(String(rec.TimeUTC));
+                var hour = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours());
+                if (!buckets[hour]) buckets[hour] = { sum: 0, n: 0 };
+                buckets[hour].sum += Number(rec.DayAheadPriceDKK);
+                buckets[hour].n += 1;
+            }
+            return Object.keys(buckets).map(function (k) {
+                var b = buckets[k];
+                return { utc: new Date(Number(k)), price: b.sum / b.n };
+            }).sort(function (a, b) { return a.utc - b.utc; });
+        }
+
+        function dkLabel(date) {
+            var f = new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit",
+                day: "2-digit", hour: "2-digit", hourCycle: "h23"
+            });
+            var parts = {};
+            f.formatToParts(date).forEach(function (p) { parts[p.type] = p.value; });
+            return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":00";
+        }
+
+        function dkWeekday(date) {
+            return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", weekday: "short" }).format(date);
+        }
+
+        function fresherPoints(a, b) { // pick the series whose last point is later
+            if (!a || !a.length) return b;
+            if (!b || !b.length) return a;
+            return a[a.length - 1].utc >= b[b.length - 1].utc ? a : b;
+        }
+
+        function modelCacheKey(modelSize) {
+            return ONNX_MODEL_URLS[modelSize] ? null : "https://elspot.app/cache/models/" + modelSize + ".h168.onnx"; // h168 = 7-day no-clamp export
+        }
+
+        function nearestSeriesEntry(series, tMs) {
+            var best = null, bd = Infinity;
+            for (var i = 0; i < series.length; i++) {
+                var d = Math.abs(series[i].t - tMs);
+                if (d < bd) { bd = d; best = series[i]; }
+            }
+            return best;
+        }
+
+        // tooltip lines for a traced chart point: [[text, color], ...]
+        function tipLines(e, lag1Val) {
+            var out = [[dkShort(e.dk), "var(--cream)"]];
+            if (e.kind === "fc") {
+                out.push([fmtKwh(e.v) + " kr/kWh · median", "var(--m-orange)"]);
+                if (e.lo != null && e.hi != null) out.push(["q10–q90 " + fmtKwh(e.lo) + "–" + fmtKwh(e.hi) + " kr/kWh", "#E10500"]);
+            } else {
+                out.push([fmtKwh(e.v) + " kr/kWh · published", "#8CFF6B"]);
+            }
+            if (lag1Val != null) out.push(["baseline " + fmtKwh(lag1Val) + " kr/kWh", "var(--cream)"]);
+            return out;
+        }
+
+        function quantileOf(vals, q) {
+            if (!vals.length) return null;
+            var v = vals.slice().sort(function (a, b) { return a - b; });
+            var pos = (v.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+            return v[lo] + (v[hi] - v[lo]) * (pos - lo);
+        }
+
+        // conformal band calibration: ratio of residual overshoot to raw half-width
+        function bandRatios(pairs) {
+            var out = [];
+            for (var i = 0; i < pairs.length; i++) {
+                var p = pairs[i];
+                if (!isFinite(p.med) || !isFinite(p.act) || !isFinite(p.q10) || !isFinite(p.q90)) continue;
+                var lo = p.med - p.q10, hi = p.q90 - p.med;
+                if (!(lo > 0) || !(hi > 0)) continue;
+                var r = Math.max((p.act - p.med) / hi, (p.med - p.act) / lo);
+                if (isFinite(r) && r >= 0) out.push(r);
+            }
+            return out;
+        }
+
+        function conformalK(pairs, level) { // null if too few samples; >= 1 always
+            var r = bandRatios(pairs), n = r.length;
+            if (n < 24) return null;
+            var k = quantileOf(r, Math.min(0.99, level + 1 / n));
+            return isFinite(k) ? Math.max(1, k) : null;
+        }
+
+        // level correction: median signed error (med - act) of past forecasts; null if too few
+        function medianError(pairs) {
+            var e = [];
+            for (var i = 0; i < pairs.length; i++) {
+                var p = pairs[i];
+                if (isFinite(p.med) && isFinite(p.act)) e.push(p.med - p.act);
+            }
+            if (e.length < 8) return null;
+            return quantileOf(e, 0.5);
+        }
+
+        function scaleBand(med, q10, q90, k) {
+            if (!isFinite(k)) return [q10, q90];
+            return [med - k * (med - q10), med + k * (q90 - med)];
+        }
+
+        // level correction: bias = median past (med - act) = over-prediction, so SUBTRACT it from the
+        // whole distribution (median AND band), then conformal k around the shifted median;
+        // clamped so the median is always inside [q10, q90]
+        function applyCalibration(medRaw, q10raw, q90raw, k, bias) {
+            var b = bias || 0;
+            var med = medRaw - b, lo = q10raw - b, hi = q90raw - b;
+            var band = scaleBand(med, lo, hi, k);
+            return { med: med, q10: Math.min(band[0], med), q90: Math.max(band[1], med) };
+        }
+
+        // past context-end indices (into the history array) for one-time calibration seeding:
+        // origins 1..maxOrigins days apart, each with `horizon` forecast hours inside the history
+        function seedOrigins(historyLen, ctxLen, horizon, maxOrigins, stepDays) {
+            var out = [], o = historyLen - horizon, step = stepDays * HOURS_PER_DAY;
+            while (out.length < maxOrigins && o >= ctxLen) { out.push(o); o -= step; }
+            return out;
+        }
+
+        // past forecast medians whose hour already has an actual price (accuracy trace + MAE stat);
+        // uses medD (the calibrated median actually displayed) when present, else raw med
+        function pastForecastSeries(preds, actMap, fromMs, toMs) {
+            var out = [];
+            (preds || []).forEach(function (p) {
+                var a = actMap[p.t];
+                if (a == null || !isFinite(a)) return;
+                if (p.t < fromMs || p.t > toMs) return;
+                out.push({ t: p.t, v: p.medD != null ? p.medD : p.med, lo: p.q10, hi: p.q90 });
+            });
+            out.sort(function (a, b) { return a.t - b.t; });
+            return out;
+        }
+        // forecast accuracy: MAE% of displayed medians vs actuals, for preds with h < maxH (null if none)
+        function fcMaePct(preds, actMap, maxH) {
+            var sum = 0, asum = 0, n = 0;
+            (preds || []).forEach(function (p) {
+                var a = actMap[p.t];
+                if (a == null || !isFinite(a) || a === 0) return;
+                if (maxH != null && p.h >= maxH) return;
+                var m = p.medD != null ? p.medD : p.med;
+                sum += Math.abs(m - a); asum += a; n++;
+            });
+            if (!n) return null;
+            return { maePct: sum / n / (asum / n) * 100, n: n };
+        }
+
+        function horizonBucket(h) {
+            return h < 24 ? 24 : h < 48 ? 48 : h < 72 ? 72 : h < 96 ? 96 : h < 120 ? 120 : h < 144 ? 144 : 168;
+        }
+
+        // ---- chart zoom/pan view math (pure) ----
+        function clampView(view, fullStart, fullEnd, minSpanMs) {
+            var full = fullEnd - fullStart;
+            if (full <= minSpanMs) return { start: fullStart, span: full };
+            var span = Math.max(minSpanMs, Math.min(full, view.span));
+            var start = Math.max(fullStart, Math.min(fullEnd - span, view.start));
+            return { start: start, span: span };
+        }
+        function zoomView(view, fullStart, fullEnd, minSpanMs, factor, centerMs) {
+            var span = view.span / factor;
+            var c = centerMs != null ? centerMs : view.start + view.span / 2;
+            return clampView({ start: c - span / 2, span: span }, fullStart, fullEnd, minSpanMs);
+        }
+        function panView(view, fullStart, fullEnd, minSpanMs, dMs) {
+            return clampView({ start: view.start + dMs, span: view.span }, fullStart, fullEnd, minSpanMs);
+        }
+        // axis label size grows with zoom (1x -> 34px viewBox units, high zoom -> capped 44px) + matching pads
+        function axisFontPx(zoomF) { return Math.round(Math.min(44, 34 * Math.pow(Math.max(1, zoomF), 0.3))); }
+        function chartPads(axisPx) { return { padL: Math.round(18 + axisPx * 2.0), padB: Math.round(34 + axisPx * 1.05) }; }
+        // how many x ticks fit without overlap, given the label size and plot width
+        function xMaxTicks(axisPx, plotW) { return Math.max(3, Math.floor(plotW / (axisPx * 3.2))); }
+
+        // ---- neighbour-price ridge fill (DE/SE3 beyond the published ~+36h day-ahead) ----
+        // Mirrors the sandbox prototype (proto7.py): walk-forward ridge per area on
+        // [1, 24 hour dummies, 7 weekday dummies, windpw, wind10, solar, temp, cloud, pres],
+        // trained on published hours only. Backtest (35 origins, 7 months, 28M):
+        // day 3-7 MAE 32-45% -> 25-29% with this fill.
+
+        function windPowerProxy(w100) { // cubic power curve above 3 m/s, capped at 25 m/s
+            if (!isFinite(w100)) return NaN;
+            var v = Math.max(0, Math.min(w100, 25) - 3);
+            return v * v * v / (22 * 22 * 22);
+        }
+
+        function deFeatRow(date, deWx) { // 38-col feature row; deWx: utcHourKey -> [w100, w10, solar, temp, cloud, pres]
+            var w = deWx ? deWx[utcHourKey(date)] : null;
+            var row = [1], hr = date.getUTCHours(), wd = weekdayMon0(date), i;
+            for (i = 0; i < 24; i++) row.push(i === hr ? 1 : 0);
+            for (i = 0; i < 7; i++) row.push(i === wd ? 1 : 0);
+            row.push(w ? windPowerProxy(w[0]) : NaN, w && isFinite(w[1]) ? w[1] : NaN,
+                     w && isFinite(w[2]) ? w[2] : NaN, w && isFinite(w[3]) ? w[3] : NaN,
+                     w && isFinite(w[4]) ? w[4] : NaN, w && isFinite(w[5]) ? w[5] : NaN);
+            return row;
+        }
+
+        function solveLinear(A, b) { // Gaussian elimination with partial pivoting; null if singular
+            var n = b.length, i, j, k;
+            var M = A.map(function (row, r) { return row.concat([b[r]]); });
+            for (k = 0; k < n; k++) {
+                var piv = k;
+                for (i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[piv][k])) piv = i;
+                if (!(Math.abs(M[piv][k]) > 1e-12)) return null;
+                if (piv !== k) { var t = M[piv]; M[piv] = M[k]; M[k] = t; }
+                for (i = k + 1; i < n; i++) {
+                    var f = M[i][k] / M[k][k];
+                    for (j = k; j <= n; j++) M[i][j] -= f * M[k][j];
+                }
+            }
+            var x = new Array(n);
+            for (i = n - 1; i >= 0; i--) {
+                var s = M[i][n];
+                for (j = i + 1; j < n; j++) s -= M[i][j] * x[j];
+                x[i] = s / M[i][i];
+            }
+            return x;
+        }
+
+        function ridgeFit(rows, ys) { // normal equations on standardized features (col 0 = intercept, not standardized)
+            var n = rows.length;
+            if (!n || n < 60) return null;
+            var k = rows[0].length, i, j;
+            var mu = new Array(k).fill(0), sd = new Array(k).fill(1);
+            for (i = 1; i < k; i++) {
+                var s = 0, c = 0;
+                for (j = 0; j < n; j++) if (isFinite(rows[j][i])) { s += rows[j][i]; c++; }
+                if (c > 0) mu[i] = s / c;
+            }
+            for (i = 1; i < k; i++) {
+                var v = 0, c2 = 0;
+                for (j = 0; j < n; j++) if (isFinite(rows[j][i])) { var d = rows[j][i] - mu[i]; v += d * d; c2++; }
+                sd[i] = c2 > 1 && v > 0 ? Math.sqrt(v / c2) : 1;
+            }
+            var A = [], b = new Array(k).fill(0);
+            for (i = 0; i < k; i++) A.push(new Array(k).fill(0));
+            for (j = 0; j < n; j++) {
+                var xs = new Array(k);
+                for (i = 0; i < k; i++) xs[i] = i === 0 ? 1 : (isFinite(rows[j][i]) ? (rows[j][i] - mu[i]) / sd[i] : 0);
+                for (i = 0; i < k; i++) {
+                    b[i] += xs[i] * ys[j];
+                    for (var l = i; l < k; l++) A[i][l] += xs[i] * xs[l];
+                }
+            }
+            for (i = 0; i < k; i++) {
+                for (j = 0; j < i; j++) A[i][j] = A[j][i];
+                A[i][i] += 1e-6 * n; // tiny ridge for numerical stability
+            }
+            var beta = solveLinear(A, b);
+            return beta ? { mu: mu, sd: sd, beta: beta, k: k } : null;
+        }
+
+        function ridgePredict(m, row) {
+            var s = 0;
+            for (var i = 0; i < m.k; i++) {
+                var x = i === 0 ? 1 : (isFinite(row[i]) ? (row[i] - m.mu[i]) / m.sd[i] : 0); // missing -> train mean
+                s += m.beta[i] * x;
+            }
+            return s;
+        }
+
+        function buildNeighborFill(neighborMap, deWxMap, trainEndMs, futureHours) {
+            var fill = { DE: {}, SE3: {} };
+            if (!neighborMap || !deWxMap) return fill;
+            [["DE", 0], ["SE3", 1]].forEach(function (area) {
+                var name = area[0], idx = area[1], rows = [], ys = [], key;
+                for (key in neighborMap) {
+                    var nb = neighborMap[key];
+                    if (!nb || !isFinite(nb[idx])) continue;
+                    var t = parseHourUtc(key + ":00").getTime();
+                    if (t > trainEndMs) continue; // train on known/published hours only
+                    var row = deFeatRow(new Date(t), deWxMap), ok = true;
+                    for (var i = 0; i < row.length; i++) if (!isFinite(row[i])) { ok = false; break; }
+                    if (ok) { rows.push(row); ys.push(nb[idx]); }
+                }
+                var m = ridgeFit(rows, ys);
+                if (!m) return;
+                futureHours.forEach(function (fh) {
+                    if (!fh) return;
+                    var fk = utcHourKey(fh), nbv = neighborMap[fk];
+                    if (nbv && isFinite(nbv[idx])) return; // published day-ahead wins
+                    fill[name][fk] = ridgePredict(m, deFeatRow(fh, deWxMap));
+                });
+            });
+            return fill;
+        }
+
+        function dkDay(dkStr) { return dkStr.slice(8, 10) + "/" + dkStr.slice(5, 7); } // "26/11"
+        function dkShort(dkStr) { return dkDay(dkStr) + " " + dkStr.slice(11, 16); } // "26/11 14:00"
+
+        // x-axis date line: weekday+date on the first tick of each DK day, empty otherwise
+        function xAxisDateLine(tMs, prevDate) {
+            var d = new Date(tMs);
+            var dl = dkLabel(d);
+            var d10 = dl.slice(0, 10);
+            return { date: d10, line: d10 !== prevDate ? dkWeekday(d) + " " + dkDay(dl) : "" };
+        }
+
+        function pearson(xs, ys) {
+            var n = xs.length;
+            if (n < 2) return 0;
+            var mx = 0, my = 0, i;
+            for (i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+            mx /= n; my /= n;
+            var num = 0, dx = 0, dy = 0;
+            for (i = 0; i < n; i++) {
+                num += (xs[i] - mx) * (ys[i] - my);
+                dx += (xs[i] - mx) * (xs[i] - mx);
+                dy += (ys[i] - my) * (ys[i] - my);
+            }
+            var den = Math.sqrt(dx * dy);
+            return den ? num / den : 0;
+        }
+
+        function corrLag1(points) {
+            var prices = points.map(function (p) { return p.price; });
+            var xs = [], ys = [];
+            for (var i = 0; i + HOURS_PER_DAY < prices.length; i++) {
+                xs.push(prices[i]);
+                ys.push(prices[i + HOURS_PER_DAY]);
+            }
+            return pearson(xs, ys);
+        }
+
+        function lag1Forecast(points, horizon) {
+            var prices = points.map(function (p) { return p.price; });
+            var out = [];
+            for (var h = 0; h < horizon; h++) {
+                out.push(prices[prices.length - HOURS_PER_DAY + (h % HOURS_PER_DAY)]);
+            }
+            return out;
+        }
+
+        function mae(predictions, actuals) {
+            var sum = 0, n = 0;
+            for (var i = 0; i < predictions.length; i++) {
+                sum += Math.abs(predictions[i] - actuals[i]);
+                n++;
+            }
+            return n ? sum / n : 0;
+        }
+
+        function backtestMae(points, predictFn, backtestDays, horizon) {
+            var prices = points.map(function (p) { return p.price; });
+            var errors = [];
+            for (var i = 1; i <= backtestDays; i++) {
+                var contextEnd = prices.length - horizon * i;
+                if (contextEnd < 7 * HOURS_PER_DAY) break;
+                var predicted = predictFn(points.slice(0, contextEnd), horizon);
+                for (var j = 0; j < horizon; j++) {
+                    errors.push(Math.abs(predicted[j] - prices[contextEnd + j]));
+                }
+            }
+            if (!errors.length) return null;
+            return errors.reduce(function (a, b) { return a + b; }, 0) / errors.length;
+        }
+
+        function summarizeWeather(hourly, nowMs) {
+            // next-24h summary of an Open-Meteo hourly forecast; nulls when data is missing
+            var times = (hourly && hourly.time) || [];
+            var wind = (hourly && hourly.wind_speed_10m) || [];
+            var temp = (hourly && hourly.temperature_2m) || [];
+            var solar = (hourly && hourly.shortwave_radiation) || [];
+            var w = [], t = [], s = [];
+            var count = 0;
+            for (var i = 0; i < times.length && count < 24; i++) {
+                var ms = parseHourUtc(String(times[i])).getTime();
+                if (ms < nowMs - HOUR_MS) continue;
+                count++;
+                if (wind[i] != null) w.push(wind[i]);
+                if (temp[i] != null) t.push(temp[i]);
+                if (solar[i] != null) s.push(solar[i]);
+            }
+            if (!w.length && !t.length && !s.length) return null;
+            return {
+                windAvg: w.length ? Math.round(w.reduce(function (a, b) { return a + b; }, 0) / w.length * 10) / 10 : null,
+                tempMin: t.length ? Math.round(Math.min.apply(null, t) * 10) / 10 : null,
+                tempMax: t.length ? Math.round(Math.max.apply(null, t) * 10) / 10 : null,
+                solarPeak: s.length ? Math.round(Math.max.apply(null, s)) : null
+            };
+        }
+
+        function fmtKwh(dkkMwh) { return (dkkMwh / 1000).toFixed(2); }
+
+        function bestWindow(forecast, winHours) {
+            // cheapest contiguous winHours window in the forecast, by median price
+            if (!forecast || !forecast.length) return null;
+            var w = Math.min(winHours, forecast.length);
+            var best = 0, bestSum = Infinity;
+            for (var i = 0; i + w <= forecast.length; i++) {
+                var sum = 0;
+                for (var j = 0; j < w; j++) sum += forecast[i + j].median;
+                if (sum < bestSum) { bestSum = sum; best = i; }
+            }
+            return {
+                start: forecast[best].hour_dk,
+                end: forecast[Math.min(best + w, forecast.length) - 1].hour_dk,
+                avg: bestSum / w
+            };
+        }
+
+        function historyFromResult(result) {
+            // the workflow result carries the full hourly history it fetched server-side
+            var hist = (result && result.history) || [];
+            return hist.map(function (h) {
+                return { utc: parseHourUtc(h.hour_utc), price: h.price_dkk };
+            }).filter(function (p) {
+                return !isNaN(p.utc.getTime()) && p.price != null && isFinite(p.price);
+            }).sort(function (a, b) { return a.utc - b.utc; });
+        }
+
+        function pickTariffRecord(records, dkDateTimeIso) {
+            var best = null;
+            for (var i = 0; i < records.length; i++) {
+                var r = records[i];
+                var vf = String(r.ValidFrom || ""), vt = String(r.ValidTo || "");
+                if (vf && dkDateTimeIso >= vf && (!vt || dkDateTimeIso < vt)) {
+                    if (!best || vf > String(best.ValidFrom || "")) best = r;
+                }
+            }
+            return best;
+        }
+
+        function tariffPriceOfHour(record, dkHour) {
+            if (!record) return null;
+            var v = record["Price" + (dkHour + 1)];
+            if (v == null) v = record.Price1;
+            return v == null ? null : Number(v);
+        }
+
+        function feeKwhAt(tariffs, utcMs) {
+            var lbl = dkLabel(new Date(utcMs));
+            var dt = lbl.slice(0, 10) + "T" + lbl.slice(11, 16) + ":00";
+            var hour = parseInt(lbl.slice(11, 13), 10);
+            var total = 0, found = false;
+            for (var n = 0; n < FEE_NOTES.length; n++) {
+                var rec = pickTariffRecord((tariffs && tariffs[FEE_NOTES[n]]) || [], dt);
+                var p = tariffPriceOfHour(rec, hour);
+                if (p != null) { total += p; found = true; }
+            }
+            return found ? total : null;
+        }
+
+        function allInDkkMwh(spotDkkMwh, feeKwh) {
+            return (spotDkkMwh / 1000 + feeKwh) * (1 + VAT_RATE) * 1000;
+        }
+
+        function dispDkkMwh(spotDkkMwh, utcMs, tariffs, showFees) {
+            if (!showFees) return spotDkkMwh;
+            var fee = feeKwhAt(tariffs, utcMs);
+            return fee == null ? spotDkkMwh : allInDkkMwh(spotDkkMwh, fee);
+        }
+
+        function combinedSeries(history, forecast, nowMs, tariffs, showFees) {
+            var out = [];
+            (history || []).forEach(function (p) {
+                var t = p.utc.getTime();
+                if (t < nowMs) return;
+                out.push({ t: t, dk: dkLabel(p.utc), v: dispDkkMwh(p.price, t, tariffs, showFees), kind: "pub", lo: null, hi: null });
+            });
+            (forecast || []).forEach(function (f) {
+                var t = parseHourUtc(f.hour_utc).getTime();
+                out.push({
+                    t: t, dk: f.hour_dk,
+                    v: dispDkkMwh(f.median, t, tariffs, showFees),
+                    lo: dispDkkMwh(f.q10, t, tariffs, showFees),
+                    hi: dispDkkMwh(f.q90, t, tariffs, showFees),
+                    kind: "fc"
+                });
+            });
+            return out.sort(function (a, b) { return a.t - b.t; });
+        }
+
+        function bestWindowEntries(entries, winHours) {
+            if (!entries || !entries.length) return null;
+            var w = Math.min(winHours, entries.length);
+            var best = 0, bestSum = Infinity;
+            for (var i = 0; i + w <= entries.length; i++) {
+                var s = 0;
+                for (var j = 0; j < w; j++) s += entries[i + j].v;
+                if (s < bestSum) { bestSum = s; best = i; }
+            }
+            return {
+                start: entries[best].dk, end: entries[best + w - 1].dk,
+                startT: entries[best].t, endT: entries[best + w - 1].t + HOUR_MS,
+                avg: bestSum / w, idx: best, len: w
+            };
+        }
+
+        function xAxisStep(spanMs, maxTicks) {
+            var steps = [1, 2, 3, 4, 6, 12, 24, 48, 72, 96];
+            for (var i = 0; i < steps.length; i++) {
+                if (spanMs / (steps[i] * HOUR_MS) <= maxTicks) return steps[i];
+            }
+            return steps[steps.length - 1];
+        }
+
+        function utcHourKey(d) {
+            function p2(n) { return (n < 10 ? "0" : "") + n; }
+            return d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate()) + "T" + p2(d.getUTCHours()) + ":00";
+        }
+
+        function weekdayMon0(d) { return (d.getUTCDay() + 6) % 7; }
+
+        function targetEncode(target, codes, smooth) {
+            // mirrors timestral.covariate_encoding.target_encode (smoothed per-series mean encoding)
+            smooth = smooth == null ? 1 : smooth;
+            var n = target.length, i;
+            var t = new Array(n), observed = new Array(n), sum = 0, cnt = 0;
+            for (i = 0; i < n; i++) {
+                observed[i] = isFinite(target[i]);
+                t[i] = observed[i] ? target[i] : 0;
+                if (observed[i]) { sum += t[i]; cnt++; }
+            }
+            var itemMean = cnt > 0 ? sum / cnt : 0;
+            var cats = [];
+            for (i = 0; i < n; i++) if (isFinite(codes[i]) && cats.indexOf(codes[i]) < 0) cats.push(codes[i]);
+            cats.sort(function (a, b) { return a - b; });
+            var nanSlot = cats.length, unseen = nanSlot + 1;
+            var sums = new Array(nanSlot + 1).fill(0), counts = new Array(nanSlot + 1).fill(0);
+            for (i = 0; i < n; i++) {
+                var slot = isFinite(codes[i]) ? cats.indexOf(codes[i]) : nanSlot;
+                if (observed[i]) { sums[slot] += t[i]; counts[slot]++; }
+            }
+            var lookup = [];
+            for (i = 0; i <= nanSlot; i++) lookup.push((smooth * itemMean + sums[i]) / (smooth + counts[i]));
+            lookup.push(itemMean);
+            return function (code) {
+                if (!isFinite(code)) return lookup[nanSlot];
+                var idx = cats.indexOf(code);
+                return idx < 0 ? lookup[unseen] : lookup[idx];
+            };
+        }
+
+        function buildOnnxInputs(history, weatherMap, neighborMap, deWxMap) {
+            // last ONNX_T hours (NaN left-padded) + ONNX_H future hours; known covariates
+            // rows = [wind, temp, solar, DE, SE3, de_windpw, de_wind10, de_solar, de_temp, de_cloud, de_pres,
+            //         enc_hour, enc_weekday] over T+H, NaN = missing
+            // DE/SE3 beyond the published day-ahead (~+36h) are filled from buildNeighborFill(deWxMap)
+            var pts = (history || []).slice(-ONNX_T);
+            var pad = ONNX_T - pts.length, i;
+            var hours = [], prices = [];
+            for (i = 0; i < pad; i++) { hours.push(null); prices.push(NaN); }
+            pts.forEach(function (p) { hours.push(p.utc); prices.push(p.price); });
+            var last = hours[ONNX_T - 1];
+            for (i = 1; i <= ONNX_H; i++) hours.push(new Date(last.getTime() + i * HOUR_MS));
+            var L = ONNX_T + ONNX_H;
+            var nbFill = deWxMap ? buildNeighborFill(neighborMap, deWxMap, hours[ONNX_T - 1].getTime(), hours.slice(ONNX_T)) : null;
+            var context = new Float32Array(ONNX_T);
+            for (i = 0; i < ONNX_T; i++) context[i] = prices[i];
+            var hourCodes = new Array(L), weekCodes = new Array(L);
+            for (i = 0; i < L; i++) {
+                var h = hours[i];
+                if (h) { hourCodes[i] = h.getUTCHours(); weekCodes[i] = weekdayMon0(h); }
+                else { hourCodes[i] = NaN; weekCodes[i] = NaN; }
+            }
+            var target = new Array(ONNX_T);
+            for (i = 0; i < ONNX_T; i++) target[i] = isFinite(prices[i]) ? prices[i] : NaN;
+            var encHour = targetEncode(target, hourCodes.slice(0, ONNX_T));
+            var encWeek = targetEncode(target, weekCodes.slice(0, ONNX_T));
+            var known = new Float32Array(ONNX_C * L);
+            for (i = 0; i < L; i++) {
+                var hh = hours[i];
+                var w = hh ? weatherMap[utcHourKey(hh)] : null;
+                known[0 * L + i] = w ? w[0] : NaN;
+                known[1 * L + i] = w ? w[1] : NaN;
+                known[2 * L + i] = w ? w[2] : NaN;
+                var nb = hh ? (neighborMap || {})[utcHourKey(hh)] : null;
+                var fkey = hh ? utcHourKey(hh) : null;
+                known[3 * L + i] = nb && isFinite(nb[0]) ? nb[0] : (nbFill && fkey && isFinite(nbFill.DE[fkey]) ? nbFill.DE[fkey] : NaN); // DE day-ahead, else ridge fill
+                known[4 * L + i] = nb && isFinite(nb[1]) ? nb[1] : (nbFill && fkey && isFinite(nbFill.SE3[fkey]) ? nbFill.SE3[fkey] : NaN); // SE3 day-ahead, else ridge fill
+                var dw = hh && deWxMap ? deWxMap[fkey] : null; // N-Germany weather rows (deWxMap: [w100, w10, solar, temp, cloud, pres])
+                known[5 * L + i] = dw ? windPowerProxy(dw[0]) : NaN;
+                known[6 * L + i] = dw && isFinite(dw[1]) ? dw[1] : NaN;
+                known[7 * L + i] = dw && isFinite(dw[2]) ? dw[2] : NaN;
+                known[8 * L + i] = dw && isFinite(dw[3]) ? dw[3] : NaN;
+                known[9 * L + i] = dw && isFinite(dw[4]) ? dw[4] : NaN;
+                known[10 * L + i] = dw && isFinite(dw[5]) ? dw[5] : NaN;
+                var eh = encHour(hourCodes[i]), ew = encWeek(weekCodes[i]);
+                if (i < ONNX_T && !isFinite(target[i]) && !isFinite(hourCodes[i])) eh = NaN;
+                if (i < ONNX_T && !isFinite(target[i]) && !isFinite(weekCodes[i])) ew = NaN;
+                known[11 * L + i] = eh;
+                known[12 * L + i] = ew;
+            }
+            return { context: context, known: known, hours: hours };
+        }
+
+        var Core = {
+            parseHourUtc: parseHourUtc,
+            aggregateHourlyUtc: aggregateHourlyUtc,
+            dkLabel: dkLabel,
+            dkWeekday: dkWeekday,
+            pearson: pearson,
+            corrLag1: corrLag1,
+            lag1Forecast: lag1Forecast,
+            mae: mae,
+            backtestMae: backtestMae,
+            summarizeWeather: summarizeWeather,
+            fmtKwh: fmtKwh,
+            bestWindow: bestWindow,
+            historyFromResult: historyFromResult,
+            pickTariffRecord: pickTariffRecord,
+            tariffPriceOfHour: tariffPriceOfHour,
+            feeKwhAt: feeKwhAt,
+            allInDkkMwh: allInDkkMwh,
+            dispDkkMwh: dispDkkMwh,
+            combinedSeries: combinedSeries,
+            bestWindowEntries: bestWindowEntries,
+            xAxisStep: xAxisStep,
+            utcHourKey: utcHourKey,
+            weekdayMon0: weekdayMon0,
+            targetEncode: targetEncode,
+            buildOnnxInputs: buildOnnxInputs,
+            ZONES: ZONES,
+            DEFAULT_TARIFFS: DEFAULT_TARIFFS,
+            zoneConfig: zoneConfig,
+            xAxisDateLine: xAxisDateLine,
+            fresherPoints: fresherPoints,
+            nearestSeriesEntry: nearestSeriesEntry,
+            modelCacheKey: modelCacheKey,
+            quantileOf: quantileOf,
+            bandRatios: bandRatios,
+            conformalK: conformalK,
+            medianError: medianError,
+            scaleBand: scaleBand,
+            applyCalibration: applyCalibration,
+            horizonBucket: horizonBucket,
+            seedOrigins: seedOrigins,
+            pastForecastSeries: pastForecastSeries,
+            fcMaePct: fcMaePct,
+            K_BUCKETS: K_BUCKETS,
+            clampView: clampView,
+            zoomView: zoomView,
+            panView: panView,
+            axisFontPx: axisFontPx,
+            chartPads: chartPads,
+            xMaxTicks: xMaxTicks,
+            windPowerProxy: windPowerProxy,
+            deFeatRow: deFeatRow,
+            solveLinear: solveLinear,
+            ridgeFit: ridgeFit,
+            ridgePredict: ridgePredict,
+            buildNeighborFill: buildNeighborFill,
+            tipLines: tipLines,
+            dkDay: dkDay,
+            dkShort: dkShort
+        };
+        if (typeof module !== "undefined" && module.exports) module.exports = Core;
+
+        // ---------- app (browser only) ----------
+
+        var state = { zone: "DK2", history: [], forecast: null, tariffs: null, showFees: true, neighborMap: {}, chartView: null };
+
+        // In the Android APK, API calls go through native HTTP (CapacitorHttp is built into
+        // @capacitor/core + @capacitor/android since Capacitor 6): no WebView CORS, and real HTTP
+        // statuses (429 + Retry-After are visible to the retry logic instead of "Failed to fetch").
+        // On web, plain fetch.
+        var BROWSER_UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
+        function nativeHttp() {
+            if (state.nativeHttp !== undefined) return state.nativeHttp;
+            var nh = null;
+            try {
+                if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+                    nh = window.CapacitorHttp ||
+                         (typeof window.Capacitor.registerPlugin === "function" ? window.Capacitor.registerPlugin("CapacitorHttp") : null);
+                }
+            } catch (e) { nh = null; }
+            state.nativeHttp = nh;
+            return nh;
+        }
+        // fetch()-compatible GET: { ok, status, headers.get(), json() }
+        // native first (no CORS, real HTTP statuses); if the native call itself fails, retry via
+        // fetch; if both fail, the error carries BOTH messages for debugging.
+        function apiGet(url) {
+            var nh = nativeHttp();
+            if (nh) {
+                return nh.get({ url: url, headers: { "Accept": "application/json", "User-Agent": BROWSER_UA },
+                                connectTimeout: 20000, readTimeout: 90000 }).then(function (r) {
+                    var hdrs = r.headers || {};
+                    return {
+                        ok: r.status >= 200 && r.status < 300,
+                        status: r.status,
+                        headers: { get: function (k) { k = String(k).toLowerCase(); for (var kk in hdrs) if (String(kk).toLowerCase() === k) return hdrs[kk]; return null; } },
+                        json: function () { return Promise.resolve(typeof r.data === "string" ? JSON.parse(r.data) : r.data); }
+                    };
+                }).catch(function (nerr) {
+                    return fetch(url).catch(function (ferr) {
+                        throw new Error("native[" + (nerr && nerr.message ? nerr.message : String(nerr)) + "] fetch[" + ferr.message + "]");
+                    });
+                });
+            }
+            return fetch(url);
+        }
+        // one-line runtime debug info for network failure banners
+        function debugInfo() {
+            var p = [];
+            try {
+                p.push("platform=" + (window.Capacitor && window.Capacitor.getPlatform ? window.Capacitor.getPlatform() : "?"));
+                p.push("native=" + (window.Capacitor && window.Capacitor.isNativePlatform ? window.Capacitor.isNativePlatform() : "?"));
+                p.push("Cap=" + typeof window.Capacitor);
+                p.push("CapHttp=" + typeof window.CapacitorHttp);
+                p.push("avail=" + (window.Capacitor && window.Capacitor.isPluginAvailable ? window.Capacitor.isPluginAvailable("CapacitorHttp") : "?"));
+                p.push("fetchPatched=" + (/nativePromise|CapacitorHttp/.test(String(window.fetch)) ? "yes" : "no"));
+            } catch (e) { p.push("dbgErr=" + e.message); }
+            return p.join(" ");
+        }
+
+        function tariffsFor() { return state.tariffs || DEFAULT_TARIFFS[state.zone] || DEFAULT_TARIFFS.DK2; }
+
+        function feedback(message, kind) {
+            var el = document.getElementById("feedback");
+            el.textContent = message;
+            el.className = "feedback visible " + kind;
+        }
+
+        function setBusy(busy) {
+            document.getElementById("runBtn").disabled = busy;
+            document.getElementById("loadBtn").disabled = busy;
+        }
+
+        function fetchPrices(days, attempt) {
+            attempt = attempt || 1;
+            var start = new Date(Date.now() - (days + 2) * 86400000).toISOString().slice(0, 16);
+            var params = new URLSearchParams({
+                filter: JSON.stringify({ PriceArea: [state.zone] }),
+                start: start,
+                sort: "TimeUTC asc",
+                limit: (days + 2) * 96 + 200
+            });
+            return apiGet(ENERGINET_URL + "?" + params.toString()).then(function (resp) {
+                if (!resp.ok) {
+                    if ((resp.status === 429 || resp.status >= 500) && attempt < 6) {
+                        var ra = parseFloat(resp.headers.get("Retry-After"));
+                        var delay = isFinite(ra) && ra > 0 ? Math.min(60000, ra * 1000)
+                                  : 2000 * attempt + Math.floor(Math.random() * 1500);
+                        return sleep(delay).then(function () { return fetchPrices(days, attempt + 1); });
+                    }
+                    throw new Error("Energinet API " + resp.status + (resp.status === 429 ? " (rate limited)" : ""));
+                }
+                return resp.json();
+            }).then(function (data) {
+                var points = aggregateHourlyUtc(data.records || []);
+                if (points.length < 7 * HOURS_PER_DAY) throw new Error("not enough " + state.zone + " history from Energinet");
+                return points;
+            });
+        }
+
+        function renderStats() {
+            var tariffs = tariffsFor();
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+            var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
+            var cheapest = "—";
+            if (series.length) {
+                var minE = series[0];
+                series.forEach(function (e) { if (e.v < minE.v) minE = e; });
+                cheapest = dkShort(minE.dk);
+            }
+            var items = [
+                ["CHEAPEST HR", cheapest, "#8CFF6B"]
+            ];
+            if (state.workflowStats && state.workflowStats.wind_avg_ms != null) {
+                items.push(["WIND AVG", state.workflowStats.wind_avg_ms + " m/s", "var(--m-yellow)"]);
+            }
+            if (series.length) {
+                var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+                var bw = bestWindowEntries(series, evH);
+                if (bw) items.push(["EV " + evH + "H FROM " + bw.start.slice(11, 16), fmtKwh(bw.avg) + " KR/KWH", "#8CFF6B"]);
+            }
+            document.getElementById("stats").innerHTML = items.map(function (it) {
+                return '<div class="stat-item"><div class="stat-value" style="color:' + it[2] + '">' + it[1] +
+                    '</div><div class="stat-label">' + it[0] + "</div></div>";
+            }).join("");
+        }
+
+        function renderChart() {
+            var svg = document.getElementById("chart");
+            var W = 760, H = 460, padR = 14, padT = 16;
+            var history = state.history;
+            var fc = state.forecast;
+            if (!history.length && !(fc && fc.length)) { svg.innerHTML = ""; return; }
+            var tariffs = tariffsFor();
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+            var fcLen = fc && fc.length ? fc.length : HOURS_PER_DAY;
+            var lastUtc = history.length ? history[history.length - 1].utc.getTime()
+                                         : parseHourUtc(fc[0].hour_utc).getTime() - HOUR_MS;
+            var x0f = history.length ? Math.max(history[0].utc.getTime(), nowMs - 24 * HOUR_MS) : lastUtc;
+            var x1f = lastUtc + Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
+            if (x1f <= x0f) x1f = x0f + HOURS_PER_DAY * HOUR_MS;
+            var vw = state.chartView ? clampView(state.chartView, x0f, x1f, CHART_MIN_SPAN_MS)
+                                      : { start: x0f, span: x1f - x0f };
+            var x0 = vw.start, x1 = vw.start + vw.span;
+            var axisPx = axisFontPx((x1f - x0f) / vw.span);
+            var pads = chartPads(axisPx);
+            var padL = pads.padL, padB = pads.padB;
+            var series = combinedSeries(history, fc, nowMs, tariffs, state.showFees);
+            history.forEach(function (p) {
+                var t = p.utc.getTime();
+                if (t >= x0f && t < nowMs) series.push({ t: t, dk: dkLabel(p.utc), v: dispDkkMwh(p.price, t, tariffs, state.showFees), kind: "pub", lo: null, hi: null });
+            });
+            series.sort(function (a, b) { return a.t - b.t; });
+            var histMapC = {};
+            history.forEach(function (p) { histMapC[p.utc.getTime()] = p.price; });
+            var pastFc = pastForecastSeries(loadPreds(), histMapC, x0f, x1f);
+            var inView = function (t) { return t >= x0 - HOUR_MS && t <= x1 + HOUR_MS; };
+            var vis = series.filter(function (e) { return inView(e.t); });
+            var allVals = (vis.length ? vis : series).map(function (e) { return e.v; });
+            var lag1 = history.length ? lag1Forecast(history, Math.max(HOURS_PER_DAY, fcLen)) : [];
+            lag1.forEach(function (val, i) {
+                var t = lastUtc + (i + 1) * HOUR_MS;
+                if (inView(t)) allVals.push(dispDkkMwh(val, t, tariffs, state.showFees));
+            });
+            if (fc) {
+                fc.forEach(function (f) {
+                    var t = parseHourUtc(f.hour_utc).getTime();
+                    if (!inView(t)) return;
+                    allVals.push(dispDkkMwh(f.median, t, tariffs, state.showFees),
+                                 dispDkkMwh(f.q10, t, tariffs, state.showFees),
+                                 dispDkkMwh(f.q90, t, tariffs, state.showFees));
+                });
+            }
+            pastFc.forEach(function (p) { if (inView(p.t)) allVals.push(dispDkkMwh(p.v, p.t, tariffs, state.showFees)); });
+            if (!allVals.length) allVals = series.map(function (e) { return e.v; });
+            if (!allVals.length) { svg.innerHTML = ""; return; }
+            var yMin = Math.min.apply(null, allVals), yMax = Math.max.apply(null, allVals);
+            var pad = (yMax - yMin) * 0.08 || 1;
+            var y0 = yMin - pad, y1 = yMax + pad;
+            function X(t) { return padL + (t - x0) / (x1 - x0) * (W - padL - padR); }
+            function Y(v) { return H - padB - (v - y0) / (y1 - y0) * (H - padT - padB); }
+            var steps = [250, 500, 1000, 2000, 5000, 10000], step = steps[steps.length - 1];
+            for (var si = 0; si < steps.length; si++) { if ((y1 - y0) / steps[si] <= 6) { step = steps[si]; break; } }
+            var s = "";
+            for (var v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
+                s += '<line class="grid" x1="' + padL + '" y1="' + Y(v) + '" x2="' + (W - padR) + '" y2="' + Y(v) + '"/>' +
+                     '<text class="axis" x="' + (padL - 8) + '" y="' + (Y(v) + Math.round(axisPx * 0.22)) + '" text-anchor="end">' + (v / 1000).toFixed(step < 1000 ? 2 : 1) + "</text>";
+            }
+            var xStep = xAxisStep(x1 - x0, xMaxTicks(axisPx, W - padL - padR)), stepMs = xStep * HOUR_MS, prevDate = null;
+            for (var t = Math.ceil(x0 / stepMs) * stepMs; t <= x1; t += stepMs) {
+                var dl = dkLabel(new Date(t));
+                var dl2 = xAxisDateLine(t, prevDate);
+                prevDate = dl2.date;
+                s += '<line class="grid" x1="' + X(t) + '" y1="' + padT + '" x2="' + X(t) + '" y2="' + (H - padB) + '"/>' +
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + Math.round(axisPx * 0.7)) + '" text-anchor="middle">' + dl2.line + '</text>' +
+                     '<text class="axis" x="' + X(t) + '" y="' + (H - padB + Math.round(axisPx * 1.65)) + '" text-anchor="middle">' + dl.slice(11, 16) + "</text>";
+            }
+            s += '<line class="now" x1="' + X(nowMs) + '" y1="' + padT + '" x2="' + X(nowMs) + '" y2="' + (H - padB) + '"/>' +
+                 '<text class="axis" x="' + X(nowMs) + '" y="' + (padT + Math.round(axisPx * 0.5)) + '" text-anchor="middle">NOW</text>';
+            var pub = series.filter(function (e) { return e.kind === "pub"; });
+            if (pub.length) {
+                s += '<polyline class="line-actual" points="' + pub.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
+            }
+            var lag1Tip = lag1.map(function (val, i) {
+                var t = lastUtc + (i + 1) * HOUR_MS;
+                return { t: t, v: dispDkkMwh(val, t, tariffs, state.showFees) };
+            });
+            if (lag1Tip.length) {
+                s += '<polyline class="line-lag1" points="' + lag1Tip.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
+            }
+            var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+            var bw = series.length ? bestWindowEntries(series.filter(function (e) { return e.t >= nowMs; }), evH) : null;
+            if (bw) {
+                s += '<rect class="ev-window" x="' + X(bw.startT) + '" y="' + padT + '" width="' + Math.max(4, X(bw.endT) - X(bw.startT)) + '" height="' + (H - padT - padB) + '"/>' +
+                     '<text class="axis" x="' + ((X(bw.startT) + X(bw.endT)) / 2) + '" y="' + (padT + Math.round(axisPx * 0.5)) + '" text-anchor="middle">EV</text>';
+            }
+            if (fc) {
+                var fPts = fc.map(function (f) {
+                    var t = parseHourUtc(f.hour_utc).getTime();
+                    return { t: t,
+                             m: dispDkkMwh(f.median, t, tariffs, state.showFees),
+                             lo: dispDkkMwh(f.q10, t, tariffs, state.showFees),
+                             hi: dispDkkMwh(f.q90, t, tariffs, state.showFees) };
+                });
+                var band = fPts.map(function (p) { return X(p.t) + "," + Y(p.hi); }).join(" ") + " " +
+                    fPts.slice().reverse().map(function (p) { return X(p.t) + "," + Y(p.lo); }).join(" ");
+                s += '<polygon class="band" points="' + band + '"/>';
+                s += '<polyline class="line-fc" points="' + fPts.map(function (p) { return X(p.t) + "," + Y(p.m); }).join(" ") + '"/>';
+            }
+            if (pastFc.length) {
+                s += '<polyline class="line-pastfc" points="' + pastFc.map(function (p) {
+                    return X(p.t) + "," + Y(dispDkkMwh(p.v, p.t, tariffs, state.showFees));
+                }).join(" ") + '"/>';
+            }
+            s += '<line id="tipLine" y1="' + padT + '" y2="' + (H - padB) + '" stroke="rgba(255,250,235,0.75)" stroke-width="2" stroke-dasharray="4 4" style="display:none"/>' +
+                 '<circle id="tipDot" r="6" fill="#FFFAEB" stroke="#000000" stroke-width="2" style="display:none"/>';
+            svg.innerHTML = s;
+            svg.style.setProperty("--axis-px", axisPx + "px");
+            state.chartGeom = { W: W, H: H, padL: padL, padR: padR, x0: x0, x1: x1, X: X, Y: Y, series: series, lag1: lag1Tip, full0: x0f, full1: x1f };
+            var zb = document.getElementById("zoomReset");
+            if (zb) zb.textContent = (x1f - x0f <= vw.span + 1 ? "1×" : Math.round((x1f - x0f) / vw.span) + "×");
+        }
+
+        function renderHours() {
+            var el = document.getElementById("hours");
+            var tariffs = tariffsFor();
+            var nowMs = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+            var series = combinedSeries(state.history, state.forecast, nowMs, tariffs, state.showFees);
+            if (!series.length) {
+                el.innerHTML = '<p class="dim">Nothing to show yet — LOAD PRICES fills the chart from the current hour.</p>';
+                return;
+            }
+            var nPub = series.filter(function (e) { return e.kind === "pub"; }).length;
+            var nFc = series.length - nPub;
+            document.getElementById("hoursTitle").textContent =
+                "FROM NOW — " + nPub + "H PUBLISHED" + (nFc ? " + " + nFc + "H FORECAST" : "") +
+                " · KR/KWH" + (state.showFees ? " · INCL. FEES" : "");
+            var minE = series[0];
+            series.forEach(function (e) { if (e.v < minE.v) minE = e; });
+            var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
+            var bw = bestWindowEntries(series, evH);
+            el.innerHTML = series.map(function (e, i) {
+                var cls = "hour-cell";
+                if (e === minE) cls += " cheapest";
+                if (bw && i >= bw.idx && i < bw.idx + bw.len) cls += " ev";
+                var range = e.kind === "fc"
+                    ? '<span class="r">q10–q90: ' + fmtKwh(e.lo) + "–" + fmtKwh(e.hi) + "</span>"
+                    : '<span class="r">published day-ahead</span>';
+                return '<div class="' + cls + '"><span class="h">' + dkShort(e.dk) + '</span>' +
+                    '<span class="v">' + fmtKwh(e.v) + ' kr/kWh</span>' + range + "</div>";
+            }).join("");
+        }
+
+        function renderAll() {
+            document.getElementById("chartTitle").textContent =
+                "PRICE CHART · " + state.zone + " " + zoneConfig(state.zone).label + " · KR/KWH" + (state.showFees ? " · INCL. FEES+VAT" : " · SPOT ONLY");
+            renderStats();
+            renderChart();
+            renderHours();
+        }
+
+        function fetchTariffRecords(gln, notes, attempt) {
+            attempt = attempt || 1;
+            var params = new URLSearchParams({
+                filter: JSON.stringify({ GLN_Number: [gln], Note: notes }),
+                sort: "ValidFrom DESC",
+                limit: 60
+            });
+            return apiGet(DATAHUB_URL + "?" + params.toString()).then(function (resp) {
+                if (!resp.ok) {
+                    if ((resp.status === 429 || resp.status >= 500) && attempt < 4) {
+                        return sleep(1500 * attempt).then(function () { return fetchTariffRecords(gln, notes, attempt + 1); });
+                    }
+                    throw new Error("DatahubPricelist HTTP " + resp.status);
+                }
+                return resp.json();
+            }).then(function (data) { return data.records || []; });
+        }
+
+        function groupTariffs(records) {
+            var g = {};
+            (records || []).forEach(function (r) {
+                if (!r.Note || FEE_NOTES.indexOf(r.Note) < 0) return;
+                (g[r.Note] = g[r.Note] || []).push(r);
+            });
+            return g;
+        }
+
+        function loadTariffs() {
+            var el = document.getElementById("feesLine");
+            var z = zoneConfig(state.zone);
+            var cacheKey = "elspot_tariffs_" + z.area;
+            Promise.all([
+                fetchTariffRecords(ENERGINET_GLN, ["Elafgift", "Systemtarif", "Transmissions nettarif"]),
+                fetchTariffRecords(z.gln, ["Nettarif C"])
+            ]).then(function (results) {
+                state.tariffs = groupTariffs(results[0].concat(results[1]));
+                try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), tariffs: state.tariffs })); } catch (e) {}
+                el.textContent = "Fees (live, DatahubPricelist): Energinet transmission+system tariff, " + z.dso + " Nettarif C (" + z.area + "; night low, peak 17–21), elafgift, +25% VAT.";
+                renderAll();
+            }).catch(function (err) {
+                var cached = null;
+                try { cached = JSON.parse(localStorage.getItem(cacheKey) || "null"); } catch (e) {}
+                state.tariffs = (cached && cached.tariffs) || DEFAULT_TARIFFS[z.area] || DEFAULT_TARIFFS.DK2;
+                el.textContent = "Fees (" + (cached ? "cached" : "built-in defaults") + "; DatahubPricelist unreachable: " + err.message +
+                    "): transmission+system, " + z.dso + " Nettarif C, elafgift, +25% VAT.";
+                renderAll();
+            });
+        }
+
+        function applyHistory(points, sourceMsg) {
+            state.history = points;
+            state.forecast = null;
+            state.workflowStats = null;
+            try {
+                localStorage.setItem("elspot_history_" + state.zone, JSON.stringify(
+                    points.map(function (p) { return [p.utc.toISOString(), p.price]; })));
+                localStorage.setItem("elspot_history_at_" + state.zone, new Date().toISOString());
+            } catch (e) {}
+            renderAll();
+            var lastUtc = points[points.length - 1].utc.getTime();
+            var stale = lastUtc < Date.now() ? " — data ends " + dkShort(dkLabel(points[points.length - 1].utc)) + " DK, nothing published ahead" : "";
+            feedback(sourceMsg + stale, "correct");
+        }
+
+        function markLive(ok) {
+            try { localStorage.setItem("elspot_live", JSON.stringify({ ok: ok, at: Date.now() })); } catch (e) {}
+        }
+
+        function loadFallback(err) {
+            var zone = state.zone;
+                var cached = null, cachedAt = null;
+                try {
+                    cached = JSON.parse(localStorage.getItem("elspot_history_" + zone) || "null");
+                    cachedAt = localStorage.getItem("elspot_history_at_" + zone);
+                } catch (e) {}
+                var cachePts = (cached && cached.length)
+                    ? cached.map(function (r) { return { utc: parseHourUtc(r[0]), price: r[1] }; }) : null;
+                // remote Pages snapshot: refreshed every few hours by a GitHub Actions job (Nord Pool fallback there)
+                var remoteUrl = new URL(zoneConfig(zone).snapshot, PAGES_BASE + "elspot-dk2/").href;
+                return apiGet(remoteUrl).then(function (r) {
+                    if (!r.ok) throw new Error("HTTP " + r.status);
+                    return r.json();
+                }).then(function (snap) {
+                    return { points: aggregateHourlyUtc(snap.records || []),
+                             msg: "remote Pages snapshot (built " + String(snap.generated_at || "?").slice(0, 16) + "Z" +
+                                  (snap.source ? ", source " + snap.source : "") + ")" };
+                }).catch(function () { return null; }).then(function (remote) {
+                    var cands = [];
+                    if (remote && remote.points.length) cands.push(remote);
+                    if (cachePts && cachePts.length) cands.push({ points: cachePts, msg: "cached prices from " + (cachedAt || "the last successful load") });
+                    var best = null, bestMsg = "";
+                    cands.forEach(function (c) {
+                        var nb = fresherPoints(best, c.points);
+                        if (nb !== best) { best = nb; bestMsg = c.msg; }
+                    });
+                    if (best && best.length >= 7 * HOURS_PER_DAY) {
+                        applyHistory(best, "Energinet failed (" + err.message + ") — showing " + bestMsg + ".  [" + debugInfo() + "]");
+                        return;
+                    }
+                    feedback("Energinet failed (" + err.message + ") and no usable cache/remote snapshot — trying the bundled snapshot…  [" + debugInfo() + "]", "wrong");
+                    return apiGet(zoneConfig(zone).snapshot).then(function (r) {
+                        if (!r.ok) throw new Error("snapshot HTTP " + r.status);
+                        return r.json();
+                    }).then(function (snap) {
+                        var points = aggregateHourlyUtc(snap.records || []);
+                        if (points.length < 7 * HOURS_PER_DAY) throw new Error("bundled snapshot too small");
+                        applyHistory(points, "Loaded " + points.length + " hourly " + zone + " prices from the bundled snapshot (built " +
+                            String(snap.generated_at || "?").slice(0, 16) + "Z). Energinet error: " + err.message + ".");
+                    }).catch(function (err2) {
+                        feedback("Could not load prices: " + err.message + "; bundled snapshot failed too: " + err2.message, "wrong");
+                    });
+                });
+        }
+
+        function loadPrices(force) {
+            setBusy(true);
+            var liveState = null;
+            try { liveState = JSON.parse(localStorage.getItem("elspot_live") || "null"); } catch (e) {}
+            if (!force && liveState && liveState.ok === false && Date.now() - liveState.at < 3600e3) {
+                feedback("Energinet unreachable from this network — loading the remote Pages snapshot instead (LOAD PRICES forces a live retry).", "correct");
+                return loadFallback(new Error("live fetch skipped: failed " + Math.round((Date.now() - liveState.at) / 60000) + " min ago"))
+                    .finally(function () { setBusy(false); });
+            }
+            feedback("Fetching " + state.zone + " prices from Energinet (35 days" + (nativeHttp() ? ", native HTTP" : "") + ")…", "correct");
+            return fetchPrices(35).then(function (points) {
+                markLive(true);
+                applyHistory(points, "Loaded " + points.length + " hourly " + state.zone + " prices live from Energinet" + (nativeHttp() ? " (native HTTP)" : "") + ", last " +
+                    dkLabel(points[points.length - 1].utc) + " (DK).");
+            }).catch(function (err) {
+                markLive(false);
+                return loadFallback(err);
+            }).finally(function () { setBusy(false); });
+        }
+
+        function sleep(ms) { return new Promise(function (resolve) { setTimeout(resolve, ms); }); }
+
+        function onnxAvailable() { return typeof ort !== "undefined"; }
+
+        function getOnnxSession(modelSize) {
+            state.onnxSessions = state.onnxSessions || {};
+            if (state.onnxSessions[modelSize]) return state.onnxSessions[modelSize];
+            state.onnxSessions[modelSize] = _createOnnxSession(modelSize); // cache the promise too: no double downloads
+            return state.onnxSessions[modelSize];
+        }
+
+        function downloadModelBytes(modelSize, url) {
+            if (url) {
+                url = new URL(url, window.location.href).href; // absolute: WebView import()/fetch need it
+                return fetch(url).then(function (r) { if (!r.ok) throw new Error("model fetch HTTP " + r.status); return r.arrayBuffer(); });
+            }
+            if (ONNX_MODEL_PARTS[modelSize]) {
+                feedback("Downloading Timestral " + modelSize + " once (~113 MB in 4 parts, then cached in the app)…", "correct");
+                return Promise.all(ONNX_MODEL_PARTS[modelSize].map(function (u) {
+                    return fetch(u).then(function (r) { if (!r.ok) throw new Error("model part HTTP " + r.status + " " + u); return r.arrayBuffer(); });
+                })).then(function (bufs) {
+                    var total = bufs.reduce(function (a, b) { return a + b.byteLength; }, 0);
+                    var out = new Uint8Array(total), off = 0;
+                    bufs.forEach(function (b) { out.set(new Uint8Array(b), off); off += b.byteLength; });
+                    return out.buffer;
+                });
+            }
+            return Promise.reject(new Error("no on-device model for " + modelSize + " — use 5M/28M"));
+        }
+
+        // downloaded models (28M parts) persist in the WebView CacheStorage across app restarts
+        function modelBytes(modelSize, url) {
+            var ck = modelCacheKey(modelSize);
+            if (!ck || typeof caches === "undefined") return downloadModelBytes(modelSize, url);
+            return caches.open("elspot-onnx-models").then(function (c) { return c.match(ck); }).then(function (resp) {
+                if (resp) return resp.arrayBuffer().then(function (buf) {
+                    feedback("Timestral " + modelSize + " loaded from the app cache — no download.", "correct");
+                    return buf;
+                });
+                return null;
+            }).catch(function () { return null; }).then(function (buf) {
+                if (buf) return buf;
+                return downloadModelBytes(modelSize, url).then(function (b) {
+                    caches.open("elspot-onnx-models").then(function (c) { return c.put(ck, new Response(b)); }).catch(function () {});
+                    return b;
+                });
+            });
+        }
+
+        function _createOnnxSession(modelSize) {
+            var p = modelBytes(modelSize, ONNX_MODEL_URLS[modelSize]);
+            return p.then(function (buf) {
+                if (typeof ort !== "undefined") {
+                    // absolute URLs (bare "vendor/..." specifiers fail in a WebView dynamic import);
+                    // pin the plain threaded glue+wasm (ORT 1.23 defaults to the jsep variant otherwise)
+                    var base = new URL("vendor/ort/", window.location.href).href;
+                    ort.env.wasm.wasmPaths = { mjs: base + "ort-wasm-simd-threaded.mjs", wasm: base + "ort-wasm-simd-threaded.wasm" };
+                    ort.env.wasm.numThreads = 1;
+                }
+                return ort.InferenceSession.create(buf, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+            });
+        }
+
+        function fetchWeatherMap(daysBack) {
+            // DK zone point (3 vars -> ONNX weather rows) + 3 N-Germany points (6 vars -> neighbour ridge);
+            // archive (daysBack) + 8-day forecast each. Returns { dk: map, de: map }.
+            var zw = zoneConfig(state.zone);
+            var dkVars = ["wind_speed_10m", "temperature_2m", "shortwave_radiation"];
+            var deLats = DE_WX_POINTS.map(function (p) { return p[0]; }).join(",");
+            var deLons = DE_WX_POINTS.map(function (p) { return p[1]; }).join(",");
+            function q(base, extra) {
+                var params = new URLSearchParams(extra);
+                return apiGet(base + "?" + params.toString()).then(function (r) {
+                    if (!r.ok) throw new Error("Open-Meteo " + r.status);
+                    return r.json();
+                });
+            }
+            var end = new Date(), start = new Date(Date.now() - daysBack * 86400000);
+            var sd = start.toISOString().slice(0, 10), ed = end.toISOString().slice(0, 10);
+            function parseMulti(resps, vars) { // multi-location responses are arrays of per-point objects; average per hour
+                var acc = {};
+                resps.forEach(function (data) {
+                    var locs = Array.isArray(data) ? data : [data];
+                    locs.forEach(function (loc) {
+                        var h = loc.hourly || {}, times = h.time || [];
+                        vars.forEach(function (v, vi) {
+                            var col = h[v] || [];
+                            times.forEach(function (t, i) {
+                                if (i >= col.length || col[i] == null) return;
+                                var key = utcHourKey(parseHourUtc(String(t)));
+                                if (!acc[key]) acc[key] = { s: vars.map(function () { return 0; }), c: vars.map(function () { return 0; }) };
+                                acc[key].s[vi] += Number(col[i]); acc[key].c[vi]++;
+                            });
+                        });
+                    });
+                });
+                var map = {};
+                Object.keys(acc).forEach(function (key) {
+                    map[key] = acc[key].s.map(function (s, vi) { return acc[key].c[vi] > 0 ? s / acc[key].c[vi] : NaN; });
+                });
+                return map;
+            }
+            var dkReq = [
+                q("https://archive-api.open-meteo.com/v1/archive", { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: dkVars.join(","), start_date: sd, end_date: ed }),
+                q("https://api.open-meteo.com/v1/forecast", { latitude: zw.lat, longitude: zw.lon, timezone: "UTC", hourly: dkVars.join(","), forecast_days: 8 })
+            ];
+            var deReq = [
+                q("https://archive-api.open-meteo.com/v1/archive", { latitude: deLats, longitude: deLons, timezone: "UTC", hourly: DE_WX_VARS.join(","), start_date: sd, end_date: ed }),
+                q("https://api.open-meteo.com/v1/forecast", { latitude: deLats, longitude: deLons, timezone: "UTC", hourly: DE_WX_VARS.join(","), forecast_days: 8 })
+            ];
+            return Promise.all([
+                Promise.all(dkReq).then(function (r) { return parseMulti(r, dkVars); }),
+                Promise.all(deReq).then(function (r) { return parseMulti(r, DE_WX_VARS); })
+            ]).then(function (r) { return { dk: r[0], de: r[1] }; });
+        }
+
+        var DEFAULT_K = { 24: 1.5, 48: 1.4, 72: 1.35, 96: 1.35, 120: 1.35, 144: 1.35, 168: 1.35 }; // backtest fallback per horizon bucket (neighbour-covariate config)
+
+        function loadNeighbors() {
+            function toMap(snap) {
+                var m = {};
+                (snap.records || []).forEach(function (r) {
+                    if (!r.TimeUTC) return;
+                    var key = utcHourKey(parseHourUtc(String(r.TimeUTC)));
+                    var arr = m[key] || [NaN, NaN];
+                    if (r.PriceArea === "DE") arr[0] = Number(r.DayAheadPriceDKK);
+                    else if (r.PriceArea === "SE3") arr[1] = Number(r.DayAheadPriceDKK);
+                    m[key] = arr;
+                });
+                return m;
+            }
+            var remote = new URL("assets/prices-neighbors.json", PAGES_BASE + "elspot-dk2/").href;
+            return apiGet(remote).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+                .then(function (snap) { state.neighborMap = toMap(snap); })
+                .catch(function () {
+                    return fetch("assets/prices-neighbors.json").then(function (r) {
+                        if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
+                    }).then(function (snap) { state.neighborMap = toMap(snap); })
+                      .catch(function () { state.neighborMap = {}; });
+                });
+        }
+
+        function loadPreds() {
+            try { return JSON.parse(localStorage.getItem("elspot_preds") || "[]") || []; } catch (e) { return []; }
+        }
+
+        function savePreds(preds) {
+            try { localStorage.setItem("elspot_preds", JSON.stringify(preds.slice(-24 * 14))); } catch (e) {}
+        }
+
+        // conformal k per horizon bucket from stored raw predictions vs actuals
+        function calibrationFactors() {
+            var preds = loadPreds();
+            var histMap = {};
+            state.history.forEach(function (p) { histMap[p.utc.getTime()] = p.price; });
+            var byBucket = {};
+            K_BUCKETS.forEach(function (H) { byBucket[H] = []; });
+            preds.forEach(function (p) {
+                var act = histMap[p.t];
+                if (act != null) byBucket[horizonBucket(p.h)].push({ med: p.med, q10: p.q10, q90: p.q90, act: act });
+            });
+            var k = {}, bias = {};
+            K_BUCKETS.forEach(function (H) {
+                k[H] = conformalK(byBucket[H], 0.85) || DEFAULT_K[H];
+                // level bias only for day 1: at 48h+ the per-bucket sample is too small/autocorrelated and the
+                // estimate flips sign run-to-run -> overcorrection (walk-forward backtest: day6 MAE 28.1% -> 36.7%
+                // with bias vs without; day1 centered, MAE ~unchanged). Conformal k still applies to all buckets.
+                bias[H] = H === 24 ? (medianError(byBucket[H]) || 0) : 0;
+            });
+            return { k: k, bias: bias };
+        }
+
+        // One-time walk-forward seeding: re-run the model at past origins over the loaded history so
+        // elspot_preds is populated and bias/conformal-k are active on the very first RUN (then cached).
+        function seedCalibration(session, weatherMap) {
+            var preds = loadPreds();
+            var histMap = {};
+            state.history.forEach(function (p) { histMap[p.utc.getTime()] = p.price; });
+            var matured = preds.filter(function (p) { return histMap[p.t] != null; }).length;
+            if (matured >= 24 || state.history.length < ONNX_T + 72) return Promise.resolve(0);
+            var origins = seedOrigins(state.history.length, ONNX_T, 72, 10, 1); // up to 10 past days, 72h each
+            if (!origins.length) return Promise.resolve(0);
+            feedback("Seeding calibration from " + origins.length + " past days (one-time)…", "correct");
+            var chain = Promise.resolve(0);
+            origins.forEach(function (o, idx) {
+                chain = chain.then(function () {
+                    var inputs = buildOnnxInputs(state.history.slice(0, o), weatherMap.dk, state.neighborMap, weatherMap.de);
+                    return session.run({
+                        context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
+                        known_covariates: new ort.Tensor("float32", inputs.known, [1, ONNX_C, ONNX_T + ONNX_H])
+                    }).then(function (out) {
+                        var q = out.quantiles.data;
+                        var last = state.history[o - 1].utc;
+                        for (var j = 0; j < 72; j++) {
+                            var t = new Date(last.getTime() + (j + 1) * HOUR_MS);
+                            if (histMap[t.getTime()] == null) continue; // only keep hours with actuals
+                            preds.push({ h: j, t: t.getTime(), med: q[j * ONNX_Q + ONNX_MED_I],
+                                         q10: q[j * ONNX_Q + ONNX_Q10_I], q90: q[j * ONNX_Q + ONNX_Q90_I],
+                                         medD: q[j * ONNX_Q + ONNX_MED_I] });
+                        }
+                        feedback("Seeding calibration from history… " + (idx + 1) + "/" + origins.length, "correct");
+                    });
+                });
+            });
+            return chain.then(function () { savePreds(preds); return origins.length; });
+        }
+
+        function runLocal() {
+            if (!state.history.length) { feedback("No prices loaded yet — wait for LOAD PRICES (or the cached copy) first.", "wrong"); return; }
+            var modelSize = document.getElementById("modelSize").value;
+            var horizon = parseInt(document.getElementById("horizon").value, 10) || 24;
+            setBusy(true);
+            var t0 = Date.now();
+            feedback("Loading Timestral " + modelSize + " on-device (ONNX/WASM)…", "correct");
+            getOnnxSession(modelSize).then(function (session) {
+                feedback("Fetching weather (Open-Meteo)…", "correct");
+                return fetchWeatherMap(32).catch(function () { return { dk: {}, de: {} }; }).then(function (weatherMap) {
+                    return { session: session, weatherMap: weatherMap };
+                });
+            }).then(function (env) {
+                return seedCalibration(env.session, env.weatherMap).then(function (nSeed) {
+                    return { session: env.session, weatherMap: env.weatherMap, nSeed: nSeed };
+                });
+            }).then(function (env) {
+                var inputs = buildOnnxInputs(state.history, env.weatherMap.dk, state.neighborMap, env.weatherMap.de);
+                return env.session.run({
+                    context: new ort.Tensor("float32", inputs.context, [1, 1, ONNX_T]),
+                    known_covariates: new ort.Tensor("float32", inputs.known, [1, ONNX_C, ONNX_T + ONNX_H])
+                }).then(function (out) { return { out: out, nSeed: env.nSeed }; });
+            }).then(function (res) {
+                var out = res.out, nSeed = res.nSeed;
+                var q = out.quantiles.data;
+                var last = state.history[state.history.length - 1].utc;
+                var lag1 = lag1Forecast(state.history, horizon);
+                var cal = calibrationFactors();
+                var kByBucket = cal.k, biasByBucket = cal.bias;
+                var forecast = [], preds = loadPreds();
+                for (var i = 0; i < horizon; i++) {
+                    var t = new Date(last.getTime() + (i + 1) * HOUR_MS);
+                    var cal = applyCalibration(q[i * ONNX_Q + ONNX_MED_I], q[i * ONNX_Q + ONNX_Q10_I], q[i * ONNX_Q + ONNX_Q90_I],
+                        kByBucket[horizonBucket(i)], biasByBucket[horizonBucket(i)] || 0);
+                    var med = cal.med, band = [cal.q10, cal.q90];
+                    forecast.push({
+                        hour_utc: utcHourKey(t) + ":00",
+                        hour_dk: dkLabel(t),
+                        median: med,
+                        q10: band[0],
+                        q90: band[1],
+                        lag1: lag1[i]
+                    });
+                    preds.push({ h: i, t: t.getTime(), med: q[i * ONNX_Q + ONNX_MED_I],
+                                 q10: q[i * ONNX_Q + ONNX_Q10_I], q90: q[i * ONNX_Q + ONNX_Q90_I],
+                                 medD: med }); // RAW med/q10/q90 -> calibration; medD = displayed (calibrated) median
+                }
+                savePreds(preds);
+                state.forecast = forecast;
+                state.chartView = null;
+                state.calibK = kByBucket;
+                state.workflowStats = {
+                    corr_lag1: corrLag1(state.history),
+                    mae_lag1_dkk: backtestMae(state.history, lag1Forecast, 7, HOURS_PER_DAY),
+                    mae_timestral_dkk: null,
+                    wind_avg_ms: (state.workflowStats && state.workflowStats.wind_avg_ms) || null
+                };
+                renderAll();
+                if (window.console && console.log) console.log("[elspot] band k", kByBucket, "level bias DKK/MWh", biasByBucket);
+                feedback("Forecast ready — Timestral " + modelSize + " on-device, " + horizon + "h in " +
+                    ((Date.now() - t0) / 1000).toFixed(1) + "s. No API key; band & level auto-calibrated (ABOUT)." +
+                    (nSeed ? " Calibration seeded from " + nSeed + " past days." : ""), "correct");
+            }).catch(function (err) {
+                feedback("On-device run failed: " + err.message, "wrong");
+            }).finally(function () { setBusy(false); });
+        }
+
+        function runTimestral() {
+            if (!onnxAvailable()) {
+                feedback("On-device ONNX needs the Android app — see elspot-dk2-android/app-debug.apk.", "wrong");
+                return;
+            }
+            runLocal();
+        }
+
+        function loadWeatherLine() {
+            var el = document.getElementById("weatherLine");
+            var zw = zoneConfig(state.zone);
+            var params = new URLSearchParams({
+                latitude: zw.lat, longitude: zw.lon, timezone: "UTC",
+                hourly: "wind_speed_10m,temperature_2m,shortwave_radiation", forecast_days: "2"
+            });
+            apiGet(OPEN_METEO_FORECAST_URL + "?" + params.toString()).then(function (r) {
+                if (!r.ok) throw new Error("Open-Meteo " + r.status);
+                return r.json();
+            }).then(function (data) {
+                var s = summarizeWeather(data.hourly, Date.now());
+                el.textContent = s
+                    ? "Weather next 24h (Open-Meteo · " + zw.place + "): wind ~" + s.windAvg + " m/s · temp " +
+                      s.tempMin + "–" + s.tempMax + " °C · solar peak " + s.solarPeak + " W/m²"
+                    : "Weather forecast unavailable.";
+            }).catch(function () {
+                el.textContent = "Weather forecast unavailable (Open-Meteo).";
+            });
+        }
+
+        function setZone(zone) {
+            if (!ZONES[zone] || zone === state.zone) return;
+            state.zone = zone;
+            try { localStorage.setItem("elspot_zone", zone); } catch (e) {}
+            state.history = []; state.forecast = null; state.workflowStats = null; state.tariffs = null; state.chartView = null;
+            renderAll();
+            loadWeatherLine();
+            loadTariffs();
+            loadPrices();
+        }
+
+        function hideChartTip() {
+            var tip = document.getElementById("chartTip");
+            if (tip) tip.hidden = true;
+            var svg = document.getElementById("chart");
+            var line = svg.querySelector("#tipLine"), dot = svg.querySelector("#tipDot");
+            if (line) line.style.display = "none";
+            if (dot) dot.style.display = "none";
+        }
+
+        function onChartMove(ev) {
+            var g = state.chartGeom;
+            var svg = document.getElementById("chart");
+            var tip = document.getElementById("chartTip");
+            if (!g || !g.series.length) { hideChartTip(); return; }
+            var rect = svg.getBoundingClientRect();
+            if (!rect.width) return;
+            var px = (ev.clientX - rect.left) * (g.W / rect.width);
+            if (px < g.padL || px > g.W - g.padR) { hideChartTip(); return; }
+            var t = g.x0 + (px - g.padL) / (g.W - g.padL - g.padR) * (g.x1 - g.x0);
+            t = Math.max(g.x0, Math.min(g.x1, Math.round(t / HOUR_MS) * HOUR_MS));
+            var e = nearestSeriesEntry(g.series, t);
+            if (!e) { hideChartTip(); return; }
+            var lag1Val = null;
+            for (var i = 0; i < g.lag1.length; i++) if (g.lag1[i].t === e.t) lag1Val = g.lag1[i].v;
+            var x = g.X(e.t), y = g.Y(e.v);
+            var line = svg.querySelector("#tipLine"), dot = svg.querySelector("#tipDot");
+            if (line) { line.style.display = ""; line.setAttribute("x1", x); line.setAttribute("x2", x); }
+            if (dot) { dot.style.display = ""; dot.setAttribute("cx", x); dot.setAttribute("cy", y); }
+            tip.innerHTML = tipLines(e, lag1Val).map(function (l) {
+                return '<div style="color:' + l[1] + '">' + l[0] + "</div>";
+            }).join("");
+            tip.hidden = false;
+            tip.style.left = Math.max(14, Math.min(86, x / g.W * 100)) + "%";
+        }
+
+        function init() {
+            document.getElementById("aboutBtn").addEventListener("click", function () {
+                var panel = document.getElementById("aboutPanel");
+                panel.hidden = !panel.hidden;
+                this.textContent = panel.hidden ? "? ABOUT" : "× CLOSE";
+            });
+            var zoneSel = document.getElementById("zone");
+            try { state.zone = localStorage.getItem("elspot_zone") || "DK2"; } catch (e) {}
+            if (!ZONES[state.zone]) state.zone = "DK2";
+            zoneSel.value = state.zone;
+            zoneSel.addEventListener("change", function () { setZone(this.value); });
+            document.getElementById("loadBtn").addEventListener("click", function () { loadPrices(true); });
+            document.getElementById("runBtn").addEventListener("click", runTimestral);
+            document.getElementById("feesToggle").addEventListener("change", function (ev) {
+                state.showFees = ev.target.checked;
+                renderAll();
+            });
+            document.getElementById("evHours").addEventListener("change", renderAll);
+            var chartSvg = document.getElementById("chart");
+            chartSvg.addEventListener("contextmenu", function (ev) { ev.preventDefault(); });
+            var ptrs = {}, pan = null, pinch = null;
+            function curView() {
+                var g = state.chartGeom;
+                if (!g) return null;
+                return state.chartView || { start: g.full0, span: g.full1 - g.full0 };
+            }
+            function zoomBy(factor) {
+                var g = state.chartGeom, vw = curView();
+                if (!g || !vw) return;
+                var center = g.x0 + (g.x1 - g.x0) / 2;
+                state.chartView = zoomView(vw, g.full0, g.full1, CHART_MIN_SPAN_MS, factor, center);
+                hideChartTip();
+                renderChart();
+            }
+            document.getElementById("zoomIn").addEventListener("click", function () { zoomBy(1.6); });
+            document.getElementById("zoomOut").addEventListener("click", function () { zoomBy(1 / 1.6); });
+            document.getElementById("zoomReset").addEventListener("click", function () { state.chartView = null; hideChartTip(); renderChart(); });
+            chartSvg.addEventListener("pointerdown", function (ev) {
+                try { chartSvg.setPointerCapture(ev.pointerId); } catch (e) {}
+                ptrs[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+                var ids = Object.keys(ptrs);
+                if (ids.length === 2) {
+                    var a = ptrs[ids[0]], b = ptrs[ids[1]];
+                    pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, span0: (curView() || { span: 1 }).span };
+                    pan = null;
+                } else {
+                    pan = { x0: ev.clientX, view0: curView(), moved: false };
+                }
+                onChartMove(ev);
+            });
+            chartSvg.addEventListener("pointermove", function (ev) {
+                if (ptrs[ev.pointerId]) ptrs[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+                var g = state.chartGeom;
+                var ids = Object.keys(ptrs);
+                if (pinch && ids.length >= 2 && g) {
+                    var a = ptrs[ids[0]], b = ptrs[ids[1]];
+                    var d = Math.hypot(a.x - b.x, a.y - b.y);
+                    if (d > 12 && pinch.d0 > 12) {
+                        var rect = chartSvg.getBoundingClientRect();
+                        var px = ((a.x + b.x) / 2 - rect.left) * (g.W / rect.width);
+                        var t = g.x0 + (px - g.padL) / (g.W - g.padL - g.padR) * (g.x1 - g.x0);
+                        state.chartView = zoomView({ start: g.full0, span: pinch.span0 }, g.full0, g.full1,
+                                                   CHART_MIN_SPAN_MS, d / pinch.d0, t);
+                        hideChartTip();
+                        renderChart();
+                    }
+                    return;
+                }
+                if (pan && g) {
+                    var dx = ev.clientX - pan.x0;
+                    if (Math.abs(dx) > 6) pan.moved = true;
+                    if (pan.moved && pan.view0) {
+                        var r2 = chartSvg.getBoundingClientRect();
+                        if (r2.width) {
+                            var msPerPxVb = (g.x1 - g.x0) / (g.W - g.padL - g.padR);
+                            var dMs = -dx * (g.W / r2.width) * msPerPxVb;
+                            state.chartView = panView(pan.view0, g.full0, g.full1, CHART_MIN_SPAN_MS, dMs);
+                            renderChart();
+                            onChartMove(ev); // tooltip keeps tracking the finger while panning
+                        }
+                        return;
+                    }
+                }
+                onChartMove(ev);
+            });
+            function ptrEnd(ev) {
+                delete ptrs[ev.pointerId];
+                var ids = Object.keys(ptrs);
+                if (!ids.length) {
+                    pinch = null;
+                    if (pan && !pan.moved) onChartMove(ev); // tap -> tooltip
+                    pan = null;
+                } else if (ids.length === 1) {
+                    pinch = null; // lift one finger of a pinch -> continue as pan
+                    var p = ptrs[ids[0]], vw = curView();
+                    if (vw) pan = { x0: p.x, view0: vw, moved: true };
+                }
+            }
+            chartSvg.addEventListener("pointerup", ptrEnd);
+            chartSvg.addEventListener("pointerleave", function (ev) { hideChartTip(); ptrEnd(ev); });
+            chartSvg.addEventListener("pointercancel", function (ev) { hideChartTip(); ptrEnd(ev); });
+            loadWeatherLine();
+            loadTariffs();
+            loadNeighbors();
+            loadPrices();
+        }
+
+        if (typeof document !== "undefined") init();
+    </script>
+</body>
+</html>
