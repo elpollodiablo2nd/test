@@ -479,11 +479,12 @@
             return [med - k * (med - q10), med + k * (q90 - med)];
         }
 
-        // level bias = translate the whole distribution (median AND band), then conformal k around the
-        // shifted median; clamped so the median is always inside [q10, q90]
+        // level correction: bias = median past (med - act) = over-prediction, so SUBTRACT it from the
+        // whole distribution (median AND band), then conformal k around the shifted median;
+        // clamped so the median is always inside [q10, q90]
         function applyCalibration(medRaw, q10raw, q90raw, k, bias) {
             var b = bias || 0;
-            var med = medRaw + b, lo = q10raw + b, hi = q90raw + b;
+            var med = medRaw - b, lo = q10raw - b, hi = q90raw - b;
             var band = scaleBand(med, lo, hi, k);
             return { med: med, q10: Math.min(band[0], med), q90: Math.max(band[1], med) };
         }
@@ -1549,7 +1550,7 @@
             var k = {}, bias = {};
             K_BUCKETS.forEach(function (H) {
                 k[H] = conformalK(byBucket[H], 0.85) || DEFAULT_K[H];
-                bias[H] = medianError(byBucket[H]) || 0; // level correction: shift p50 by median past error
+                bias[H] = medianError(byBucket[H]) || 0; // median past over-prediction (med-act); subtracted in applyCalibration
             });
             return { k: k, bias: bias };
         }

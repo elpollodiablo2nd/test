@@ -283,11 +283,11 @@ check("scaleBand widens by k", JSON.stringify(Core.scaleBand(100, 80, 120, 2)) =
 check("scaleBand no k -> unchanged", JSON.stringify(Core.scaleBand(100, 80, 120, NaN)) === JSON.stringify([80, 120]));
 
 // applyCalibration: level bias translates the whole curve; median always inside [q10, q90]
-const ac = Core.applyCalibration(100, 80, 120, 1, 50); // big +50 bias
-check("applyCalibration translates curve", ac.med === 150 && ac.q10 === 130 && ac.q90 === 170);
+const ac = Core.applyCalibration(100, 80, 120, 1, 50); // bias +50 = over-predicted by 50 -> shift DOWN
+check("applyCalibration subtracts over-prediction bias", ac.med === 50 && ac.q10 === 30 && ac.q90 === 70);
 check("applyCalibration median inside band (big bias)", ac.q10 <= ac.med && ac.med <= ac.q90);
 const ac2 = Core.applyCalibration(100, 80, 120, 2, -300); // big negative bias
-check("applyCalibration negative bias, median inside", ac2.med === -200 && ac2.q10 <= ac2.med && ac2.med <= ac2.q90 && ac2.q10 === -240 && ac2.q90 === -160);
+check("applyCalibration negative bias (under-prediction -> shift up), median inside", ac2.med === 400 && ac2.q10 <= ac2.med && ac2.med <= ac2.q90 && ac2.q10 === 360 && ac2.q90 === 440);
 const ac3 = Core.applyCalibration(100, 80, 120, 1, 0);
 check("applyCalibration zero bias unchanged", ac3.med === 100 && ac3.q10 === 80 && ac3.q90 === 120);
 const ac4 = Core.applyCalibration(100, 130, 140, 1, 0); // non-monotone raw (q10 > med) -> clamped
