@@ -254,7 +254,7 @@
             <p class="dim"><b>elspot</b> forecasts Danish day-ahead electricity prices — pick <b>DK2 · EAST</b> (default) or <b>DK1 · WEST</b> in the RUN card (remembered). Everything runs <b>on your device</b>: no API key, no server.</p>
             <p><b>What Timestral is:</b> <a href="https://mistral.ai/news/timestral/">Timestral</a> is Mistral AI's open time-series <b>foundation model</b> — a small patch-transformer that reads the past of a series (here: up to 768 hourly prices) and predicts every future hour at once as <b>21 quantiles</b>, i.e. a full uncertainty curve, not just a point estimate. We use it <b>zero-shot</b> — never retrained — and only feed it context + covariates. In the Android app it runs fully offline as an ONNX graph on the phone CPU (~1–5 s): the <b>5M</b> checkpoint is bundled in the APK, the <b>28M</b> (default, more accurate) is downloaded once from this page and then kept in the app cache. A plain browser has no ONNX runtime, so RUN TIMESTRAL there just explains this.</p>
             <p><b>Data:</b> prices load automatically — live from Energinet (retries + Retry-After); if the network blocks it, the <b>Pages snapshot</b> (CI-refreshed every 30 min, Nord Pool fallback), then the local cache (freshest wins), then the snapshot bundled in the APK. The banner always names the source; <b>LOAD PRICES</b> forces a live retry. With <b>INCL. FEES+VAT</b> ticked, prices include the mandatory fees — Energinet transmission + system tariff + elafgift, the DSO Nettarif C of your zone (N1 for DK2, TREFOR for DK1; seasonal changes automatic via ValidFrom/ValidTo) — plus 25% VAT: what you actually pay per kWh.</p>
-            <p><b>A run:</b> RUN TIMESTRAL feeds the price history plus <b>covariates</b> to the model: weather at your zone (Open-Meteo), <b>DE/SE3 day-ahead prices</b> — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — N-German weather, and hour-of-day/weekday encodings. DE/SE3 prices are published only to ~+36h; beyond that the app fills them with a small on-device <b>ridge forecast</b> (N-German weather + calendar, trained on published hours at run time), which cut day 3–7 error from 32–45% to <b>24–28%</b>. Output: the orange dashed <b>median</b> with a red <b>q10–q90 band</b>, recalibrated on-device from past forecast errors (conformal band width; day-1 level-bias correction) — on the first RUN the app re-runs the last ~10 days on-device to seed this immediately, then it updates itself daily. Horizons: <b>24–168h (7 days)</b>. The chart starts at the current hour: green = published day-ahead, then the forecast; the cream dashed <b>baseline</b> is the naive reference "tomorrow repeats today's hourly pattern", shown so you can see what the AI adds. Zoom the chart with the <b>+ / − / 1×</b> buttons next to the zone picker, by pinching, or by dragging sideways — labels grow and re-step (down to 1h) as you zoom; tap a point for exact values. The green shaded <b>EV window</b> is the cheapest contiguous 4/6/8h charge run from now; the grid below lists every hour in kr/kWh with its q10–q90 range.</p>
+            <p><b>A run:</b> RUN TIMESTRAL feeds the price history plus <b>covariates</b> to the model: weather at your zone (Open-Meteo), <b>DE/SE3 day-ahead prices</b> — the strongest signal (full-year backtest h24 MAE 16.5% → <b>4.0%</b>) — N-German weather, and hour-of-day/weekday encodings. DE/SE3 prices are published only to ~+36h; beyond that the app fills them with a small on-device <b>ridge forecast</b> (N-German weather + calendar, trained on published hours at run time), which cut day 3–7 error from 32–45% to <b>24–28%</b>. Output: the orange dashed <b>median</b> with a red <b>q10–q90 band</b>, recalibrated on-device from past forecast errors (conformal band width; day-1 level-bias correction) — on the first RUN the app re-runs the last ~10 days on-device to seed this immediately, then it updates itself daily. Horizons: <b>24–168h (7 days)</b>. The chart shows the last 24 h of actual prices leading into the NOW line (with the purple past-median trace of earlier forecasts drawn on top), then published day-ahead + forecast; the cream dashed <b>baseline</b> is the naive reference "tomorrow repeats today's hourly pattern", shown so you can see what the AI adds. Zoom the chart with the <b>+ / − / 1×</b> buttons next to the zone picker, by pinching, or by dragging sideways — labels grow and re-step (down to 1h) as you zoom; tap a point for exact values. The green shaded <b>EV window</b> is the cheapest contiguous 4/6/8h charge run from now; the grid below lists every hour in kr/kWh with its q10–q90 range.</p>
             <p><b>Accuracy</b> (DK2 backtests, MAE as % of mean price): full-year 28M: h24 <b>4.0%</b>, h48 8.7%, h72 12.3%; 7-month 7-day run with the ridge fill: day1 6.3% → day2 16.0% → day3 27.7% → day7 26.9% (naive baseline 28–51%). For reference, published competitors land at ~19–25% (elforbrug.nu) and 15–22% (elpriser.dk; their day-1 is scored pre-auction) from day 1. The largest remaining errors are wind-gust hours beyond +36h. Negative prices (92% of them occur in hours with wind >15 m/s) are forecastable — the ONNX export is not clamped at 0.</p>
             <p class="dim">Sources: prices &amp; fees — <a href="https://www.energidataservice.dk/tso-electricity/DayAheadPrices">Energi Data Service (Energinet)</a>, DayAheadPrices (day-ahead, published daily ~13:00 CET) + DatahubPricelist (Energinet GLN 5790000432752; N1 5790001089030 DK2; TREFOR 5790000392261 DK1); weather — <a href="https://open-meteo.com/">Open-Meteo</a>; model — <a href="https://docs.mistral.ai/models/timestral-1-0-28m">Mistral Timestral 1.0</a>, ONNX-exported and bundled in <b>elspot-dk2-android/</b>; snapshots refreshed every 30 min by a GitHub Actions workflow. Full docs: <a href="README.md">README.md</a>.</p>
             <p id="weatherLine" class="dim" style="margin-top:0.6rem"></p>
@@ -1148,10 +1148,6 @@
                 var bw = bestWindowEntries(series, evH);
                 if (bw) items.push(["EV " + evH + "H FROM " + bw.start.slice(11, 16), fmtKwh(bw.avg) + " KR/KWH", "#8CFF6B"]);
             }
-            var histMapS = {};
-            state.history.forEach(function (p) { histMapS[p.utc.getTime()] = p.price; });
-            var acc = fcMaePct(loadPreds(), histMapS, 24);
-            if (acc) items.push(["FC MAE 24H", acc.maePct.toFixed(1) + "% · n=" + acc.n, "#C792EA"]);
             document.getElementById("stats").innerHTML = items.map(function (it) {
                 return '<div class="stat-item"><div class="stat-value" style="color:' + it[2] + '">' + it[1] +
                     '</div><div class="stat-label">' + it[0] + "</div></div>";
@@ -1169,7 +1165,7 @@
             var fcLen = fc && fc.length ? fc.length : HOURS_PER_DAY;
             var lastUtc = history.length ? history[history.length - 1].utc.getTime()
                                          : parseHourUtc(fc[0].hour_utc).getTime() - HOUR_MS;
-            var x0f = history.length ? nowMs : lastUtc;
+            var x0f = history.length ? Math.max(history[0].utc.getTime(), nowMs - 24 * HOUR_MS) : lastUtc;
             var x1f = lastUtc + Math.max(HOURS_PER_DAY, fcLen) * HOUR_MS;
             if (x1f <= x0f) x1f = x0f + HOURS_PER_DAY * HOUR_MS;
             var vw = state.chartView ? clampView(state.chartView, x0f, x1f, CHART_MIN_SPAN_MS)
@@ -1179,9 +1175,14 @@
             var pads = chartPads(axisPx);
             var padL = pads.padL, padB = pads.padB;
             var series = combinedSeries(history, fc, nowMs, tariffs, state.showFees);
+            history.forEach(function (p) {
+                var t = p.utc.getTime();
+                if (t >= x0f && t < nowMs) series.push({ t: t, dk: dkLabel(p.utc), v: dispDkkMwh(p.price, t, tariffs, state.showFees), kind: "pub", lo: null, hi: null });
+            });
+            series.sort(function (a, b) { return a.t - b.t; });
             var histMapC = {};
             history.forEach(function (p) { histMapC[p.utc.getTime()] = p.price; });
-            var pastFc = pastForecastSeries(loadPreds(), histMapC, x0f - 30 * HOUR_MS, x1f);
+            var pastFc = pastForecastSeries(loadPreds(), histMapC, x0f, x1f);
             var inView = function (t) { return t >= x0 - HOUR_MS && t <= x1 + HOUR_MS; };
             var vis = series.filter(function (e) { return inView(e.t); });
             var allVals = (vis.length ? vis : series).map(function (e) { return e.v; });
@@ -1237,7 +1238,7 @@
                 s += '<polyline class="line-lag1" points="' + lag1Tip.map(function (p) { return X(p.t) + "," + Y(p.v); }).join(" ") + '"/>';
             }
             var evH = parseInt(document.getElementById("evHours").value, 10) || 6;
-            var bw = series.length ? bestWindowEntries(series, evH) : null;
+            var bw = series.length ? bestWindowEntries(series.filter(function (e) { return e.t >= nowMs; }), evH) : null;
             if (bw) {
                 s += '<rect class="ev-window" x="' + X(bw.startT) + '" y="' + padT + '" width="' + Math.max(4, X(bw.endT) - X(bw.startT)) + '" height="' + (H - padT - padB) + '"/>' +
                      '<text class="axis" x="' + ((X(bw.startT) + X(bw.endT)) / 2) + '" y="' + (padT + Math.round(axisPx * 0.5)) + '" text-anchor="middle">EV</text>';
